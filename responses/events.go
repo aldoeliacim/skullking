@@ -11,13 +11,13 @@ func GameCreatedEvent(gameId, lobbyId string) (string, error) {
 	type GameCreatedContent struct {
 		GameId   string `json:"gameId"`
 		LobbyId  string `json:"lobbyId"`
-		GameName string `json:"gameName"`
+		GameSlug string `json:"gameSlug"`
 	}
 
 	var content = GameCreatedContent{
 		GameId:   gameId,
 		LobbyId:  lobbyId,
-		GameName: "skullking",
+		GameSlug: "skull-king",
 	}
 
 	return parseEvent("GameCreated", content)
