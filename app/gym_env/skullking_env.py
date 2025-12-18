@@ -75,15 +75,15 @@ class SkullKingEnv(gym.Env):
         self.bots: List[Any] = []
 
         # Observation space: vectorized game state
-        # Cards: 71 cards (one-hot encoded)
+        # Cards: 63 physical cards; 71 one-hot indices (CardId values 1-71)
         # Player hand: 10 slots (max cards in round 10)
         # Trick cards: 7 slots (max players)
         # Bids: 7 players x 11 possible bids (0-10)
         # Scores: 7 players (normalized)
         # Metadata: round number, tricks won, etc.
         obs_size = (
-            10 * 71  # Hand (10 cards x 71 card types)
-            + 7 * 71  # Trick cards (7 players x 71 card types)
+            10 * 71  # Hand (10 cards x 71 card id indices)
+            + 7 * 71  # Trick cards (7 players x 71 card id indices)
             + 7 * 11  # Bids (7 players x 11 bids)
             + 7  # Scores
             + 7  # Tricks won this round
