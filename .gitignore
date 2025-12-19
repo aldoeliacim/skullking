@@ -1,22 +1,58 @@
-.idea
-.env
-private.key
-public.key
 # Python
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 *.so
 .Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-.pytest_cache/
-.coverage
-htmlcov/
-.env
-.venv/
+.installed.cfg
+*.egg
+
+# Virtual environments
 venv/
 ENV/
 env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Trained models (too large for git)
+models/
+
+# Poetry
 poetry.lock
+
+# OS
+.DS_Store
