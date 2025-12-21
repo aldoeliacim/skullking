@@ -126,6 +126,7 @@ class SkullKingEnvEnhanced(gym.Env):
 
         # Start first round
         self.game.start_new_round()
+        self.game.state = GameState.BIDDING  # CRITICAL FIX: Set state to BIDDING
         self.invalid_move_count = 0
         self.previous_score = 0
         self.previous_tricks_won = 0
@@ -151,8 +152,10 @@ class SkullKingEnvEnhanced(gym.Env):
         # Execute action based on game state
         if self.game.state == GameState.BIDDING:
             # Action is bid amount
-            bid = min(action, self.game.get_current_round().number)
-            agent_player.set_bid(bid)
+            current_round = self.game.get_current_round()
+            bid = min(action, current_round.number)
+            agent_player.bid = bid
+            current_round.add_bid(self.agent_player_id, bid)
 
             # Have bots make their bids
             for bot_id, bot in self.bots:
@@ -160,10 +163,11 @@ class SkullKingEnvEnhanced(gym.Env):
                 if bot_player and bot_player.bid is None:
                     bot_bid = bot.make_bid(
                         self.game,
-                        self.game.get_current_round().number,
+                        current_round.number,
                         bot_player.hand,
                     )
-                    bot_player.set_bid(bot_bid)
+                    bot_player.bid = bot_bid
+                    current_round.add_bid(bot_id, bot_bid)
 
             # Transition to picking after all bids
             if self._all_players_bid():
@@ -418,10 +422,6 @@ class SkullKingEnvEnhanced(gym.Env):
             next_index = (player.index + 1) % self.num_players
             current_trick.picking_player_id = self.game.players[next_index].id
 
-            # If next player is bot, have them play
-            if current_trick.picking_player_id != self.agent_player_id:
-                self._bots_play_cards()
-
         return True
 
     def _end_round(self) -> None:
@@ -438,35 +438,62 @@ class SkullKingEnvEnhanced(gym.Env):
             self.game.start_new_round()
             self.game.state = GameState.BIDDING
         else:
-            self.game.state = GameState.FINISHED
+            self.game.state = GameState.ENDED
 
     def _bots_play_cards(self) -> None:
-        """Have bots play their cards."""
+        """Have bots play their cards until it's the agent's turn (iterative, no recursion)."""
         if not self.game:
             return
 
-        current_round = self.game.get_current_round()
-        if not current_round:
-            return
+        # Safety limit to prevent infinite loops
+        max_iterations = 100
+        iterations = 0
 
-        current_trick = current_round.get_current_trick()
-        if not current_trick:
-            return
+        while iterations < max_iterations:
+            iterations += 1
 
-        for bot_id, bot in self.bots:
-            if current_trick.picking_player_id != bot_id:
-                continue
+            # Check game state
+            if self.game.state == GameState.ENDED:
+                break
 
-            player = self.game.get_player(bot_id)
-            if not player:
-                continue
+            current_round = self.game.get_current_round()
+            if not current_round:
+                break
 
-            # Bot picks a card
-            card_to_play = bot.pick_card(
-                self.game, player.hand, current_trick.get_all_card_ids()
-            )
-            self._play_card(bot_id, card_to_play)
-            return  # Exit after one bot plays to avoid recursion
+            # If we're in bidding state, stop (agent needs to bid)
+            if self.game.state == GameState.BIDDING:
+                break
+
+            current_trick = current_round.get_current_trick()
+            if not current_trick:
+                break
+
+            # Check whose turn it is
+            picking_player_id = current_trick.picking_player_id
+
+            # If it's the agent's turn, stop
+            if picking_player_id == self.agent_player_id:
+                break
+
+            # Find the bot whose turn it is
+            bot_found = False
+            for bot_id, bot in self.bots:
+                if picking_player_id == bot_id:
+                    player = self.game.get_player(bot_id)
+                    if not player:
+                        break
+
+                    # Bot picks and plays a card
+                    card_to_play = bot.pick_card(
+                        self.game, player.hand, current_trick.get_all_card_ids()
+                    )
+                    self._play_card(bot_id, card_to_play)
+                    bot_found = True
+                    break
+
+            # If no bot was found for current player, something's wrong - break to avoid infinite loop
+            if not bot_found:
+                break
 
     def render(self) -> Optional[str]:
         """Render the environment."""
