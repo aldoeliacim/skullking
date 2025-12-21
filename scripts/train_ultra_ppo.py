@@ -136,14 +136,13 @@ def train_ultra_ppo(
         vec_env_cls=SubprocVecEnv,
     )
 
-    # Create evaluation environment (wrapped with Monitor for proper evaluation)
-    # TEMPORARILY DISABLED - debugging hang issue
-    # print("Creating evaluation environment...")
-    # eval_env = make_vec_env(
-    #     lambda: create_enhanced_env("rule_based", "medium"),
-    #     n_envs=1,
-    #     vec_env_cls=DummyVecEnv,
-    # )
+    # Create evaluation environment
+    print("Creating evaluation environment...")
+    eval_env = make_vec_env(
+        lambda: create_enhanced_env("rule_based", "medium"),
+        n_envs=1,
+        vec_env_cls=DummyVecEnv,
+    )
 
     # Curriculum callback
     curriculum_cb = CurriculumCallback(curriculum, vec_env, verbose=1)
@@ -157,16 +156,15 @@ def train_ultra_ppo(
     )
 
     # Evaluation callback (evaluate every 50k steps)
-    # TEMPORARILY DISABLED - debugging hang issue
-    # eval_cb = EvalCallback(
-    #     eval_env,
-    #     best_model_save_path=f"{save_dir}/best_model",
-    #     log_path=f"{save_dir}/eval_logs",
-    #     eval_freq=50_000 // n_envs,
-    #     n_eval_episodes=10,
-    #     deterministic=True,
-    #     render=False,
-    # )
+    eval_cb = EvalCallback(
+        eval_env,
+        best_model_save_path=f"{save_dir}/best_model",
+        log_path=f"{save_dir}/eval_logs",
+        eval_freq=50_000 // n_envs,
+        n_eval_episodes=5,  # Reduced from 10 for faster evaluation
+        deterministic=True,
+        render=False,
+    )
 
     # Create or load PPO model
     if load_path and os.path.exists(load_path):
@@ -205,10 +203,10 @@ def train_ultra_ppo(
 
     print("\n🏋️ Starting training...\n")
 
-    # Train with all callbacks (eval temporarily disabled)
+    # Train with all callbacks
     model.learn(
         total_timesteps=total_timesteps,
-        callback=[curriculum_cb, checkpoint_cb],  # eval_cb removed temporarily
+        callback=[curriculum_cb, checkpoint_cb, eval_cb],
         progress_bar=True,
     )
 
@@ -216,7 +214,7 @@ def train_ultra_ppo(
     final_path = f"{save_dir}/ultra_ppo_final"
     model.save(final_path)
     vec_env.close()
-    # eval_env.close()  # Temporarily disabled
+    eval_env.close()
 
     print(f"\n✅ Training complete!")
     print(f"Final model saved to: {final_path}.zip")
