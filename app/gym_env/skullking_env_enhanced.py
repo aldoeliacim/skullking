@@ -94,14 +94,27 @@ class SkullKingEnvEnhanced(gym.Env):
         self.game = Game(id="env_game", slug="env-game")
 
         # Create agent player
-        agent_player = Player(name="Agent")
-        self.agent_player_id = agent_player.id
+        self.agent_player_id = "agent_0"
+        agent_player = Player(
+            id=self.agent_player_id,
+            username="Agent",
+            game_id=self.game.id,
+            index=0,
+            is_bot=False,
+        )
         self.game.add_player(agent_player)
 
         # Create bot opponents
         self.bots = []
         for i in range(self.num_players - 1):
-            bot_player = Player(name=f"Bot{i+1}")
+            bot_id = f"bot_{i}"
+            bot_player = Player(
+                id=bot_id,
+                username=f"Bot{i+1}",
+                game_id=self.game.id,
+                index=i + 1,
+                is_bot=True,
+            )
             self.game.add_player(bot_player)
 
             if self.opponent_bot_type == "random":
