@@ -172,14 +172,15 @@ def train_masked_ppo(
         )
     else:
         print("\nCreating new MaskablePPO model...")
-        print("Optimized Hyperparameters:")
+        print("Improved Hyperparameters (v2):")
         print("  learning_rate: 1e-4 (stable with masking)")
         print("  n_steps: 4096 (more samples per update)")
         print("  batch_size: 128 (better gradient estimates)")
-        print("  n_epochs: 15 (more gradient steps)")
+        print("  n_epochs: 20 (MORE updates for value function)")
         print("  gamma: 0.995 (longer horizon)")
-        print("  gae_lambda: 0.98 (better advantage)")
-        print("  ent_coef: 0.02 (more exploration)")
+        print("  gae_lambda: 0.99 (BETTER long-term credit)")
+        print("  ent_coef: 0.02 (exploration)")
+        print("  vf_coef: 1.0 (STRONGER value function learning)")
         print()
 
         model = MaskablePPO(
@@ -188,12 +189,12 @@ def train_masked_ppo(
             learning_rate=1e-4,
             n_steps=4096,
             batch_size=128,
-            n_epochs=15,
+            n_epochs=20,  # Increased from 15
             gamma=0.995,
-            gae_lambda=0.98,
+            gae_lambda=0.99,  # Increased from 0.98
             clip_range=0.15,
             ent_coef=0.02,
-            vf_coef=0.5,
+            vf_coef=1.0,  # Increased from 0.5
             max_grad_norm=0.5,
             verbose=1,
             tensorboard_log=f"{save_dir}/tensorboard",

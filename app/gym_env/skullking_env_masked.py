@@ -357,33 +357,32 @@ class SkullKingEnvMasked(gym.Env):
         return 0.0
 
     def _calculate_round_reward(self, agent_player: Player, current_round) -> float:
-        """Round completion reward (bidding accuracy)."""
+        """Round completion reward (bidding accuracy) - NORMALIZED."""
         bid = agent_player.bid if agent_player.bid is not None else 0
         tricks_won = current_round.get_tricks_won(self.agent_player_id)
         bid_accuracy = abs(bid - tricks_won)
 
+        # Normalized scale: -5 to +5 (was -80 to +20)
         if bid_accuracy == 0:
-            return 20.0  # Perfect bid!
+            return 5.0  # Perfect bid!
         elif bid_accuracy == 1:
-            return 8.0  # Close
+            return 2.0  # Close
         elif bid_accuracy == 2:
-            return -3.0
+            return -1.0
         else:
-            return -8.0 * bid_accuracy
+            return -5.0  # Bad bid (capped)
 
     def _calculate_game_reward(self, agent_player: Player) -> float:
-        """Final game reward (ranking)."""
+        """Final game reward (ranking) - NORMALIZED."""
         leaderboard = self.game.get_leaderboard()
         agent_rank = next(
             (i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id),
             3
         )
 
-        rank_rewards = [50, 15, -10, -35]
+        # Normalized scale: -5 to +10 (was -35 to +80)
+        rank_rewards = [10, 3, -2, -5]
         reward = rank_rewards[min(agent_rank, 3)]
-
-        if agent_rank == 0:
-            reward += 30  # Win bonus
 
         return reward
 
