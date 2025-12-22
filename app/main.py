@@ -6,7 +6,10 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import uvicorn
+import os
 
 from app.api.routes import router
 from app.api.websocket import websocket_manager
@@ -35,14 +38,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.log_service = LogService()
     app.state.publisher_service = PublisherService()
 
-    # Initialize repository (will connect to MongoDB)
+    # Initialize repository (optional - will use in-memory storage if connection fails)
     app.state.game_repository = GameRepository()
-    await app.state.game_repository.connect()
+    try:
+        await app.state.game_repository.connect()
+        print("✅ Connected to MongoDB")
+    except Exception as e:
+        print(f"⚠ Could not connect to MongoDB: {e}. Using in-memory storage.")
+        app.state.game_repository = None
 
     # Start WebSocket manager background task
     websocket_task = asyncio.create_task(websocket_manager.run())
 
     print("✅ Server started successfully")
+    print(f"🌐 Access the game at: http://localhost:{settings.port}")
 
     yield
 
@@ -56,11 +65,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except asyncio.CancelledError:
         pass
 
-    # Close database connection
-    await app.state.game_repository.disconnect()
+    # Close database connection if exists
+    if app.state.game_repository:
+        try:
+            await app.state.game_repository.disconnect()
+        except:
+            pass
 
     # Close Redis connection
-    await app.state.publisher_service.close()
+    try:
+        await app.state.publisher_service.close()
+    except:
+        pass
 
     print("✅ Server shutdown complete")
 
@@ -85,10 +101,18 @@ app.add_middleware(
 # Include routers
 app.include_router(router)
 
+# Mount static files
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
 @app.get("/")
-async def root() -> dict[str, str]:
-    """Root endpoint."""
+async def root():
+    """Serve the main game UI."""
+    static_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(static_path):
+        return FileResponse(static_path)
     return {
         "message": "Skull King API",
         "version": "2.0.0",
