@@ -1,22 +1,22 @@
 """FastAPI main application."""
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import uvicorn
-import os
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.api.websocket import websocket_manager
 from app.config import settings
 from app.repositories.game_repository import GameRepository
-from app.services.publisher_service import PublisherService
 from app.services.log_service import LogService
+from app.services.publisher_service import PublisherService
 
 
 @asynccontextmanager
@@ -69,13 +69,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if app.state.game_repository:
         try:
             await app.state.game_repository.disconnect()
-        except:
+        except Exception:
             pass
 
     # Close Redis connection
     try:
         await app.state.publisher_service.close()
-    except:
+    except Exception:
         pass
 
     print("✅ Server shutdown complete")
@@ -109,7 +109,7 @@ if os.path.exists(static_dir):
 
 @app.get("/")
 async def root():
-    """Serve the main game UI."""
+    """Serve the main game UI or API info."""
     static_path = os.path.join(static_dir, "index.html")
     if os.path.exists(static_path):
         return FileResponse(static_path)
