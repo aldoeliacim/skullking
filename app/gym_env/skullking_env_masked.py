@@ -226,7 +226,7 @@ class SkullKingEnvMasked(gym.Env):
         # DENSE REWARD: Round completion rewards
         if current_round and current_round.is_complete():
             reward += self._calculate_round_reward(agent_player, current_round)
-            current_round.update_scores()
+            current_round.calculate_scores()
 
         # Check if game is over
         if self.game.is_game_complete():
@@ -264,7 +264,7 @@ class SkullKingEnvMasked(gym.Env):
         if self._all_players_bid():
             self.game.state = GameState.PICKING
             self._start_new_trick()
-            self._bots_play_cards()
+            # Bots will play in step() after this returns
 
         return True
 
@@ -397,19 +397,20 @@ class SkullKingEnvMasked(gym.Env):
 
     def _evaluate_card_strength(self, card: Card) -> float:
         """Evaluate card strength (0.0 to 1.0)."""
-        if card.is_skull_king():
-            return 1.0
+        if card.is_king():
+            return 0.9  # King (includes Skull King)
         elif card.is_pirate():
             return 0.8
-        elif card.is_king():
-            return 0.7
         elif card.is_mermaid():
             return 0.3
         elif card.is_escape():
             return 0.1
-        else:
+        elif card.is_standard_suit():
             # Suited cards: value-based (1-14)
-            return 0.3 + (card.value / 14.0) * 0.4
+            return 0.3 + (card.number / 14.0) * 0.4 if card.number else 0.3
+        else:
+            # Other special cards (whale, kraken, etc.)
+            return 0.5
 
     def _get_observation(self) -> np.ndarray:
         """COMPACT OBSERVATIONS: 151 dims."""
@@ -493,7 +494,7 @@ class SkullKingEnvMasked(gym.Env):
                 self._count_card_type(agent_player.hand, lambda c: c.is_pirate()) / 5.0,
                 self._count_card_type(agent_player.hand, lambda c: c.is_king()) / 4.0,
                 self._count_card_type(agent_player.hand, lambda c: c.is_mermaid()) / 2.0,
-                self._count_card_type(agent_player.hand, lambda c: not c.is_special() and c.value >= 10) / 10.0,
+                self._count_card_type(agent_player.hand, lambda c: c.is_standard_suit() and c.number >= 10) / 10.0,
             ])
         else:
             obs.extend([0.0] * 4)
@@ -501,23 +502,31 @@ class SkullKingEnvMasked(gym.Env):
         return np.array(obs, dtype=np.float32)
 
     def _encode_card_compact(self, card: Card) -> List[float]:
-        """Encode card with 9 features: suit (5) + value (1) + special flags (3)."""
+        """Encode card with 9 features: card_type (5) + number (1) + special flags (3)."""
         encoding = []
 
-        # Suit one-hot (5 dims)
-        suits = ['black', 'green', 'purple', 'yellow', 'escape']
-        suit_vec = [0.0] * 5
-        if card.suit and card.suit.value in suits:
-            suit_vec[suits.index(card.suit.value)] = 1.0
-        encoding.extend(suit_vec)
+        # Card type one-hot (5 dims) - group similar types
+        # Group 1: Standard suits (has number), Group 2-5: Special cards
+        card_type_vec = [0.0] * 5
+        if card.is_standard_suit():
+            card_type_vec[0] = 1.0  # Standard suit card
+        elif card.is_pirate():
+            card_type_vec[1] = 1.0  # Pirate
+        elif card.is_king():
+            card_type_vec[2] = 1.0  # King/Skull King
+        elif card.is_mermaid():
+            card_type_vec[3] = 1.0  # Mermaid
+        elif card.is_escape():
+            card_type_vec[4] = 1.0  # Escape/Tigress
+        encoding.extend(card_type_vec)
 
-        # Value (1 dim, normalized)
-        encoding.append(card.value / 14.0 if card.value else 0.0)
+        # Number (1 dim, normalized) - only meaningful for standard suits
+        encoding.append(card.number / 14.0 if card.number else 0.0)
 
-        # Special flags (3 dims)
+        # Special flags (3 dims) - quick lookup for strategy
         encoding.extend([
             1.0 if card.is_pirate() else 0.0,
-            1.0 if card.is_king() or card.is_skull_king() else 0.0,
+            1.0 if card.is_king() else 0.0,
             1.0 if card.is_mermaid() else 0.0,
         ])
 
@@ -610,7 +619,7 @@ class SkullKingEnvMasked(gym.Env):
 
         current_round = self.game.get_current_round()
         if current_round:
-            current_round.update_scores()
+            current_round.calculate_scores()
 
         if len(self.game.rounds) < MAX_ROUNDS:
             self.game.start_new_round()
