@@ -3,29 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="app.title">Skull King - Card Game</title>
+    <title data-i18n="app.title">Skull King</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏴‍☠️</text></svg>">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
         <!-- Language Switcher -->
-        <div class="language-switcher">
-            <button id="lang-toggle" class="btn btn-small" title="Switch language">
-                <span id="lang-flag">EN</span>
-            </button>
-        </div>
+        <button id="lang-toggle" class="lang-btn" title="Switch language">
+            <span id="lang-flag">EN</span>
+        </button>
 
         <!-- Login Screen -->
         <div id="login-screen" class="screen active">
-            <div class="container">
-                <h1><span class="skull-icon">&#x2694;</span> <span data-i18n="app.name">Skull King</span></h1>
-                <p class="subtitle" data-i18n="app.subtitle">A trick-taking pirate card game</p>
+            <div class="login-container">
+                <div class="logo">
+                    <div class="skull-icon">&#9760;</div>
+                    <h1>Skull King</h1>
+                    <p class="tagline" data-i18n="app.subtitle">A trick-taking pirate card game</p>
+                </div>
                 <div class="login-form">
-                    <input type="text" id="username-input" data-i18n-placeholder="login.enterName" placeholder="Enter your name" maxlength="20">
-                    <button id="create-game-btn" class="btn btn-primary" data-i18n="login.createGame">Create New Game</button>
-                    <div class="divider" data-i18n="login.or">or</div>
-                    <input type="text" id="game-id-input" data-i18n-placeholder="login.enterGameId" placeholder="Enter Game ID">
-                    <button id="join-game-btn" class="btn btn-secondary" data-i18n="login.joinGame">Join Game</button>
+                    <div class="input-group">
+                        <label for="username-input" data-i18n="login.yourName">Your Name</label>
+                        <input type="text" id="username-input" data-i18n-placeholder="login.enterName" placeholder="Captain..." maxlength="20" autocomplete="off">
+                    </div>
+                    <button id="create-game-btn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">+</span>
+                        <span data-i18n="login.createGame">Create Game</span>
+                    </button>
+                    <div class="divider"><span data-i18n="login.or">or join existing</span></div>
+                    <div class="input-group">
+                        <label for="game-id-input" data-i18n="login.gameCode">Game Code</label>
+                        <input type="text" id="game-id-input" data-i18n-placeholder="login.enterGameId" placeholder="Enter code..." autocomplete="off">
+                    </div>
+                    <button id="join-game-btn" class="btn btn-secondary">
+                        <span data-i18n="login.joinGame">Join Game</span>
+                    </button>
                 </div>
                 <div id="login-error" class="error-message"></div>
             </div>
@@ -33,93 +49,186 @@
 
         <!-- Lobby Screen -->
         <div id="lobby-screen" class="screen">
-            <div class="container">
-                <h2 data-i18n="lobby.title">Game Lobby</h2>
-                <div class="lobby-info">
-                    <p><span data-i18n="lobby.gameId">Game ID:</span> <span id="lobby-game-id" class="code"></span></p>
-                    <button id="copy-game-id-btn" class="btn btn-small"><span class="copy-icon">&#x1F4CB;</span> <span data-i18n="lobby.copy">Copy</span></button>
+            <div class="lobby-container">
+                <div class="lobby-header">
+                    <h2 data-i18n="lobby.title">Game Lobby</h2>
+                    <div class="game-code-box">
+                        <span class="label" data-i18n="lobby.shareCode">Share this code:</span>
+                        <div class="code-display">
+                            <span id="lobby-game-id" class="code"></span>
+                            <button id="copy-game-id-btn" class="btn-icon-only" title="Copy">
+                                <span class="copy-icon">&#128203;</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="players-list">
-                    <h3><span data-i18n="lobby.players">Players</span> (<span id="player-count">0</span>/4)</h3>
-                    <ul id="lobby-players"></ul>
+
+                <div class="lobby-content">
+                    <!-- Players Panel -->
+                    <div class="lobby-panel players-panel">
+                        <div class="panel-header">
+                            <h3><span data-i18n="lobby.players">Players</span> <span class="player-count">(<span id="player-count">0</span>/4)</span></h3>
+                        </div>
+                        <ul id="lobby-players" class="players-list"></ul>
+                    </div>
+
+                    <!-- Config Panel (Host Only) -->
+                    <div id="config-panel" class="lobby-panel config-panel">
+                        <div class="panel-header">
+                            <h3 data-i18n="lobby.gameSettings">Game Settings</h3>
+                        </div>
+
+                        <div class="config-section">
+                            <h4 data-i18n="lobby.addOpponents">Add Opponents</h4>
+                            <div class="bot-config">
+                                <div class="config-row">
+                                    <label data-i18n="lobby.botType">Bot Type</label>
+                                    <select id="bot-type-select" class="select-input">
+                                        <option value="rl" data-i18n="lobby.botRL">AI (Neural Network)</option>
+                                        <option value="rule_based" data-i18n="lobby.botRuleBased">Rule-Based</option>
+                                        <option value="random" data-i18n="lobby.botRandom">Random</option>
+                                    </select>
+                                </div>
+                                <div class="config-row">
+                                    <label data-i18n="lobby.difficulty">Difficulty</label>
+                                    <select id="bot-difficulty-select" class="select-input">
+                                        <option value="easy" data-i18n="lobby.easy">Easy</option>
+                                        <option value="medium" selected data-i18n="lobby.medium">Medium</option>
+                                        <option value="hard" data-i18n="lobby.hard">Hard</option>
+                                    </select>
+                                </div>
+                                <button id="add-bot-btn" class="btn btn-secondary">
+                                    <span class="btn-icon">+</span>
+                                    <span data-i18n="lobby.addBot">Add Bot</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <h4 data-i18n="lobby.quickSetup">Quick Setup</h4>
+                            <div class="quick-buttons">
+                                <button id="fill-bots-btn" class="btn btn-outline btn-small" data-i18n="lobby.fillWithBots">Fill with AI Bots</button>
+                                <button id="clear-bots-btn" class="btn btn-outline btn-small" data-i18n="lobby.clearBots">Remove All Bots</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
                 <div class="lobby-actions">
-                    <button id="add-bot-btn" class="btn btn-secondary" data-i18n="lobby.addBot">Add Bot</button>
-                    <button id="start-game-btn" class="btn btn-primary" data-i18n="lobby.startGame" disabled>Start Game</button>
+                    <button id="leave-lobby-btn" class="btn btn-ghost" data-i18n="lobby.leave">Leave</button>
+                    <button id="start-game-btn" class="btn btn-primary btn-large" disabled>
+                        <span data-i18n="lobby.startGame">Start Game</span>
+                        <span class="btn-icon">&#9654;</span>
+                    </button>
                 </div>
+                <p id="start-hint" class="hint" data-i18n="lobby.needPlayers">Need at least 2 players to start</p>
                 <div id="lobby-error" class="error-message"></div>
             </div>
         </div>
 
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
-            <div class="game-container">
-                <!-- Game Header -->
-                <div class="game-header">
-                    <div class="round-info">
-                        <span><span data-i18n="game.round">Round</span> <span id="current-round">1</span>/10</span>
+            <div class="game-layout">
+                <!-- Top Bar -->
+                <header class="game-topbar">
+                    <div class="round-badge">
+                        <span data-i18n="game.round">Round</span>
+                        <strong><span id="current-round">1</span>/10</strong>
                     </div>
-                    <div class="game-status">
-                        <span id="game-status-text" data-i18n="game.waiting">Waiting...</span>
+                    <div class="game-phase" id="game-status-text" data-i18n="game.waiting">Waiting...</div>
+                    <div class="score-display">
+                        <span data-i18n="game.yourScore">Your Score:</span>
+                        <strong id="player-score">0</strong>
                     </div>
-                </div>
+                </header>
 
-                <!-- Players Info -->
-                <div class="players-info">
-                    <div id="players-container"></div>
-                </div>
+                <!-- Main Game Area -->
+                <main class="game-main">
+                    <!-- Opponents Area (Top) -->
+                    <div class="opponents-area" id="opponents-container"></div>
 
-                <!-- Trick Area -->
-                <div class="trick-area">
-                    <h3 data-i18n="game.currentTrick">Current Trick</h3>
-                    <div id="trick-cards"></div>
-                </div>
-
-                <!-- Player's Hand -->
-                <div class="hand-area">
-                    <div class="hand-header">
-                        <h3 data-i18n="game.yourHand">Your Hand</h3>
-                        <div class="hand-info">
-                            <span id="hand-count">0 cards</span>
+                    <!-- Center Play Area -->
+                    <div class="play-area">
+                        <div class="table-felt">
+                            <h3 class="area-label" data-i18n="game.currentTrick">Current Trick</h3>
+                            <div id="trick-cards" class="trick-cards"></div>
+                            <div id="trick-winner" class="trick-winner hidden"></div>
                         </div>
                     </div>
-                    <div id="player-hand" class="hand-cards"></div>
+
+                    <!-- Player Hand Area (Bottom) -->
+                    <div class="player-area">
+                        <div class="player-info-bar">
+                            <div class="player-stat-item">
+                                <span class="stat-label" data-i18n="game.yourBid">Your Bid:</span>
+                                <span class="stat-value" id="player-bid">-</span>
+                            </div>
+                            <div class="player-stat-item">
+                                <span class="stat-label" data-i18n="game.tricksWon">Tricks Won:</span>
+                                <span class="stat-value" id="player-tricks">0</span>
+                            </div>
+                            <div class="player-stat-item your-turn-indicator hidden" id="your-turn-indicator">
+                                <span data-i18n="game.yourTurn">Your Turn!</span>
+                            </div>
+                        </div>
+                        <div class="hand-section">
+                            <div class="hand-label">
+                                <span data-i18n="game.yourHand">Your Hand</span>
+                                <span class="card-count">(<span id="hand-count">0</span>)</span>
+                            </div>
+                            <div id="player-hand" class="hand-cards"></div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Bidding Modal -->
+                <div id="bidding-modal" class="modal hidden">
+                    <div class="modal-content bidding-content">
+                        <h3 data-i18n="game.makeYourBid">Make Your Bid</h3>
+                        <p data-i18n="game.bidQuestion">How many tricks will you win?</p>
+                        <div id="bid-buttons" class="bid-buttons"></div>
+                    </div>
                 </div>
 
-                <!-- Bidding Area -->
-                <div id="bidding-area" class="action-area hidden">
-                    <h3 data-i18n="game.makeYourBid">Make Your Bid</h3>
-                    <p data-i18n="game.bidQuestion">How many tricks will you win this round?</p>
-                    <div id="bid-buttons"></div>
-                </div>
-
-                <!-- Game Log -->
-                <div class="game-log">
-                    <h4 data-i18n="game.gameLog">Game Log</h4>
-                    <div id="log-messages"></div>
-                </div>
+                <!-- Game Log (collapsible) -->
+                <aside class="game-log collapsed" id="game-log">
+                    <button class="log-toggle" id="log-toggle">
+                        <span data-i18n="game.gameLog">Game Log</span>
+                        <span class="toggle-icon">&#9650;</span>
+                    </button>
+                    <div class="log-content" id="log-messages"></div>
+                </aside>
             </div>
         </div>
 
         <!-- Results Screen -->
         <div id="results-screen" class="screen">
-            <div class="container">
-                <h2><span class="trophy-icon">&#x1F3C6;</span> <span data-i18n="results.title">Game Over!</span></h2>
-                <div class="final-scores">
-                    <h3 data-i18n="results.finalScores">Final Scores</h3>
-                    <table id="final-scores-table">
-                        <thead>
-                            <tr>
-                                <th data-i18n="results.rank">Rank</th>
-                                <th data-i18n="results.player">Player</th>
-                                <th data-i18n="results.score">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody id="final-scores-body"></tbody>
-                    </table>
+            <div class="results-container">
+                <div class="results-header">
+                    <div class="trophy">&#127942;</div>
+                    <h2 data-i18n="results.title">Game Over!</h2>
+                    <div id="winner-announcement" class="winner-announcement"></div>
                 </div>
+                <div class="podium">
+                    <div class="podium-place second" id="place-2"></div>
+                    <div class="podium-place first" id="place-1"></div>
+                    <div class="podium-place third" id="place-3"></div>
+                </div>
+                <table id="final-scores-table" class="scores-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="results.rank">#</th>
+                            <th data-i18n="results.player">Player</th>
+                            <th data-i18n="results.score">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="final-scores-body"></tbody>
+                </table>
                 <div class="results-actions">
-                    <button id="new-game-btn" class="btn btn-primary" data-i18n="results.newGame">New Game</button>
+                    <button id="new-game-btn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">🏴‍☠️</span>
+                        <span data-i18n="results.playAgain">Play Again</span>
+                    </button>
                 </div>
             </div>
         </div>
