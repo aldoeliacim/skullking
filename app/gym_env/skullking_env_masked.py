@@ -17,7 +17,7 @@ from app.models.card import Card, CardId, get_card
 from app.models.enums import MAX_ROUNDS, GameState
 from app.models.game import Game
 from app.models.player import Player
-from app.models.trick import Trick
+from app.models.trick import TigressChoice, Trick
 
 
 class SkullKingEnvMasked(gym.Env):
@@ -915,8 +915,17 @@ class SkullKingEnvMasked(gym.Env):
         if current_trick.picking_player_id != player_id:
             return False
 
+        # Handle Tigress choice - decide based on bid status
+        tigress_choice: TigressChoice | None = None
+        card = get_card(card_id)
+        if card.is_tigress():
+            tricks_won = current_round.get_tricks_won(player_id)
+            bid = player.bid if player.bid is not None else 0
+            need_more_wins = tricks_won < bid
+            tigress_choice = TigressChoice.PIRATE if need_more_wins else TigressChoice.ESCAPE
+
         player.remove_card(card_id)
-        current_trick.add_card(player_id, card_id)
+        current_trick.add_card(player_id, card_id, tigress_choice)
 
         if current_trick.is_complete(self.num_players):
             current_trick.determine_winner()
