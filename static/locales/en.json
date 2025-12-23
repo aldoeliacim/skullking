@@ -1,0 +1,62 @@
+{
+  "app": {
+    "title": "Skull King - Card Game",
+    "name": "Skull King",
+    "subtitle": "A trick-taking pirate card game"
+  },
+  "login": {
+    "enterName": "Enter your name",
+    "createGame": "Create New Game",
+    "or": "or",
+    "enterGameId": "Enter Game ID",
+    "joinGame": "Join Game",
+    "errorEnterName": "Please enter your name",
+    "errorEnterGameId": "Please enter a game ID",
+    "errorCreateFailed": "Failed to create game",
+    "errorConnection": "Connection error"
+  },
+  "lobby": {
+    "title": "Game Lobby",
+    "gameId": "Game ID:",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "players": "Players",
+    "addBot": "Add Bot",
+    "startGame": "Start Game",
+    "you": "(You)",
+    "bot": "BOT",
+    "errorConnectionLost": "Connection lost",
+    "errorOccurred": "An error occurred"
+  },
+  "game": {
+    "round": "Round",
+    "waiting": "Waiting...",
+    "currentTrick": "Current Trick",
+    "yourHand": "Your Hand",
+    "cards": "cards",
+    "card": "card",
+    "makeYourBid": "Make Your Bid",
+    "bidQuestion": "How many tricks will you win this round?",
+    "gameLog": "Game Log",
+    "bid": "Bid",
+    "tricks": "Tricks",
+    "biddingPhase": "Bidding Phase",
+    "playingTricks": "Playing Tricks",
+    "gameOver": "Game Over",
+    "inProgress": "In Progress"
+  },
+  "results": {
+    "title": "Game Over!",
+    "finalScores": "Final Scores",
+    "rank": "Rank",
+    "player": "Player",
+    "score": "Score",
+    "newGame": "New Game"
+  },
+  "log": {
+    "playerJoined": "{username} joined the game",
+    "playerLeft": "{username} left the game",
+    "trickWon": "Trick won by {winner}",
+    "roundComplete": "Round {round} complete!"
+  }
+}

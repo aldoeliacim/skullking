@@ -8,6 +8,32 @@ class SkullKingGame {
         this.gameState = null;
 
         this.initializeEventListeners();
+        this.initializeI18n();
+    }
+
+    async initializeI18n() {
+        await window.i18n.init();
+        this.updateLangFlag();
+
+        // Listen for locale changes
+        window.addEventListener('localeChanged', () => {
+            this.updateLangFlag();
+            this.updateDynamicContent();
+        });
+    }
+
+    updateLangFlag() {
+        const flag = document.getElementById('lang-flag');
+        if (flag) {
+            flag.textContent = window.i18n.getLocale().toUpperCase();
+        }
+    }
+
+    updateDynamicContent() {
+        // Re-render dynamic content when language changes
+        if (this.gameState) {
+            this.updateGameScreen();
+        }
     }
 
     initializeEventListeners() {
@@ -25,13 +51,18 @@ class SkullKingGame {
 
         // Results screen
         document.getElementById('new-game-btn').addEventListener('click', () => this.returnToLogin());
+
+        // Language switcher
+        document.getElementById('lang-toggle').addEventListener('click', () => {
+            window.i18n.toggleLocale();
+        });
     }
 
     async createGame() {
         const username = document.getElementById('username-input').value.trim();
 
         if (!username) {
-            this.showError('login', 'Please enter your name');
+            this.showError('login', window.i18n.t('login.errorEnterName'));
             return;
         }
 
@@ -47,7 +78,7 @@ class SkullKingGame {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to create game');
+                throw new Error(window.i18n.t('login.errorCreateFailed'));
             }
 
             const data = await response.json();
@@ -56,7 +87,7 @@ class SkullKingGame {
 
             this.connectWebSocket();
         } catch (error) {
-            this.showError('login', 'Failed to create game: ' + error.message);
+            this.showError('login', `${window.i18n.t('login.errorCreateFailed')}: ${error.message}`);
         }
     }
 
@@ -65,12 +96,12 @@ class SkullKingGame {
         const gameId = document.getElementById('game-id-input').value.trim();
 
         if (!username) {
-            this.showError('login', 'Please enter your name');
+            this.showError('login', window.i18n.t('login.errorEnterName'));
             return;
         }
 
         if (!gameId) {
-            this.showError('login', 'Please enter a game ID');
+            this.showError('login', window.i18n.t('login.errorEnterGameId'));
             return;
         }
 
@@ -100,13 +131,13 @@ class SkullKingGame {
 
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
-            this.showError('login', 'Connection error');
+            this.showError('login', window.i18n.t('login.errorConnection'));
         };
 
         this.ws.onclose = () => {
             console.log('WebSocket closed');
             if (this.gameState && this.gameState.state !== 'ENDED') {
-                this.showError('lobby', 'Connection lost');
+                this.showError('lobby', window.i18n.t('lobby.errorConnectionLost'));
             }
         };
     }
@@ -120,10 +151,10 @@ class SkullKingGame {
                 this.updateLobby();
                 break;
             case 'JOINED':
-                this.addLog(`${message.content.username} joined the game`);
+                this.addLog(window.i18n.t('log.playerJoined', { username: message.content.username }));
                 break;
             case 'PLAYER_LEFT':
-                this.addLog(`${message.content.username} left the game`);
+                this.addLog(window.i18n.t('log.playerLeft', { username: message.content.username }));
                 break;
             case 'GAME_STATE':
                 this.gameState = message.content;
@@ -142,7 +173,7 @@ class SkullKingGame {
                 this.handleGameOver(message.content);
                 break;
             case 'ERROR':
-                this.showError('lobby', message.content.message || 'An error occurred');
+                this.showError('lobby', message.content.message || window.i18n.t('lobby.errorOccurred'));
                 break;
         }
     }
@@ -159,8 +190,8 @@ class SkullKingGame {
         players.forEach(player => {
             const li = document.createElement('li');
             li.innerHTML = `
-                <span class="player-name">${player.username}${player.id === this.playerId ? ' (You)' : ''}</span>
-                ${player.is_bot ? '<span class="player-badge">BOT</span>' : ''}
+                <span class="player-name">${player.username}${player.id === this.playerId ? ` ${window.i18n.t('lobby.you')}` : ''}</span>
+                ${player.is_bot ? `<span class="player-badge">${window.i18n.t('lobby.bot')}</span>` : ''}
             `;
             playersList.appendChild(li);
         });
@@ -212,8 +243,8 @@ class SkullKingGame {
                     <span class="player-score">${player.score || 0}</span>
                 </div>
                 <div class="player-stats">
-                    <span>Bid: ${player.bid !== undefined ? player.bid : '-'}</span>
-                    <span>Tricks: ${player.tricks_won || 0}</span>
+                    <span>${window.i18n.t('game.bid')}: ${player.bid !== undefined ? player.bid : '-'}</span>
+                    <span>${window.i18n.t('game.tricks')}: ${player.tricks_won || 0}</span>
                 </div>
             `;
 
@@ -226,7 +257,8 @@ class SkullKingGame {
         const handContainer = document.getElementById('player-hand');
         handContainer.innerHTML = '';
 
-        document.getElementById('hand-count').textContent = `${hand.length} card${hand.length !== 1 ? 's' : ''}`;
+        const cardWord = hand.length === 1 ? window.i18n.t('game.card') : window.i18n.t('game.cards');
+        document.getElementById('hand-count').textContent = `${hand.length} ${cardWord}`;
 
         hand.forEach((card, index) => {
             const cardElement = this.createCardElement(card);
@@ -291,13 +323,13 @@ class SkullKingGame {
 
         switch (state) {
             case 'BIDDING':
-                return 'Bidding Phase';
+                return window.i18n.t('game.biddingPhase');
             case 'PICKING':
-                return 'Playing Tricks';
+                return window.i18n.t('game.playingTricks');
             case 'ENDED':
-                return 'Game Over';
+                return window.i18n.t('game.gameOver');
             default:
-                return 'In Progress';
+                return window.i18n.t('game.inProgress');
         }
     }
 
@@ -328,13 +360,13 @@ class SkullKingGame {
     }
 
     handleTrickComplete(data) {
-        this.addLog(`Trick won by ${data.winner_name}`);
+        this.addLog(window.i18n.t('log.trickWon', { winner: data.winner_name }));
         // Update UI after short delay to show trick result
         setTimeout(() => this.updateGameScreen(), 1500);
     }
 
     handleRoundComplete(data) {
-        this.addLog(`Round ${data.round_number} complete!`);
+        this.addLog(window.i18n.t('log.roundComplete', { round: data.round_number }));
     }
 
     handleGameOver(data) {
@@ -350,13 +382,13 @@ class SkullKingGame {
             const tr = document.createElement('tr');
 
             let badge = `<span class="rank-badge">${index + 1}</span>`;
-            if (index === 0) badge = `<span class="rank-badge gold">🏆</span>`;
-            else if (index === 1) badge = `<span class="rank-badge silver">🥈</span>`;
-            else if (index === 2) badge = `<span class="rank-badge bronze">🥉</span>`;
+            if (index === 0) badge = `<span class="rank-badge gold">&#x1F3C6;</span>`;
+            else if (index === 1) badge = `<span class="rank-badge silver">&#x1F948;</span>`;
+            else if (index === 2) badge = `<span class="rank-badge bronze">&#x1F949;</span>`;
 
             tr.innerHTML = `
                 <td>${badge}</td>
-                <td>${player.username}${player.id === this.playerId ? ' (You)' : ''}</td>
+                <td>${player.username}${player.id === this.playerId ? ` ${window.i18n.t('lobby.you')}` : ''}</td>
                 <td><strong>${player.score}</strong></td>
             `;
             tbody.appendChild(tr);
@@ -386,11 +418,14 @@ class SkullKingGame {
         const gameId = document.getElementById('lobby-game-id').textContent;
         navigator.clipboard.writeText(gameId).then(() => {
             const btn = document.getElementById('copy-game-id-btn');
-            const originalText = btn.textContent;
-            btn.textContent = '✓ Copied!';
-            setTimeout(() => {
-                btn.textContent = originalText;
-            }, 2000);
+            const copySpan = btn.querySelector('[data-i18n="lobby.copy"]');
+            if (copySpan) {
+                const originalText = copySpan.textContent;
+                copySpan.textContent = window.i18n.t('lobby.copied');
+                setTimeout(() => {
+                    copySpan.textContent = originalText;
+                }, 2000);
+            }
         });
     }
 

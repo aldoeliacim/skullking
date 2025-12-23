@@ -1,0 +1,62 @@
+{
+  "app": {
+    "title": "Skull King - Juego de Cartas",
+    "name": "Skull King",
+    "subtitle": "Un juego de bazas pirata"
+  },
+  "login": {
+    "enterName": "Ingresa tu nombre",
+    "createGame": "Crear Partida",
+    "or": "o",
+    "enterGameId": "Ingresa el ID de partida",
+    "joinGame": "Unirse a Partida",
+    "errorEnterName": "Por favor ingresa tu nombre",
+    "errorEnterGameId": "Por favor ingresa un ID de partida",
+    "errorCreateFailed": "Error al crear partida",
+    "errorConnection": "Error de conexion"
+  },
+  "lobby": {
+    "title": "Sala de Espera",
+    "gameId": "ID de Partida:",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "players": "Jugadores",
+    "addBot": "Agregar Bot",
+    "startGame": "Iniciar Partida",
+    "you": "(Tu)",
+    "bot": "BOT",
+    "errorConnectionLost": "Conexion perdida",
+    "errorOccurred": "Ocurrio un error"
+  },
+  "game": {
+    "round": "Ronda",
+    "waiting": "Esperando...",
+    "currentTrick": "Baza Actual",
+    "yourHand": "Tu Mano",
+    "cards": "cartas",
+    "card": "carta",
+    "makeYourBid": "Haz tu Apuesta",
+    "bidQuestion": "Cuantas bazas ganaras esta ronda?",
+    "gameLog": "Registro del Juego",
+    "bid": "Apuesta",
+    "tricks": "Bazas",
+    "biddingPhase": "Fase de Apuestas",
+    "playingTricks": "Jugando Bazas",
+    "gameOver": "Fin del Juego",
+    "inProgress": "En Progreso"
+  },
+  "results": {
+    "title": "Fin del Juego!",
+    "finalScores": "Puntuacion Final",
+    "rank": "Posicion",
+    "player": "Jugador",
+    "score": "Puntos",
+    "newGame": "Nueva Partida"
+  },
+  "log": {
+    "playerJoined": "{username} se unio a la partida",
+    "playerLeft": "{username} abandono la partida",
+    "trickWon": "Baza ganada por {winner}",
+    "roundComplete": "Ronda {round} completa!"
+  }
+}

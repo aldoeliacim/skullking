@@ -12,6 +12,37 @@ body {
     color: #333;
 }
 
+/* Language Switcher */
+.language-switcher {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    z-index: 1000;
+}
+
+.language-switcher .btn-small {
+    background: white;
+    border: 2px solid #667eea;
+    color: #667eea;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.language-switcher .btn-small:hover {
+    background: #667eea;
+    color: white;
+    transform: scale(1.05);
+}
+
+#lang-flag {
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
 /* Screen Management */
 .screen {
     display: none;
