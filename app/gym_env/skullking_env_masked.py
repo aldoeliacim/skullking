@@ -619,20 +619,34 @@ class SkullKingEnvMasked(gym.Env):
         return [our_best, our_avg]
 
     def _evaluate_card_strength(self, card: Card) -> float:
-        """Evaluate card strength (0.0 to 1.0)."""
+        """Evaluate card strength (0.0 to 1.0). Handles all 74 cards."""
         if card.is_king():
-            return 0.9  # King (includes Skull King)
+            return 0.95  # King (Skull King) - highest
         if card.is_pirate():
             return 0.8
+        if card.is_tigress():
+            # Flexible - can be pirate (0.8) or escape (0.05)
+            return 0.55
+        if card.is_whale():
+            # Unpredictable - highest suit wins
+            return 0.4
+        if card.is_kraken():
+            # Nobody wins - disruptive
+            return 0.25
         if card.is_mermaid():
-            return 0.3
+            return 0.35
+        if card.is_loot():
+            # Acts like escape but alliance bonus
+            return 0.08
         if card.is_escape():
-            return 0.1
+            return 0.05
+        if card.is_roger():
+            # Trump suit - higher value
+            return 0.5 + (card.number / 14.0) * 0.35 if card.number else 0.5
         if card.is_standard_suit():
             # Suited cards: value-based (1-14)
-            return 0.3 + (card.number / 14.0) * 0.4 if card.number else 0.3
-        # Other special cards (whale, kraken, etc.)
-        return 0.5
+            return 0.2 + (card.number / 14.0) * 0.35 if card.number else 0.2
+        return 0.3
 
     def _get_observation(self) -> np.ndarray:
         """COMPACT OBSERVATIONS: 151 dims."""
@@ -760,32 +774,47 @@ class SkullKingEnvMasked(gym.Env):
         return np.array(obs, dtype=np.float32)
 
     def _encode_card_compact(self, card: Card) -> list[float]:
-        """Encode card with 9 features: card_type (5) + number (1) + special flags (3)."""
+        """Encode card with 9 features. Handles all 74 cards including expansion."""
         encoding = []
 
-        # Card type one-hot (5 dims) - group similar types
-        # Group 1: Standard suits (has number), Group 2-5: Special cards
+        # Card type one-hot (5 dims) - grouped for feature efficiency
+        # [0] = Standard suits including Roger (has number)
+        # [1] = Pirate-like (Pirate, Tigress as pirate)
+        # [2] = King (Skull King)
+        # [3] = Mermaid
+        # [4] = Escape-like (Escape, Loot, Tigress as escape)
+        # Note: Beasts (Whale, Kraken) handled via special flags
         card_type_vec = [0.0] * 5
-        if card.is_standard_suit():
+        if card.is_standard_suit() or card.is_roger():
             card_type_vec[0] = 1.0  # Standard suit card
         elif card.is_pirate():
             card_type_vec[1] = 1.0  # Pirate
+        elif card.is_tigress():
+            # Tigress can be pirate or escape - encode as both
+            card_type_vec[1] = 0.5  # Partial pirate
+            card_type_vec[4] = 0.5  # Partial escape
         elif card.is_king():
             card_type_vec[2] = 1.0  # King/Skull King
         elif card.is_mermaid():
             card_type_vec[3] = 1.0  # Mermaid
-        elif card.is_escape():
-            card_type_vec[4] = 1.0  # Escape/Tigress
+        elif card.is_escape() or card.is_loot():
+            card_type_vec[4] = 1.0  # Escape or Loot
+        elif card.is_whale() or card.is_kraken():
+            # Beasts get their own partial encoding
+            card_type_vec[2] = 0.5  # Beast power similar to king
         encoding.extend(card_type_vec)
 
         # Number (1 dim, normalized) - only meaningful for standard suits
         encoding.append(card.number / 14.0 if card.number else 0.0)
 
-        # Special flags (3 dims) - quick lookup for strategy
+        # Special flags (3 dims) - expanded meaning for 74 cards:
+        # [0] = Is high-power card (Pirate, Tigress, Beast)
+        # [1] = Is King or Beast
+        # [2] = Is Mermaid or counter-card
         encoding.extend(
             [
-                1.0 if card.is_pirate() else 0.0,
-                1.0 if card.is_king() else 0.0,
+                1.0 if (card.is_pirate() or card.is_tigress() or card.is_beast()) else 0.0,
+                1.0 if (card.is_king() or card.is_beast()) else 0.0,
                 1.0 if card.is_mermaid() else 0.0,
             ]
         )
