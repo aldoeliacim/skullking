@@ -69,7 +69,13 @@
     "cardsVisibleBelow": "Your cards are visible below",
     "yourBid": "Your Bid:",
     "tricksWon": "Tricks Won:",
-    "yourTurn": "Your Turn!"
+    "yourTurn": "Your Turn!",
+    "tigressChoice": "Scary Mary",
+    "tigressQuestion": "Play as Pirate or Escape?",
+    "tigressPirate": "Pirate",
+    "tigressPirateDesc": "Win tricks, beats suits",
+    "tigressEscape": "Escape",
+    "tigressEscapeDesc": "Lose on purpose"
   },
   "results": {
     "title": "Game Over!",

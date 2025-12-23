@@ -13,7 +13,7 @@ from app.models.card import CardId, get_card
 from app.models.enums import GameState
 from app.models.game import Game
 from app.models.player import Player
-from app.models.trick import Trick
+from app.models.trick import TigressChoice, Trick
 
 if TYPE_CHECKING:
     from app.api.websocket import ConnectionManager
@@ -179,7 +179,7 @@ class GameHandler:
         Args:
             game: Game instance
             player_id: ID of picking player
-            content: Must contain 'card_id' key with card ID
+            content: Must contain 'card_id' key with card ID, optional 'tigress_choice'
         """
         if game.state != GameState.PICKING:
             await self._send_error(game.id, player_id, "Not in picking phase")
@@ -214,27 +214,44 @@ class GameHandler:
             await self._send_error(game.id, player_id, "Card not in hand")
             return
 
+        # Handle Tigress choice
+        tigress_choice: TigressChoice | None = None
+        card = get_card(card_id)
+        if card.is_tigress():
+            choice_raw = content.get("tigress_choice")
+            if choice_raw not in ("pirate", "escape"):
+                await self._send_error(
+                    game.id, player_id, "Tigress requires choice: pirate or escape"
+                )
+                return
+            tigress_choice = TigressChoice(choice_raw)
+
         # Play the card
         player.hand.remove(card_id)
-        if not current_trick.add_card(player_id, card_id):
+        if not current_trick.add_card(player_id, card_id, tigress_choice):
             # Card was rejected (player already picked)
             player.hand.append(card_id)
             await self._send_error(game.id, player_id, "Already played in this trick")
             return
 
         logger.info(
-            "Player %s played card %s in game %s",
+            "Player %s played card %s%s in game %s",
             player_id,
-            get_card(card_id),
+            card,
+            f" as {tigress_choice.value}" if tigress_choice else "",
             game.id,
         )
 
         # Broadcast pick to all players
+        pick_content: dict[str, Any] = {"player_id": player_id, "card_id": card_id.value}
+        if tigress_choice:
+            pick_content["tigress_choice"] = tigress_choice.value
+
         await self.manager.broadcast_to_game(
             ServerMessage(
                 command=Command.PICKED,
                 game_id=game.id,
-                content={"player_id": player_id, "card_id": card_id.value},
+                content=pick_content,
             ),
             game.id,
         )
@@ -797,6 +814,15 @@ class GameHandler:
         card_id = bot.pick_card(game, player.hand, cards_in_trick, valid_cards)
         card = get_card(card_id)
 
+        # Handle Tigress choice for bots
+        tigress_choice: TigressChoice | None = None
+        if card.is_tigress():
+            # Bot decides: play as pirate if need to win tricks, escape otherwise
+            tricks_won = current_round.get_tricks_won(picking_player_id)
+            bid = player.bid if player.bid is not None else 0
+            need_more_wins = tricks_won < bid
+            tigress_choice = TigressChoice.PIRATE if need_more_wins else TigressChoice.ESCAPE
+
         # Remove from hand
         if card_id in player.hand:
             player.hand.remove(card_id)
@@ -809,7 +835,7 @@ class GameHandler:
             return
 
         # Add to trick
-        if not trick.add_card(picking_player_id, card_id):
+        if not trick.add_card(picking_player_id, card_id, tigress_choice):
             # Card was rejected (player already picked) - shouldn't happen with guards above
             logger.error(
                 "Bot %s card rejected - already picked in trick %d", picking_player_id, trick.number
@@ -817,14 +843,23 @@ class GameHandler:
             player.hand.append(card_id)
             return
 
-        logger.info("Bot %s plays %s", picking_player_id, card)
+        logger.info(
+            "Bot %s plays %s%s",
+            picking_player_id,
+            card,
+            f" as {tigress_choice.value}" if tigress_choice else "",
+        )
 
         # Broadcast card played
+        pick_content: dict[str, Any] = {"player_id": picking_player_id, "card_id": card_id.value}
+        if tigress_choice:
+            pick_content["tigress_choice"] = tigress_choice.value
+
         await self.manager.broadcast_to_game(
             ServerMessage(
                 command=Command.PICKED,
                 game_id=game.id,
-                content={"player_id": picking_player_id, "card_id": card_id.value},
+                content=pick_content,
             ),
             game.id,
         )

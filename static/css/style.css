@@ -1218,6 +1218,115 @@ input[type="text"]::placeholder {
 }
 
 /* ============================================
+   TIGRESS (SCARY MARY) CHOICE MODAL
+   ============================================ */
+
+#tigress-modal {
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.tigress-content {
+    background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a3e 100%);
+    border: 2px solid var(--suit-special);
+    max-width: 400px;
+}
+
+.tigress-content h3 {
+    font-family: 'Pirata One', cursive;
+    font-size: 2rem;
+    color: var(--suit-special);
+    margin-bottom: var(--spacing-xs);
+}
+
+.tigress-content p {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.tigress-card-preview {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-lg);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.tigress-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+}
+
+.tigress-btn {
+    flex: 1;
+    max-width: 160px;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 2px solid;
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.tigress-btn .tigress-icon {
+    font-size: 2.5rem;
+}
+
+.tigress-btn span:not(.tigress-icon) {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.tigress-btn small {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.pirate-btn {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
+.pirate-btn:hover {
+    background: var(--accent-red);
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(230, 57, 70, 0.4);
+}
+
+.pirate-btn:hover small {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.escape-btn {
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+}
+
+.escape-btn:hover {
+    background: var(--text-secondary);
+    color: var(--bg-dark);
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(160, 160, 176, 0.4);
+}
+
+.escape-btn:hover small {
+    color: var(--bg-dark);
+}
+
+/* ============================================
    GAME LOG
    ============================================ */
 

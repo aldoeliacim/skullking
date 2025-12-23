@@ -69,7 +69,13 @@
     "cardsVisibleBelow": "Tus cartas estan visibles abajo",
     "yourBid": "Tu Apuesta:",
     "tricksWon": "Bazas Ganadas:",
-    "yourTurn": "Tu Turno!"
+    "yourTurn": "Tu Turno!",
+    "tigressChoice": "Tigresa",
+    "tigressQuestion": "Jugar como Pirata o Huida?",
+    "tigressPirate": "Pirata",
+    "tigressPirateDesc": "Ganar bazas, vence palos",
+    "tigressEscape": "Huida",
+    "tigressEscapeDesc": "Perder a proposito"
   },
   "results": {
     "title": "Fin del Juego!",

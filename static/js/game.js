@@ -701,7 +701,37 @@ class SkullKingGame {
     }
 
     playCard(cardId) {
+        // Tigress (card_id 72) requires player to choose pirate or escape
+        if (cardId === 72) {
+            this.showTigressChoice(cardId);
+            return;
+        }
         this.sendMessage('PICK', { card_id: cardId });
+    }
+
+    showTigressChoice(cardId) {
+        const modal = document.getElementById('tigress-modal');
+        modal.classList.remove('hidden');
+
+        const pirateBtn = document.getElementById('tigress-pirate');
+        const escapeBtn = document.getElementById('tigress-escape');
+
+        // Remove old listeners
+        const newPirateBtn = pirateBtn.cloneNode(true);
+        const newEscapeBtn = escapeBtn.cloneNode(true);
+        pirateBtn.parentNode.replaceChild(newPirateBtn, pirateBtn);
+        escapeBtn.parentNode.replaceChild(newEscapeBtn, escapeBtn);
+
+        // Add new listeners
+        newPirateBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.sendMessage('PICK', { card_id: cardId, tigress_choice: 'pirate' });
+        });
+
+        newEscapeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.sendMessage('PICK', { card_id: cardId, tigress_choice: 'escape' });
+        });
     }
 
     handleTrickWinner(data) {
