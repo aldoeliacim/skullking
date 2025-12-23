@@ -57,6 +57,10 @@ class Round:
         """Check if a player has made their bid."""
         return player_id in self.bids
 
+    def all_bids_placed(self, num_players: int) -> bool:
+        """Check if all players have placed their bids."""
+        return len(self.bids) >= num_players
+
     def add_bid(self, player_id: str, bid: int) -> None:
         """Add a player's bid."""
         self.bids[player_id] = bid

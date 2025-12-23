@@ -94,6 +94,13 @@ class CardId(IntEnum):
     ESCAPE4 = 70
     ESCAPE5 = 71
 
+    # Tigress / Scary Mary (1)
+    TIGRESS = 72
+
+    # Loot / Botín cards (2)
+    LOOT1 = 73
+    LOOT2 = 74
+
 
 @dataclass(frozen=True)
 class Card:
@@ -144,8 +151,14 @@ class Card:
         return self.is_kraken() or self.is_whale()
 
     def is_special(self) -> bool:
-        """Check if card is special (character, beast, or escape)."""
-        return self.is_character() or self.is_beast() or self.is_escape()
+        """Check if card is special (character, beast, escape, tigress, or loot)."""
+        return (
+            self.is_character()
+            or self.is_beast()
+            or self.is_escape()
+            or self.is_tigress()
+            or self.is_loot()
+        )
 
     def is_parrot(self) -> bool:
         """Check if card is Parrot suit."""
@@ -171,6 +184,14 @@ class Card:
         """Check if card is Escape."""
         return self.card_type == CardType.ESCAPE
 
+    def is_tigress(self) -> bool:
+        """Check if card is Tigress (Scary Mary)."""
+        return self.card_type == CardType.TIGRESS
+
+    def is_loot(self) -> bool:
+        """Check if card is Loot (Botín)."""
+        return self.card_type == CardType.LOOT
+
     def __str__(self) -> str:
         """String representation of card."""
         if self.number > 0:
@@ -178,7 +199,7 @@ class Card:
         return self.card_type.value.title().replace("_", " ")
 
 
-# All cards in the deck (63 total)
+# All cards in the deck (74 total)
 _CARDS: dict[CardId, Card] = {
     # Special characters
     CardId.SKULL_KING: Card(CardId.SKULL_KING, 0, CardType.KING),
@@ -216,6 +237,13 @@ for num in range(1, 15):
 for num in range(1, 6):
     escape_id = CardId[f"ESCAPE{num}"]
     _CARDS[escape_id] = Card(escape_id, 0, CardType.ESCAPE)
+
+# Tigress (Scary Mary)
+_CARDS[CardId.TIGRESS] = Card(CardId.TIGRESS, 0, CardType.TIGRESS)
+
+# Loot cards (Botín)
+_CARDS[CardId.LOOT1] = Card(CardId.LOOT1, 0, CardType.LOOT)
+_CARDS[CardId.LOOT2] = Card(CardId.LOOT2, 0, CardType.LOOT)
 
 
 def get_card(card_id: CardId) -> Card:

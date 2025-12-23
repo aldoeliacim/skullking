@@ -55,6 +55,8 @@ class CardType(str, Enum):
     ROGER = "roger"
     PIRATE = "pirate"
     ESCAPE = "escape"
+    TIGRESS = "tigress"  # Scary Mary - can be played as pirate or escape
+    LOOT = "loot"  # Botín - acts like escape but creates alliance
 
 
 # Game configuration constants

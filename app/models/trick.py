@@ -125,6 +125,53 @@ class Trick:
         """Check if all players have picked a card."""
         return len(self.picked_cards) == num_players
 
+    def get_valid_cards(self, hand: list[CardId], cards_in_trick: list[CardId]) -> list[CardId]:
+        """
+        Get valid cards that can be played from the hand.
+
+        In Skull King, the rules are:
+        - Special cards (Pirates, Mermaids, Escapes, etc.) can always be played
+        - If leading, any card can be played
+        - If following, must follow the lead suit if possible (unless playing special)
+
+        For simplicity, we allow all cards and let the game rules handle it.
+        This is a basic implementation - full rules would require suit matching.
+        """
+        if not hand:
+            return []
+
+        # If leading (no cards in trick), can play anything
+        if not cards_in_trick:
+            return list(hand)
+
+        # Get the lead card (first non-escape, non-special card determines suit)
+        lead_suit = None
+        for card_id in cards_in_trick:
+            card = get_card(card_id)
+            if card.is_suit():  # Standard suit or Roger
+                lead_suit = card.card_type
+                break
+
+        # If no suit was led (all special cards), can play anything
+        if lead_suit is None:
+            return list(hand)
+
+        # Check if player has cards of the lead suit
+        suit_cards = []
+        special_cards = []
+        for card_id in hand:
+            card = get_card(card_id)
+            if card.is_special():
+                special_cards.append(card_id)
+            elif card.card_type == lead_suit:
+                suit_cards.append(card_id)
+
+        # Must follow suit if possible, but can always play special cards
+        if suit_cards:
+            return suit_cards + special_cards
+        # Can't follow suit, can play anything
+        return list(hand)
+
     def __str__(self) -> str:
         """String representation."""
         if self.winner_player_id:
