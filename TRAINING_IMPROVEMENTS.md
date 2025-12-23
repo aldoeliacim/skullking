@@ -207,14 +207,40 @@ Per-step range: [-5, +11.5]
 
 ---
 
-## Training Status
+## Training Results (V3 - December 2024)
 
-**Status:** Not started - ready to train
+### Final Metrics @ 1.5M steps:
+```
+Training time:       38 minutes (RTX 4080 SUPER)
+Explained variance:  0.89 (excellent!)
+Value loss:          27.1
+Eval reward:         226
+```
 
-**To start training:**
+### Agent Performance:
+```
+vs Rule-Based MEDIUM (20 games): 100% win rate
+vs Rule-Based HARD (50 games):   100% win rate
+Average reward: 87.4 ± 10.1
+```
+
+### Model Files:
+- `./models/masked_ppo/masked_ppo_final.zip` (407 KB)
+- `./models/masked_ppo/best_model/best_model.zip` (407 KB)
+
+---
+
+## Training Commands
+
+**Train new model:**
 ```bash
 source .venv/bin/activate
-python scripts/train_masked_ppo.py train --timesteps 1500000 --envs 8
+python scripts/train_masked_ppo.py train --timesteps 1500000 --envs 32
+```
+
+**Resume training:**
+```bash
+python scripts/train_masked_ppo.py resume --load ./models/masked_ppo/masked_ppo_final.zip --timesteps 500000
 ```
 
 **Monitor progress:**
