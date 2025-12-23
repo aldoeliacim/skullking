@@ -187,29 +187,29 @@ def train_masked_ppo(
         )
     else:
         print("\nCreating new MaskablePPO model...")
-        print("Improved Hyperparameters (v2):")
-        print("  learning_rate: 1e-4 (stable with masking)")
-        print("  n_steps: 4096 (more samples per update)")
-        print("  batch_size: 128 (better gradient estimates)")
-        print("  n_epochs: 20 (MORE updates for value function)")
-        print("  gamma: 0.995 (longer horizon)")
-        print("  gae_lambda: 0.99 (BETTER long-term credit)")
-        print("  ent_coef: 0.02 (exploration)")
-        print("  vf_coef: 1.0 (STRONGER value function learning)")
+        print("Hyperparameters (v3 - optimized for high-end hardware):")
+        print("  learning_rate: 1e-4")
+        print("  n_steps: 2048 (more frequent updates)")
+        print("  batch_size: 512 (better GPU utilization)")
+        print("  n_epochs: 20")
+        print("  gamma: 0.995")
+        print("  gae_lambda: 0.99")
+        print("  ent_coef: 0.02")
+        print("  vf_coef: 1.0")
         print()
 
         model = MaskablePPO(
             "MlpPolicy",
             vec_env,
             learning_rate=1e-4,
-            n_steps=4096,
-            batch_size=128,
-            n_epochs=20,  # Increased from 15
+            n_steps=2048,  # Reduced for more frequent updates
+            batch_size=512,  # Increased for better GPU utilization
+            n_epochs=20,
             gamma=0.995,
-            gae_lambda=0.99,  # Increased from 0.98
+            gae_lambda=0.99,
             clip_range=0.15,
             ent_coef=0.02,
-            vf_coef=1.0,  # Increased from 0.5
+            vf_coef=1.0,
             max_grad_norm=0.5,
             verbose=1,
             tensorboard_log=f"{save_dir}/tensorboard",
@@ -242,7 +242,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train MaskablePPO on Skull King")
     parser.add_argument("command", choices=["train", "resume"], help="Train new or resume existing")
     parser.add_argument("--timesteps", type=int, default=1_500_000, help="Total training timesteps")
-    parser.add_argument("--envs", type=int, default=8, help="Number of parallel environments")
+    parser.add_argument("--envs", type=int, default=32, help="Number of parallel environments")
     parser.add_argument("--load", type=str, help="Path to load existing model")
 
     args = parser.parse_args()
