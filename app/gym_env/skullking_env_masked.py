@@ -231,6 +231,8 @@ class SkullKingEnvMasked(gym.Env):
             if is_complete and is_new_winner:
                 self.last_trick_winner = last_trick.winner_player_id
                 reward += self._calculate_trick_reward(agent_player, last_trick)
+                # BONUS CAPTURE: Reward for capturing valuable cards
+                reward += self._calculate_bonus_capture_reward(last_trick)
 
         # DENSE REWARD: Round completion rewards
         if current_round and current_round.is_complete():
@@ -362,6 +364,37 @@ class SkullKingEnvMasked(gym.Env):
             return -1.0  # Missed needed trick
 
         return 0.0
+
+    def _calculate_bonus_capture_reward(self, trick: Trick) -> float:
+        """
+        Reward for capturing valuable cards (14s and character combos).
+        Only awarded if agent won the trick AND hit their bid (checked at round end).
+        """
+        if trick.winner_player_id != self.agent_player_id:
+            return 0.0
+
+        reward = 0.0
+        winner_card = get_card(trick.winner_card_id) if trick.winner_card_id else None
+
+        for picked in trick.picked_cards:
+            card = get_card(picked.card_id)
+
+            # Bonus for capturing 14s
+            if picked.card_id in [CardId.PARROT14, CardId.CHEST14, CardId.MAP14]:
+                reward += 0.3  # +10 points = 0.3 reward
+            elif picked.card_id == CardId.ROGER14:
+                reward += 0.5  # +20 points = 0.5 reward
+
+            # Character capture bonuses (only if we won with the right card)
+            if winner_card:
+                if winner_card.is_pirate() and card.is_mermaid():
+                    reward += 0.5  # +20 points
+                elif winner_card.is_king() and card.is_pirate():
+                    reward += 0.7  # +30 points
+                elif winner_card.is_mermaid() and card.is_king():
+                    reward += 1.0  # +40 points
+
+        return reward
 
     def _calculate_round_reward(self, agent_player: Player, current_round) -> float:
         """Round completion reward (bidding accuracy) - NORMALIZED."""
