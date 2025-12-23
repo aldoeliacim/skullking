@@ -1,5 +1,6 @@
 """Game model for managing game state."""
 
+import random
 from dataclasses import dataclass, field
 
 from app.models.deck import Deck
@@ -89,7 +90,14 @@ class Game:
     def start_new_round(self) -> Round:
         """Start a new round."""
         self.current_round_number += 1
-        starter_index = (self.current_round_number - 1) % len(self.players)
+
+        # First round: random starter. Subsequent rounds: rotate from round 1 starter
+        if self.current_round_number == 1:
+            starter_index = random.randint(0, len(self.players) - 1)
+        else:
+            # Get round 1 starter and rotate from there
+            round1_starter = self.rounds[0].starter_player_index if self.rounds else 0
+            starter_index = (round1_starter + self.current_round_number - 1) % len(self.players)
 
         round_obj = Round(
             number=self.current_round_number,

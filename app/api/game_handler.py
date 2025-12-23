@@ -720,9 +720,6 @@ class GameHandler:
 
         # Use lock to prevent concurrent bot processing
         lock = self._get_bot_lock(game.id)
-        if lock.locked():
-            # Already processing bots for this game, skip
-            return
 
         async with lock:
             await asyncio.sleep(0.5)  # Small delay for natural feel

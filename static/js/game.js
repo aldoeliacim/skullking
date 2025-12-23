@@ -448,7 +448,9 @@ class SkullKingGame {
             const div = document.createElement('div');
             div.className = 'opponent-card';
 
-            if (this.gameState.current_player_id === player.id) {
+            // Check if it's this opponent's turn to pick
+            if (this.gameState.picking_player_id === player.id ||
+                this.gameState.current_player_id === player.id) {
                 div.classList.add('current-turn');
             }
 
@@ -456,13 +458,20 @@ class SkullKingGame {
             const playerBid = player.bid ?? this.gameState.bids?.[player.id] ?? null;
             const bidDisplay = playerBid !== null && playerBid !== undefined ? playerBid : '-';
 
+            // Check for score animation
+            const scoreChange = this.lastScoreChanges?.[player.id];
+            let scoreClass = 'stat-value';
+            if (scoreChange !== undefined) {
+                scoreClass += scoreChange > 0 ? ' score-up' : ' score-down';
+            }
+
             div.innerHTML = `
                 <div class="opponent-name">
                     ${player.is_bot ? '🤖 ' : ''}${player.username}
                 </div>
                 <div class="opponent-stats">
                     <div class="stat">
-                        <span class="stat-value">${player.score || 0}</span>
+                        <span class="${scoreClass}">${player.score || 0}</span>
                         <span class="stat-label">${window.i18n.t('game.score')}</span>
                     </div>
                     <div class="stat">
@@ -545,6 +554,7 @@ class SkullKingGame {
         trickCards.forEach(({ player_id, card_id, player_name, card }) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'trick-card-wrapper';
+            wrapper.dataset.playerId = player_id;
 
             // Handle both formats: {card_id} from server or {card} object
             const cardData = card || this.cardIdToCard(card_id);
@@ -801,6 +811,15 @@ class SkullKingGame {
             winner.tricks_won = (winner.tricks_won || 0) + 1;
         }
 
+        // Mark the winning card in the trick area
+        const trickCards = document.querySelectorAll('.trick-card-wrapper');
+        trickCards.forEach(wrapper => {
+            const playerId = wrapper.dataset.playerId;
+            if (playerId === data.winner_player_id) {
+                wrapper.classList.add('winner');
+            }
+        });
+
         const winnerLabel = document.getElementById('trick-winner');
         const winnerName = winner?.username || 'Unknown';
 
@@ -849,20 +868,34 @@ class SkullKingGame {
 
     handleScoresAnnounced(data) {
         console.log('[handleScoresAnnounced] Round:', data.round, 'Scores:', data.scores);
+
+        // Track score changes for animation
+        const scoreChanges = {};
+
         // Update player scores
         if (this.gameState?.players && data.scores) {
             data.scores.forEach(scoreInfo => {
                 const player = this.gameState.players.find(p => p.id === scoreInfo.player_id);
                 if (player) {
+                    scoreChanges[player.id] = scoreInfo.score_delta;
                     player.score = scoreInfo.total_score;
                     player.tricks_won = 0; // Reset for next round
                     player.bid = null; // Reset bid
                 }
             });
         }
+
+        // Store score changes for animation
+        this.lastScoreChanges = scoreChanges;
+
         console.log('[handleScoresAnnounced] Current hand after scores:', this.gameState?.hand);
         this.addLog(window.i18n.t('log.roundComplete', { round: data.round }));
         this.updateGameScreen();
+
+        // Clear score changes after animation completes
+        setTimeout(() => {
+            this.lastScoreChanges = null;
+        }, 1000);
     }
 
     handleRoundComplete(data) {
