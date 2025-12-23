@@ -1,121 +1,191 @@
-# About Game
+# Skull King
 
-This program is a digital version of a board game that belongs to the original series
-of [Grandpa Skull King](https://www.grandpabecksgames.com/pages/skull-king).
+A modern Python implementation of the [Skull King](https://www.grandpabecksgames.com/pages/skull-king) card game with bot AI players and Gymnasium environment for reinforcement learning.
 
 ![Screenshot of Skull King online board game.](./screenshot.png)
 
-Skull King is a trick-taking game in which you will bid
-the exact number of tricks you predict you will win each
-round. You’ll battle with your rivals as you strive to keep
-your own bid afloat… while seizing opportunities to also
-sink your opponents! The pirate with the highest score at
-the end of the game wins and earns the title of Captain of
-the Seven Seas!
+Skull King is a trick-taking game where you bid the exact number of tricks you predict you'll win each round. Battle your rivals while keeping your bid afloat and seizing opportunities to sink your opponents! The pirate with the highest score earns the title of Captain of the Seven Seas!
 
-# Cards
+## Features
 
-## Suit Cards
+### Core Game Engine
+- Complete Skull King rules implementation
+- Support for 2-7 players
+- 10 rounds with escalating complexity
+- All special cards (Skull King, Mermaids, Pirates, Kraken, White Whale)
+- Comprehensive scoring system with bonus points
 
-- Parrot (14)
-- Pirate Map (14)
-- Treasure Chest (14)
-- Jolly Roger (14)
+### AI Bot Players
+- **RandomBot**: Baseline bot making random valid moves
+- **RuleBasedBot**: Intelligent heuristic-based strategy with difficulty levels
+- **RLBot**: Interface for reinforcement learning agents
 
-## Special Cards
+### Reinforcement Learning
+- **Gymnasium Environment**: OpenAI Gym-compatible environment
+- Observation/action space encoding for RL algorithms
+- Ready for PPO, DQN, A2C, etc.
 
-- Pirate (5)
+### Modern Python Stack
+- Python 3.11+ with type hints
+- FastAPI WebSocket server for multiplayer
+- Poetry for dependency management
+- Pre-commit hooks with ruff linting
+- Comprehensive test suite (46 tests)
+
+## Installation
+
+```bash
+# Install Poetry if needed
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Install dependencies
+poetry install
+
+# Activate virtual environment
+poetry shell
+```
+
+## Quick Start
+
+### Watch Bots Play
+
+```bash
+# 4 rule-based bots (default)
+python scripts/play_bot_game.py
+
+# 6 players with custom mix
+python scripts/play_bot_game.py --players 6 --random 2
+```
+
+### Train RL Agents
+
+```python
+from stable_baselines3 import PPO
+from app.gym_env import SkullKingEnv
+
+env = SkullKingEnv(num_opponents=3, opponent_bot_type="rule_based")
+model = PPO("MlpPolicy", env, verbose=1)
+model.learn(total_timesteps=100000)
+model.save("skullking_ppo")
+```
+
+### Run Tests
+
+```bash
+pytest tests/
+```
+
+## Cards
+
+### Suit Cards (14 each)
+- Parrot (yellow)
+- Pirate Map (green)
+- Treasure Chest (purple)
+- Jolly Roger (black - trump)
+
+### Special Cards
 - Skull King (1)
 - Mermaid (2)
+- Pirate (5)
 - Escape (5)
-
-## Expansion Cards
-
 - Kraken (1)
 - White Whale (1)
 
-> **Loot** and **Tigress** cards are not implemented duo to complexity.
+> **Loot** and **Tigress** cards are not implemented due to complexity.
 
-# Rules
+## Rules
 
-- If multiple pirates are played in a trick, the first player who plays one wins it.
+### Card Hierarchy
+1. **Skull King** beats Pirates
+2. **Pirates** beat Mermaids
+3. **Mermaids** beat Skull King
+4. **Special**: Mermaid wins if Skull King + Pirate + Mermaid all present
+5. **Jolly Roger** (trump) beats standard suits
+6. **Kraken**: No one wins the trick
+7. **White Whale**: Highest suit card wins
+8. **Escape**: Always loses
 
-- In the rare event that each player plays an escape card in the
-same trick; the first card played wins the trick.
+### Following Suit
+- If a suit card leads, you must follow that suit if able
+- Special cards (Mermaid, Pirate, Skull King, etc.) have no suit to follow
+- Escape defers suit-setting to next player
 
-- If a Pirate, the Skull King, and a Mermaid are all played in the same trick,
-the Mermaid always wins the trick, regardless of order of play.
+### Scoring
 
-- The next trick is led by the player who would have won the trick.
+**Bidding One or More:**
+- Correct bid: 20 points per trick won + bonus points
+- Wrong bid: -10 points per trick off
 
-- The player to the left of the current round's starting player becomes the starting player for the next round.
+**Bidding Zero:**
+- Correct: +10 points × round number
+- Wrong: -10 points × round number
 
-## When a suit card is led
+### Bonus Points
+- Standard 14s captured: +10 each
+- Jolly Roger 14 captured: +20
+- Pirate captures Mermaid: +20
+- Skull King captures Pirate: +30
+- Mermaid captures Skull King: +40
 
-If a suit card is played first in a trick (lead), all players must
-‘follow suit’and play that same suit (if they are going to
-play a numbered card). If you don’t have the suit that was
-lead, you may play any other suit.
-
-## When a special card is led
-
-### Leading with an escape
-
-When an Escape is lead, the next player sets the suit that must be followed,
-unless they play one of these as well, which would defer setting the suit
-to the next player.
-
-### Leading with a character
-
-When a Mermaid, Pirate, Skull King, Kraken, or White Whale
-leads a trick, there is no suit to follow for that trick.
-Each other player may play any card they choose.
-
-# Scoring
-
-## Bidding One or More
-
-When you win the exact number of tricks that you bid, you
-are awarded 20 points for each trick taken.
-Capture more or fewer tricks than you bid, and you’ll lose
-10 points for every trick you were off. You don’t earn
-points for any tricks captured that round.
-
-## Bidding Zero
-
-Bid zero and get your bid correct and your potential score
-is 10 points times the number of cards dealt that round.
-However, if you bid zero and then take 1 or more tricks,
-you’ll lose 10 points per card dealt that round instead.
-
-## Bonus Points
-
-### The Number Fourteen Cards
-
-- **10 points** for each standard suit (yellow, purple, or
-  green) 14 card you have at the end of the round.
-- **20 points** for possessing the black (Jolly Roger) 14 card at
-  the end of the round.
-
-> Every 14 you have at the end of the round earns you a bonus, whether played by you or an opponent.
-
-### Character Cards
-
-Capturing (taking) character cards will earn a bonus:
-
-- 20 points for each Mermaid taken by a Pirate.
-- 30 points for each Pirate taken by the Skull King.
-- 40 points for taking the Skull King with a Mermaid.
-
-# Setup
-
-## Production
-
-### Nginx
+## Project Structure
 
 ```
-server
-{
+skullking/
+├── app/
+│   ├── api/                 # FastAPI routes & WebSocket
+│   │   ├── routes.py
+│   │   ├── websocket.py
+│   │   └── game_handler.py  # Game logic handler
+│   ├── models/              # Game domain models
+│   ├── bots/                # AI bot players
+│   ├── gym_env/             # Gymnasium environment
+│   ├── repositories/        # Data access
+│   └── services/            # Business logic
+├── tests/                   # Test suite
+├── scripts/                 # Utility scripts
+└── pyproject.toml
+```
+
+## Development
+
+### Code Quality
+
+```bash
+# Run pre-commit hooks
+pre-commit run --all-files
+
+# Run tests
+pytest tests/ -v
+
+# Type checking
+mypy app/
+```
+
+### Environment Variables
+
+Copy `.env.example` to `.env`:
+
+```bash
+ENABLE_BOTS=true
+BOT_THINK_TIME_MIN=0.5
+BOT_THINK_TIME_MAX=2.0
+DEFAULT_BOT_STRATEGY=rule_based
+MAX_PLAYERS=7
+ROUNDS_COUNT=10
+```
+
+## Production Deployment
+
+### Docker
+
+```bash
+docker compose -f docker-compose-production.yml up -d --build
+```
+
+### Nginx Configuration
+
+```nginx
+server {
   listen 80;
   server_name api.skullking.ir;
   return 301 https://$host$request_uri;
@@ -135,15 +205,13 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   }
 
-  location /games/join  {
+  location /games/join {
     proxy_pass http://127.0.0.1:3002$request_uri;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
-
     proxy_read_timeout 300;
     proxy_connect_timeout 300;
     proxy_send_timeout 300;
@@ -151,8 +219,13 @@ server {
 }
 ```
 
-### Docker
+## Resources
 
-```bash
-docker compose -f docker-compose-production.yml up -d --build
-```
+- [Skull King Official Rules](https://www.grandpabecksgames.com/products/skull-king)
+- [Gymnasium Documentation](https://gymnasium.farama.org/)
+- [Stable-Baselines3](https://stable-baselines3.readthedocs.io/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+
+## License
+
+See LICENSE file for details.
