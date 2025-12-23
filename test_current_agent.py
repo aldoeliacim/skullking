@@ -1,7 +1,8 @@
-from app.gym_env.skullking_env_masked import SkullKingEnvMasked
+import numpy as np
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
-import numpy as np
+
+from app.gym_env.skullking_env_masked import SkullKingEnvMasked
 
 # Load the latest model
 model_path = "./models/masked_ppo/best_model/best_model.zip"
@@ -13,8 +14,10 @@ except Exception as e:
     print("Testing random policy\n")
     model = None
 
+
 def mask_fn(env):
     return env.action_masks()
+
 
 # Test 10 episodes
 env = SkullKingEnvMasked(num_opponents=3, opponent_bot_type="random", opponent_difficulty="medium")
@@ -47,7 +50,7 @@ for episode in range(10):
 
     # Check if won
     final_info = info
-    if 'ranking' in final_info and final_info['ranking'] == 1:
+    if "ranking" in final_info and final_info["ranking"] == 1:
         wins += 1
         status = "🏆 WIN"
     else:
@@ -58,9 +61,9 @@ for episode in range(10):
 
     print(f"Episode {episode+1:2d}: {status}  Reward: {total_reward:6.1f}  Steps: {steps:2d}")
 
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print(f"Average reward: {np.mean(rewards):.1f} ± {np.std(rewards):.1f}")
 print(f"Average length: {np.mean(lengths):.1f}")
 print(f"Win rate: {wins}/10 ({100*wins/10:.0f}%)")
-print(f"Expected vs random: ~25% (1/4 players)")
-print("="*50)
+print("Expected vs random: ~25% (1/4 players)")
+print("=" * 50)

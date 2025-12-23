@@ -1,7 +1,6 @@
 """Rule-based bot with heuristic strategy."""
 
 import random
-from typing import List, Optional
 
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import CardId, get_card
@@ -26,7 +25,7 @@ class RuleBasedBot(BaseBot):
         """Initialize rule-based bot."""
         super().__init__(player_id, difficulty)
 
-    def make_bid(self, game: Game, round_number: int, hand: List[CardId]) -> int:
+    def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
         """
         Make a bid based on hand strength.
 
@@ -50,7 +49,6 @@ class RuleBasedBot(BaseBot):
 
         for card_id in hand:
             card = get_card(card_id)
-            strength = self._evaluate_card_strength(card_id, hand)
 
             # Estimate probability of winning with this card
             if card.is_king():
@@ -97,9 +95,9 @@ class RuleBasedBot(BaseBot):
     def pick_card(
         self,
         game: Game,
-        hand: List[CardId],
-        cards_in_trick: List[CardId],
-        valid_cards: Optional[List[CardId]] = None,
+        hand: list[CardId],
+        cards_in_trick: list[CardId],
+        valid_cards: list[CardId] | None = None,
     ) -> CardId:
         """
         Pick a card strategically.
@@ -163,12 +161,11 @@ class RuleBasedBot(BaseBot):
         # Execute strategy
         if strategy == "win":
             return self._play_strong_card(playable, cards_in_trick)
-        elif strategy == "lose":
+        if strategy == "lose":
             return self._play_weak_card(playable, cards_in_trick)
-        else:
-            return self._play_medium_card(playable, cards_in_trick)
+        return self._play_medium_card(playable, cards_in_trick)
 
-    def _evaluate_card_strength(self, card_id: CardId, hand: List[CardId]) -> float:
+    def _evaluate_card_strength(self, card_id: CardId, hand: list[CardId]) -> float:
         """
         Evaluate the strength of a card (0.0 to 1.0).
 
@@ -183,40 +180,45 @@ class RuleBasedBot(BaseBot):
 
         if card.is_escape():
             return 0.0
-        elif card.is_king():
+        if card.is_king():
             return 1.0
-        elif card.is_pirate():
+        if card.is_pirate():
             return 0.85
-        elif card.is_mermaid():
+        if card.is_mermaid():
             return 0.75
-        elif card.is_whale():
+        if card.is_whale():
             return 0.5  # Special case
-        elif card.is_kraken():
+        if card.is_kraken():
             return 0.3  # Nobody wins
-        elif card.is_roger():
+        if card.is_roger():
             # Trump suit
             return 0.4 + (card.number / 14) * 0.4
-        elif card.is_suit():
+        if card.is_suit():
             # Standard suit
             return 0.1 + (card.number / 14) * 0.3
-        else:
-            return 0.2
+        return 0.2
 
-    def _play_strong_card(self, playable: List[CardId], cards_in_trick: List[CardId]) -> CardId:
+    def _play_strong_card(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
         """Play the strongest available card."""
-        strengths = [(card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable]
+        strengths = [
+            (card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable
+        ]
         strengths.sort(key=lambda x: x[1], reverse=True)
         return strengths[0][0]
 
-    def _play_weak_card(self, playable: List[CardId], cards_in_trick: List[CardId]) -> CardId:
+    def _play_weak_card(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
         """Play the weakest available card."""
-        strengths = [(card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable]
+        strengths = [
+            (card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable
+        ]
         strengths.sort(key=lambda x: x[1])
         return strengths[0][0]
 
-    def _play_medium_card(self, playable: List[CardId], cards_in_trick: List[CardId]) -> CardId:
+    def _play_medium_card(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
         """Play a medium-strength card."""
-        strengths = [(card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable]
+        strengths = [
+            (card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable
+        ]
         strengths.sort(key=lambda x: x[1])
 
         # Pick middle card

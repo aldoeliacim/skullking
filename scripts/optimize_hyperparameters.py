@@ -14,10 +14,8 @@ Tests different combinations of:
 import argparse
 import itertools
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 
@@ -39,7 +37,7 @@ def create_env(opponent_type="random", difficulty="medium"):
 
 
 def quick_train_and_evaluate(
-    hyperparams: Dict,
+    hyperparams: dict,
     train_steps: int = 50_000,
     eval_games: int = 20,
 ) -> float:
@@ -107,7 +105,7 @@ def quick_train_and_evaluate(
 
 
 def grid_search_hyperparameters(
-    param_grid: Dict[str, List],
+    param_grid: dict[str, list],
     train_steps: int = 50_000,
     eval_games: int = 20,
 ):
@@ -119,9 +117,9 @@ def grid_search_hyperparameters(
         train_steps: Training steps per configuration
         eval_games: Evaluation games per configuration
     """
-    print("="*70)
+    print("=" * 70)
     print("HYPERPARAMETER GRID SEARCH")
-    print("="*70)
+    print("=" * 70)
 
     # Generate all combinations
     param_names = list(param_grid.keys())
@@ -134,27 +132,29 @@ def grid_search_hyperparameters(
     results = []
 
     for i, values in enumerate(combinations, 1):
-        hyperparams = dict(zip(param_names, values))
+        hyperparams = dict(zip(param_names, values, strict=False))
 
         print(f"\n[{i}/{len(combinations)}]", end=" ")
         avg_reward = quick_train_and_evaluate(hyperparams, train_steps, eval_games)
 
-        results.append({
-            "hyperparams": hyperparams,
-            "avg_reward": avg_reward,
-        })
+        results.append(
+            {
+                "hyperparams": hyperparams,
+                "avg_reward": avg_reward,
+            }
+        )
 
     # Sort by performance
     results.sort(key=lambda x: x["avg_reward"], reverse=True)
 
     # Print results
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("RESULTS (sorted by performance)")
-    print("="*70)
+    print("=" * 70)
 
     for i, result in enumerate(results[:5], 1):
         print(f"\n{i}. Avg Reward: {result['avg_reward']:.2f}")
-        print(f"   Hyperparameters:")
+        print("   Hyperparameters:")
         for key, value in result["hyperparams"].items():
             print(f"     {key}: {value}")
 
@@ -178,9 +178,9 @@ def random_search_hyperparameters(
 
     Samples random combinations from continuous ranges.
     """
-    print("="*70)
+    print("=" * 70)
     print(f"HYPERPARAMETER RANDOM SEARCH ({n_trials} trials)")
-    print("="*70)
+    print("=" * 70)
 
     results = []
 
@@ -199,22 +199,24 @@ def random_search_hyperparameters(
         print(f"\n[Trial {trial}/{n_trials}]")
         avg_reward = quick_train_and_evaluate(hyperparams, train_steps, eval_games)
 
-        results.append({
-            "hyperparams": hyperparams,
-            "avg_reward": avg_reward,
-        })
+        results.append(
+            {
+                "hyperparams": hyperparams,
+                "avg_reward": avg_reward,
+            }
+        )
 
     # Sort by performance
     results.sort(key=lambda x: x["avg_reward"], reverse=True)
 
     # Print top results
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TOP 5 CONFIGURATIONS")
-    print("="*70)
+    print("=" * 70)
 
     for i, result in enumerate(results[:5], 1):
         print(f"\n{i}. Avg Reward: {result['avg_reward']:.2f}")
-        print(f"   Hyperparameters:")
+        print("   Hyperparameters:")
         for key, value in result["hyperparams"].items():
             if isinstance(value, float):
                 print(f"     {key}: {value:.6f}")

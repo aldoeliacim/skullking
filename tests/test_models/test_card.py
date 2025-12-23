@@ -1,8 +1,6 @@
 """Tests for Card model and winner determination."""
 
-import pytest
-
-from app.models.card import Card, CardId, CardType, determine_winner, get_card
+from app.models.card import CardId, CardType, determine_winner, get_card
 
 
 class TestCard:

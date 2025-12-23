@@ -1,12 +1,17 @@
 """Detailed agent testing with gameplay analysis."""
-from app.gym_env.skullking_env_masked import SkullKingEnvMasked
+
+from collections import defaultdict
+
+import numpy as np
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
-import numpy as np
-from collections import defaultdict
+
+from app.gym_env.skullking_env_masked import SkullKingEnvMasked
+
 
 def mask_fn(env):
     return env.action_masks()
+
 
 # Load best model
 model_path = "./models/masked_ppo/best_model/best_model.zip"
@@ -29,9 +34,9 @@ opponent_configs = [
     ("rule_based", "medium", "Rule-based Medium"),
 ]
 
-print("="*70)
+print("=" * 70)
 print("DETAILED AGENT PERFORMANCE TESTING")
-print("="*70)
+print("=" * 70)
 
 overall_stats = defaultdict(list)
 
@@ -40,7 +45,9 @@ for opp_type, opp_diff, label in opponent_configs:
     print(f"Testing vs {label}")
     print(f"{'='*70}")
 
-    env = SkullKingEnvMasked(num_opponents=3, opponent_bot_type=opp_type, opponent_difficulty=opp_diff)
+    env = SkullKingEnvMasked(
+        num_opponents=3, opponent_bot_type=opp_type, opponent_difficulty=opp_diff
+    )
     env = ActionMasker(env, mask_fn)
 
     rewards = []
@@ -62,18 +69,18 @@ for opp_type, opp_diff, label in opponent_configs:
         rewards.append(total_reward)
 
         # Extract final info
-        if 'ranking' in info:
-            ranks.append(info['ranking'])
+        if "ranking" in info:
+            ranks.append(info["ranking"])
 
         # Try to get bid accuracy
-        if hasattr(env, 'game') and env.game:
+        if hasattr(env, "game") and env.game:
             agent_player = env.game.get_player(env.agent_player_id)
             if agent_player:
                 perfect_bids = 0
                 total_rounds = 0
                 for round_obj in env.game.rounds:
                     if agent_player.id in round_obj.scores:
-                        bid = agent_player.bid if hasattr(agent_player, 'bid') else 0
+                        bid = agent_player.bid if hasattr(agent_player, "bid") else 0
                         tricks_won = round_obj.get_tricks_won(agent_player.id)
                         if abs(bid - tricks_won) == 0:
                             perfect_bids += 1
@@ -95,16 +102,16 @@ for opp_type, opp_diff, label in opponent_configs:
     print(f"  Win rate: {win_rate:.1f}%")
     print(f"  Perfect bid rate: {avg_bid_acc*100:.1f}%")
 
-    overall_stats['rewards'].append(avg_reward)
-    overall_stats['ranks'].append(avg_rank)
-    overall_stats['win_rates'].append(win_rate)
-    overall_stats['labels'].append(label)
+    overall_stats["rewards"].append(avg_reward)
+    overall_stats["ranks"].append(avg_rank)
+    overall_stats["win_rates"].append(win_rate)
+    overall_stats["labels"].append(label)
 
 print(f"\n{'='*70}")
 print("OVERALL SUMMARY")
 print(f"{'='*70}")
 
-for i, label in enumerate(overall_stats['labels']):
+for i, label in enumerate(overall_stats["labels"]):
     print(f"\n{label}:")
     print(f"  Avg Reward: {overall_stats['rewards'][i]:.1f}")
     print(f"  Avg Rank: {overall_stats['ranks'][i]:.2f}")
@@ -115,13 +122,15 @@ print("PERFORMANCE ANALYSIS")
 print(f"{'='*70}")
 
 # Analyze performance
-all_win_rates = overall_stats['win_rates']
+all_win_rates = overall_stats["win_rates"]
 avg_win_rate = np.mean(all_win_rates)
 baseline_random = 25.0  # Expected for random 1/4 players
 
 print(f"\nAverage win rate: {avg_win_rate:.1f}%")
 print(f"Baseline (random): {baseline_random:.1f}%")
-print(f"Improvement: {avg_win_rate - baseline_random:+.1f}% ({(avg_win_rate/baseline_random - 1)*100:+.1f}%)")
+print(
+    f"Improvement: {avg_win_rate - baseline_random:+.1f}% ({(avg_win_rate/baseline_random - 1)*100:+.1f}%)"
+)
 
 if avg_win_rate > 35:
     print("\n✅ STRONG PERFORMANCE - Agent is learning well!")

@@ -1,7 +1,6 @@
 """Deck model for shuffling and dealing cards."""
 
 import random
-from typing import List
 
 from app.models.card import CardId, get_all_cards
 
@@ -22,7 +21,7 @@ class Deck:
 
     def __init__(self) -> None:
         """Initialize an empty deck."""
-        self.cards: List[CardId] = []
+        self.cards: list[CardId] = []
 
     def fill(self) -> None:
         """Fill the deck with all 63 cards."""
@@ -34,7 +33,7 @@ class Deck:
         self.fill()
         random.shuffle(self.cards)
 
-    def deal(self, num_players: int, cards_per_player: int) -> List[List[CardId]]:
+    def deal(self, num_players: int, cards_per_player: int) -> list[list[CardId]]:
         """
         Deal cards to players.
 
@@ -48,7 +47,7 @@ class Deck:
         if not self.cards:
             self.shuffle()
 
-        hands: List[List[CardId]] = []
+        hands: list[list[CardId]] = []
         index = 0
 
         for _ in range(num_players):

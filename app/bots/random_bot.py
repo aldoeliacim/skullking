@@ -1,7 +1,6 @@
 """Random bot that makes random valid moves."""
 
 import random
-from typing import List, Optional
 
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import CardId
@@ -20,7 +19,7 @@ class RandomBot(BaseBot):
         """Initialize random bot."""
         super().__init__(player_id, BotDifficulty.RANDOM)
 
-    def make_bid(self, game: Game, round_number: int, hand: List[CardId]) -> int:
+    def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
         """
         Make a random bid between 0 and round_number.
 
@@ -37,9 +36,9 @@ class RandomBot(BaseBot):
     def pick_card(
         self,
         game: Game,
-        hand: List[CardId],
-        cards_in_trick: List[CardId],
-        valid_cards: Optional[List[CardId]] = None,
+        hand: list[CardId],
+        cards_in_trick: list[CardId],
+        valid_cards: list[CardId] | None = None,
     ) -> CardId:
         """
         Pick a random valid card.

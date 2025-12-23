@@ -5,15 +5,16 @@ Masked Gymnasium environment for Skull King with critical improvements:
 3. Compact observations (151 dims vs 1226)
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
+
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from app.bots import RandomBot, RuleBasedBot
 from app.bots.base_bot import BotDifficulty
-from app.models.card import CardId, get_card, Card
-from app.models.enums import GameState, MAX_PLAYERS, MAX_ROUNDS
+from app.models.card import Card, CardId, get_card
+from app.models.enums import MAX_ROUNDS, GameState
 from app.models.game import Game
 from app.models.player import Player
 from app.models.trick import Trick
@@ -22,7 +23,7 @@ from app.models.trick import Trick
 class SkullKingEnvMasked(gym.Env):
     """Masked action environment with dense rewards and compact observations."""
 
-    metadata = {"render_modes": ["ansi"], "render_fps": 4}
+    metadata: ClassVar[dict[str, Any]] = {"render_modes": ["ansi"], "render_fps": 4}
 
     def __init__(
         self,
@@ -30,7 +31,7 @@ class SkullKingEnvMasked(gym.Env):
         opponent_bot_type: str = "random",
         opponent_difficulty: str = "medium",
         max_invalid_moves: int = 50,  # INCREASED from 10
-        render_mode: Optional[str] = None,
+        render_mode: str | None = None,
     ):
         super().__init__()
         self.num_players = num_opponents + 1
@@ -39,7 +40,7 @@ class SkullKingEnvMasked(gym.Env):
         self.max_invalid_moves = max_invalid_moves
         self.render_mode = render_mode
 
-        # COMPACT OBSERVATION SPACE: 151 dims (vs 1226)
+        # ENHANCED OBSERVATION SPACE: 171 dims (was 151)
         # Breakdown:
         # - Game phase (4): one-hot for PENDING/BIDDING/PICKING/ENDED
         # - Hand encoding (90): 10 cards × 9 features each
@@ -47,23 +48,29 @@ class SkullKingEnvMasked(gym.Env):
         # - Bidding context (8): round info, tricks, hand strength
         # - Opponent state (9): 3 opponents × 3 features each
         # - Hand strength breakdown (4): pirates, kings, mermaids, high cards
-        self.observation_space = spaces.Box(
-            low=0, high=1, shape=(151,), dtype=np.float32
-        )
+        # NEW ADDITIONS (+20 dims):
+        # - Trick position (4): one-hot for 1st/2nd/3rd/4th to play
+        # - Opponent patterns (6): avg bid and error per opponent
+        # - Cards played count (5): by type (pirates, kings, etc.)
+        # - Round progression (1): tricks played / total
+        # - Bid pressure (1): (needed - remaining) / needed
+        # - Position advantage (1): how often we play last
+        # - Trump strength (2): our best vs seen, our avg vs seen
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(171,), dtype=np.float32)
 
         # Action space: 0-10 (bids or card indices)
         self.action_space = spaces.Discrete(11)
 
         # Game state
-        self.game: Optional[Game] = None
+        self.game: Game | None = None
         self.agent_player_id: str = ""
-        self.bots: List[Tuple[str, Any]] = []
+        self.bots: list[tuple[str, Any]] = []
         self.invalid_move_count = 0
 
         # Enhanced tracking for dense rewards
         self.previous_score = 0
         self.previous_tricks_won = 0
-        self.last_trick_winner: Optional[str] = None
+        self.last_trick_winner: str | None = None
 
     def _parse_difficulty(self, difficulty: str) -> BotDifficulty:
         """Parse difficulty string to enum."""
@@ -122,8 +129,8 @@ class SkullKingEnvMasked(gym.Env):
         return mask
 
     def reset(
-        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
-    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        self, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[np.ndarray, dict[str, Any]]:
         """Reset environment."""
         super().reset(seed=seed)
 
@@ -147,7 +154,7 @@ class SkullKingEnvMasked(gym.Env):
             bot_id = f"bot_{i}"
             bot_player = Player(
                 id=bot_id,
-                username=f"Bot{i+1}",
+                username=f"Bot{i + 1}",
                 game_id=self.game.id,
                 index=i + 1,
                 is_bot=True,
@@ -175,7 +182,7 @@ class SkullKingEnvMasked(gym.Env):
 
         return observation, info
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """Execute action with DENSE REWARD SHAPING."""
         if self.game is None:
             raise RuntimeError("Environment not initialized. Call reset() first.")
@@ -219,7 +226,9 @@ class SkullKingEnvMasked(gym.Env):
         current_round = self.game.get_current_round()
         if current_round and current_round.tricks:
             last_trick = current_round.tricks[-1]
-            if last_trick.is_complete(self.num_players) and last_trick.winner_player_id != self.last_trick_winner:
+            is_complete = last_trick.is_complete(self.num_players)
+            is_new_winner = last_trick.winner_player_id != self.last_trick_winner
+            if is_complete and is_new_winner:
                 self.last_trick_winner = last_trick.winner_player_id
                 reward += self._calculate_trick_reward(agent_player, last_trick)
 
@@ -309,7 +318,6 @@ class SkullKingEnvMasked(gym.Env):
         bid = agent_player.bid if agent_player.bid is not None else 0
         tricks_won = current_round.get_tricks_won(self.agent_player_id)
         tricks_needed = bid - tricks_won
-        tricks_remaining = current_round.number - len(current_round.tricks) + 1
 
         card = get_card(card_played)
         card_strength = self._evaluate_card_strength(card)
@@ -318,13 +326,13 @@ class SkullKingEnvMasked(gym.Env):
         if tricks_needed > 0:
             if card_strength > 0.6:
                 return 1.0  # Good strategic choice
-            elif card_strength < 0.3:
+            if card_strength < 0.3:
                 return -0.5  # Poor choice
         # Reward playing weak cards when not needing to win
         elif tricks_needed == 0:
             if card_strength < 0.4:
                 return 0.5  # Good strategic choice
-            elif card_strength > 0.7:
+            if card_strength > 0.7:
                 return -0.3  # Wasteful
 
         return 0.0
@@ -335,7 +343,7 @@ class SkullKingEnvMasked(gym.Env):
         if not current_round:
             return 0.0
 
-        won_trick = (trick.winner_player_id == self.agent_player_id)
+        won_trick = trick.winner_player_id == self.agent_player_id
         bid = agent_player.bid if agent_player.bid is not None else 0
         tricks_won = current_round.get_tricks_won(self.agent_player_id)
         tricks_needed = bid - (tricks_won - (1 if won_trick else 0))  # Before this trick
@@ -343,16 +351,15 @@ class SkullKingEnvMasked(gym.Env):
         # Reward correct strategic outcomes
         if tricks_needed > 0 and won_trick:
             return 3.0  # Good! Needed to win and did
-        elif tricks_needed == 0 and not won_trick:
+        if tricks_needed == 0 and not won_trick:
             return 1.5  # Good! Avoided overbidding
-        elif tricks_needed == 0 and won_trick:
+        if tricks_needed == 0 and won_trick:
             return -2.0  # Bad! Overbidding
-        elif tricks_needed > 0 and not won_trick:
+        if tricks_needed > 0 and not won_trick:
             tricks_remaining = current_round.number - len(current_round.tricks)
             if tricks_needed > tricks_remaining:
                 return 0.0  # Can't make bid anyway
-            else:
-                return -1.0  # Missed needed trick
+            return -1.0  # Missed needed trick
 
         return 0.0
 
@@ -365,19 +372,17 @@ class SkullKingEnvMasked(gym.Env):
         # Normalized scale: -5 to +5 (was -80 to +20)
         if bid_accuracy == 0:
             return 5.0  # Perfect bid!
-        elif bid_accuracy == 1:
+        if bid_accuracy == 1:
             return 2.0  # Close
-        elif bid_accuracy == 2:
+        if bid_accuracy == 2:
             return -1.0
-        else:
-            return -5.0  # Bad bid (capped)
+        return -5.0  # Bad bid (capped)
 
     def _calculate_game_reward(self, agent_player: Player) -> float:
         """Final game reward (ranking) - NORMALIZED."""
         leaderboard = self.game.get_leaderboard()
         agent_rank = next(
-            (i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id),
-            3
+            (i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id), 3
         )
 
         # Normalized scale: -5 to +10 (was -35 to +80)
@@ -386,30 +391,248 @@ class SkullKingEnvMasked(gym.Env):
 
         return reward
 
-    def _estimate_hand_strength(self, hand: List[CardId]) -> float:
-        """Estimate expected tricks from hand."""
-        strength = 0.0
+    def _estimate_hand_strength(self, hand: list[CardId]) -> float:
+        """Enhanced hand strength estimation with context awareness."""
+        if not hand:
+            return 0.0
+
+        # Base strength from individual cards
+        card_objects = [get_card(cid) for cid in hand]
+        base_strength = sum(self._evaluate_card_strength(c) for c in card_objects)
+
+        # Context adjustments
+        current_round = self.game.get_current_round()
+        round_number = current_round.number if current_round else 1
+
+        # 1. Suit distribution bonus - strong in one suit helps win tricks
+        suit_counts = self._count_cards_by_suit(hand)
+        max_suit_count = max(suit_counts.values()) if suit_counts else 0
+        if max_suit_count >= max(round_number * 0.6, 3):
+            base_strength += 0.5
+
+        # 2. Special card synergies
+        has_mermaid = any(c.is_mermaid() for c in card_objects)
+        high_cards = sum(1 for c in card_objects if self._evaluate_card_strength(c) > 0.7)
+
+        if has_mermaid and high_cards >= 2:
+            base_strength -= 0.5  # Mermaid liability with high cards
+
+        # 3. Pirate strength in later rounds (more tricks = more chances)
+        pirates = sum(1 for c in card_objects if c.is_pirate())
+        if round_number >= 5 and pirates >= 2:
+            base_strength += 0.3
+
+        # 4. Escape cards reduce expected tricks
+        escapes = sum(1 for c in card_objects if c.is_escape())
+        if escapes > 0:
+            base_strength -= escapes * 0.4
+
+        # 5. Kings guarantee some tricks
+        kings = sum(1 for c in card_objects if c.is_king())
+        if kings >= 1:
+            base_strength += 0.2
+
+        return max(0, round(base_strength))
+
+    def _count_cards_by_suit(self, hand: list[CardId]) -> dict:
+        """Count cards by suit."""
+        suit_counts = {}
         for card_id in hand:
             card = get_card(card_id)
-            strength += self._evaluate_card_strength(card)
-        return round(strength)
+            if card.is_standard_suit() and hasattr(card, "card_type"):
+                suit = card.card_type.name
+                suit_counts[suit] = suit_counts.get(suit, 0) + 1
+        return suit_counts
+
+    def _encode_trick_position(self) -> list[float]:
+        """Encode current trick position (who plays when) - 4 dims."""
+        position = [0.0] * 4  # [first, second, third, fourth]
+
+        if not self.game:
+            return position
+
+        current_round = self.game.get_current_round()
+        if not current_round:
+            return position
+
+        current_trick = current_round.get_current_trick()
+        if not current_trick:
+            return position
+
+        # Determine agent's position in this trick
+        num_played = len(current_trick.picked_cards)
+
+        # If agent hasn't played yet and position is valid
+        agent_not_played = all(
+            pc.player_id != self.agent_player_id for pc in current_trick.picked_cards
+        )
+        if agent_not_played and num_played < 4:
+            position[num_played] = 1.0
+
+        return position
+
+    def _encode_opponent_patterns(self) -> list[float]:
+        """Encode opponent bidding patterns - 6 dims."""
+        patterns = []
+
+        if not self.game:
+            return [0.0] * 6
+
+        for bot_id, _ in self.bots:
+            bids = []
+            errors = []
+
+            for round_obj in self.game.rounds:
+                if bot_id in round_obj.bids:
+                    bid = round_obj.bids[bot_id]
+                    tricks_won = round_obj.get_tricks_won(bot_id)
+                    bids.append(bid)
+                    errors.append(abs(bid - tricks_won))
+
+            avg_bid = float(np.mean(bids)) if bids else 0.0
+            avg_error = float(np.mean(errors)) if errors else 0.0
+
+            patterns.append(avg_bid / 10.0)
+            patterns.append(avg_error / 5.0)
+
+        # Pad to 6 dims if fewer than 3 bots
+        while len(patterns) < 6:
+            patterns.append(0.0)
+
+        return patterns[:6]
+
+    def _encode_cards_played(self) -> list[float]:
+        """Encode what cards have been played this round - 5 dims."""
+        if not self.game:
+            return [0.0] * 5
+
+        current_round = self.game.get_current_round()
+        if not current_round:
+            return [0.0] * 5
+
+        pirates_played = 0
+        kings_played = 0
+        mermaids_played = 0
+        escapes_played = 0
+        high_cards_played = 0
+
+        for trick in current_round.tricks:
+            for card_id in trick.get_all_card_ids():
+                if card_id:
+                    card = get_card(card_id)
+                    if card.is_pirate():
+                        pirates_played += 1
+                    elif card.is_king():
+                        kings_played += 1
+                    elif card.is_mermaid():
+                        mermaids_played += 1
+                    elif card.is_escape():
+                        escapes_played += 1
+                    elif card.is_standard_suit() and card.number and card.number >= 10:
+                        high_cards_played += 1
+
+        total_round_cards = current_round.number * self.num_players
+
+        return [
+            pirates_played / max(total_round_cards, 1),
+            kings_played / max(total_round_cards, 1),
+            mermaids_played / max(total_round_cards, 1),
+            escapes_played / max(total_round_cards, 1),
+            high_cards_played / max(total_round_cards, 1),
+        ]
+
+    def _calculate_bid_pressure(self) -> float:
+        """Calculate pressure to win tricks - 1 dim."""
+        if not self.game:
+            return 0.0
+
+        current_round = self.game.get_current_round()
+        if not current_round:
+            return 0.0
+
+        agent_player = self.game.get_player(self.agent_player_id)
+        if not agent_player or agent_player.bid is None:
+            return 0.0
+
+        bid = agent_player.bid
+        tricks_won = current_round.get_tricks_won(self.agent_player_id)
+        tricks_needed = bid - tricks_won
+        tricks_remaining = current_round.number - len(current_round.tricks)
+
+        if tricks_needed <= 0:
+            return -0.5  # Negative pressure - avoid winning
+        if tricks_remaining == 0:
+            return 1.0 if tricks_needed > 0 else 0.0
+        return min(tricks_needed / max(tricks_remaining, 1), 1.0)
+
+    def _calculate_position_advantage(self) -> float:
+        """Calculate how often we play in advantageous position - 1 dim."""
+        if not self.game:
+            return 0.0
+
+        current_round = self.game.get_current_round()
+        if not current_round or not current_round.tricks:
+            return 0.0
+
+        last_position_count = 0
+        total_tricks = 0
+
+        for trick in current_round.tricks:
+            if len(trick.picked_cards) == self.num_players:
+                total_tricks += 1
+                if trick.picked_cards and trick.picked_cards[-1].player_id == self.agent_player_id:
+                    last_position_count += 1
+
+        return last_position_count / max(total_tricks, 1)
+
+    def _encode_trump_strength(self) -> list[float]:
+        """Encode strength of our cards vs cards seen - 2 dims."""
+        if not self.game:
+            return [0.0, 0.0]
+
+        agent_player = self.game.get_player(self.agent_player_id)
+        if not agent_player or not agent_player.hand:
+            return [0.0, 0.0]
+
+        # Calculate our strongest and average card strength
+        our_strengths = [self._evaluate_card_strength(get_card(cid)) for cid in agent_player.hand]
+        our_best = max(our_strengths) if our_strengths else 0.0
+        our_avg = float(np.mean(our_strengths)) if our_strengths else 0.0
+
+        # Calculate average strength of cards played
+        current_round = self.game.get_current_round()
+        if current_round:
+            seen_strengths = [
+                self._evaluate_card_strength(get_card(card_id))
+                for trick in current_round.tricks
+                for card_id in trick.get_all_card_ids()
+                if card_id
+            ]
+
+            if seen_strengths:
+                seen_avg = float(np.mean(seen_strengths))
+                return [
+                    our_best - seen_avg,  # How much better is our best card
+                    our_avg - seen_avg,  # How much better is our average
+                ]
+
+        return [our_best, our_avg]
 
     def _evaluate_card_strength(self, card: Card) -> float:
         """Evaluate card strength (0.0 to 1.0)."""
         if card.is_king():
             return 0.9  # King (includes Skull King)
-        elif card.is_pirate():
+        if card.is_pirate():
             return 0.8
-        elif card.is_mermaid():
+        if card.is_mermaid():
             return 0.3
-        elif card.is_escape():
+        if card.is_escape():
             return 0.1
-        elif card.is_standard_suit():
+        if card.is_standard_suit():
             # Suited cards: value-based (1-14)
             return 0.3 + (card.number / 14.0) * 0.4 if card.number else 0.3
-        else:
-            # Other special cards (whale, kraken, etc.)
-            return 0.5
+        # Other special cards (whale, kraken, etc.)
+        return 0.5
 
     def _get_observation(self) -> np.ndarray:
         """COMPACT OBSERVATIONS: 151 dims."""
@@ -462,16 +685,18 @@ class SkullKingEnvMasked(gym.Env):
             bid = agent_player.bid if agent_player.bid is not None else 0
             tricks_needed = bid - tricks_won
 
-            obs.extend([
-                current_round.number / 10.0,
-                len(agent_player.hand) / 10.0,
-                bid / 10.0,
-                tricks_won / 10.0,
-                max(tricks_needed, -10) / 10.0,  # Can be negative
-                tricks_remaining / 10.0,
-                1.0 if tricks_needed <= tricks_remaining else 0.0,
-                self._estimate_hand_strength(agent_player.hand) / 10.0,
-            ])
+            obs.extend(
+                [
+                    current_round.number / 10.0,
+                    len(agent_player.hand) / 10.0,
+                    bid / 10.0,
+                    tricks_won / 10.0,
+                    max(tricks_needed, -10) / 10.0,  # Can be negative
+                    tricks_remaining / 10.0,
+                    1.0 if tricks_needed <= tricks_remaining else 0.0,
+                    self._estimate_hand_strength(agent_player.hand) / 10.0,
+                ]
+            )
         else:
             obs.extend([0.0] * 8)
 
@@ -479,28 +704,62 @@ class SkullKingEnvMasked(gym.Env):
         for i in range(1, 4):
             if i < len(self.game.players):
                 opp = self.game.players[i]
-                obs.extend([
-                    opp.bid / 10.0 if opp.bid is not None else 0.0,
-                    opp.score / 100.0,
-                    opp.tricks_won / 10.0,
-                ])
+                obs.extend(
+                    [
+                        opp.bid / 10.0 if opp.bid is not None else 0.0,
+                        opp.score / 100.0,
+                        opp.tricks_won / 10.0,
+                    ]
+                )
             else:
                 obs.extend([0.0] * 3)
 
         # 6. HAND STRENGTH BREAKDOWN (4 dims)
         if agent_player:
-            obs.extend([
-                self._count_card_type(agent_player.hand, lambda c: c.is_pirate()) / 5.0,
-                self._count_card_type(agent_player.hand, lambda c: c.is_king()) / 4.0,
-                self._count_card_type(agent_player.hand, lambda c: c.is_mermaid()) / 2.0,
-                self._count_card_type(agent_player.hand, lambda c: c.is_standard_suit() and c.number >= 10) / 10.0,
-            ])
+            high_standard = self._count_card_type(
+                agent_player.hand, lambda c: c.is_standard_suit() and c.number >= 10
+            )
+            obs.extend(
+                [
+                    self._count_card_type(agent_player.hand, lambda c: c.is_pirate()) / 5.0,
+                    self._count_card_type(agent_player.hand, lambda c: c.is_king()) / 4.0,
+                    self._count_card_type(agent_player.hand, lambda c: c.is_mermaid()) / 2.0,
+                    high_standard / 10.0,
+                ]
+            )
         else:
             obs.extend([0.0] * 4)
 
+        # === NEW OBSERVATIONS (+20 dims) ===
+
+        # 7. TRICK POSITION (4 dims) - one-hot for 1st/2nd/3rd/4th to play
+        obs.extend(self._encode_trick_position())
+
+        # 8. OPPONENT PATTERNS (6 dims) - avg bid and error per opponent
+        obs.extend(self._encode_opponent_patterns())
+
+        # 9. CARDS PLAYED COUNT (5 dims) - by type
+        obs.extend(self._encode_cards_played())
+
+        # 10. ROUND PROGRESSION (1 dim)
+        if current_round:
+            round_progress = len(current_round.tricks) / max(current_round.number, 1)
+        else:
+            round_progress = 0.0
+        obs.append(round_progress)
+
+        # 11. BID PRESSURE (1 dim)
+        obs.append(self._calculate_bid_pressure())
+
+        # 12. POSITION ADVANTAGE (1 dim)
+        obs.append(self._calculate_position_advantage())
+
+        # 13. TRUMP STRENGTH (2 dims)
+        obs.extend(self._encode_trump_strength())
+
         return np.array(obs, dtype=np.float32)
 
-    def _encode_card_compact(self, card: Card) -> List[float]:
+    def _encode_card_compact(self, card: Card) -> list[float]:
         """Encode card with 9 features: card_type (5) + number (1) + special flags (3)."""
         encoding = []
 
@@ -523,19 +782,21 @@ class SkullKingEnvMasked(gym.Env):
         encoding.append(card.number / 14.0 if card.number else 0.0)
 
         # Special flags (3 dims) - quick lookup for strategy
-        encoding.extend([
-            1.0 if card.is_pirate() else 0.0,
-            1.0 if card.is_king() else 0.0,
-            1.0 if card.is_mermaid() else 0.0,
-        ])
+        encoding.extend(
+            [
+                1.0 if card.is_pirate() else 0.0,
+                1.0 if card.is_king() else 0.0,
+                1.0 if card.is_mermaid() else 0.0,
+            ]
+        )
 
         return encoding
 
-    def _count_card_type(self, hand: List[CardId], predicate) -> int:
+    def _count_card_type(self, hand: list[CardId], predicate) -> int:
         """Count cards matching a predicate."""
         return sum(1 for card_id in hand if predicate(get_card(card_id)))
 
-    def _get_info(self) -> Dict[str, Any]:
+    def _get_info(self) -> dict[str, Any]:
         """Get additional info."""
         info = {}
         if self.game:
@@ -679,7 +940,7 @@ class SkullKingEnvMasked(gym.Env):
         self.opponent_bot_type = opponent_type
         self.opponent_difficulty = self._parse_difficulty(difficulty)
 
-    def render(self) -> Optional[str]:
+    def render(self) -> str | None:
         """Render the environment."""
         if self.render_mode == "ansi":
             return self._render_ansi()

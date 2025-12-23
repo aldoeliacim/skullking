@@ -1,19 +1,19 @@
 """API routes."""
 
 import uuid
-from typing import Any, Dict, List
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Query, WebSocket
 
 from app.api.responses import (
     CardListResponse,
+    Command,
     CreateGameRequest,
     CreateGameResponse,
-    ErrorResponse,
+    ServerMessage,
 )
 from app.api.websocket import websocket_manager
-from app.models.card import get_all_cards, CardType
+from app.models.card import get_all_cards
 from app.models.enums import GameState
 from app.models.game import Game
 from app.models.player import Player
@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 @router.post("/games", response_model=CreateGameResponse)
-async def create_game(request: CreateGameRequest) -> CreateGameResponse:
+async def create_game(_request: CreateGameRequest) -> CreateGameResponse:
     """
     Create a new game.
 
@@ -91,8 +91,6 @@ async def join_game(
     player.is_connected = True
 
     # Send initial game state
-    from app.api.responses import ServerMessage, Command
-
     init_message = ServerMessage(
         command=Command.INIT,
         game_id=game_id,
@@ -156,7 +154,7 @@ async def get_cards() -> CardListResponse:
 
 
 @router.get("/games/{game_id}")
-async def get_game(game_id: str) -> Dict[str, Any]:
+async def get_game(game_id: str) -> dict[str, Any]:
     """
     Get game state.
 

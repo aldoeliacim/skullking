@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional
 
 from app.models.card import CardId
 from app.models.game import Game
@@ -37,7 +36,7 @@ class BaseBot(ABC):
         self.difficulty = difficulty
 
     @abstractmethod
-    def make_bid(self, game: Game, round_number: int, hand: List[CardId]) -> int:
+    def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
         """
         Make a bid for the current round.
 
@@ -49,15 +48,14 @@ class BaseBot(ABC):
         Returns:
             Bid amount (0 to round_number)
         """
-        pass
 
     @abstractmethod
     def pick_card(
         self,
         game: Game,
-        hand: List[CardId],
-        cards_in_trick: List[CardId],
-        valid_cards: Optional[List[CardId]] = None,
+        hand: list[CardId],
+        cards_in_trick: list[CardId],
+        valid_cards: list[CardId] | None = None,
     ) -> CardId:
         """
         Pick a card to play in the current trick.
@@ -71,9 +69,10 @@ class BaseBot(ABC):
         Returns:
             CardId to play
         """
-        pass
 
-    def _get_valid_cards(self, hand: List[CardId], valid_cards: Optional[List[CardId]] = None) -> List[CardId]:
+    def _get_valid_cards(
+        self, hand: list[CardId], valid_cards: list[CardId] | None = None
+    ) -> list[CardId]:
         """
         Get list of valid cards to play.
 

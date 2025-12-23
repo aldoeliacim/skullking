@@ -11,23 +11,22 @@ Features:
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from stable_baselines3 import PPO
+
 from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
 
 
 def evaluate_model_comprehensive(
     model_path: str,
     n_games: int = 100,
-) -> Dict[str, any]:
+) -> dict[str, any]:
     """
     Comprehensively evaluate a trained model.
 
@@ -96,17 +95,21 @@ def evaluate_model_comprehensive(
                 opponent_scores = [p.score for p in env.game.players[1:]]
                 ranking = 1 + sum(1 for s in opponent_scores if s > agent_score)
 
-                game_data.append({
-                    "reward": total_reward,
-                    "score": agent_score,
-                    "ranking": ranking,
-                    "won": ranking == 1,
-                    "top2": ranking <= 2,
-                })
+                game_data.append(
+                    {
+                        "reward": total_reward,
+                        "score": agent_score,
+                        "ranking": ranking,
+                        "won": ranking == 1,
+                        "top2": ranking <= 2,
+                    }
+                )
 
                 if game_num < 5:  # Print first 5 games
-                    print(f"  Game {game_num+1:3d}: Score={agent_score:4d} | "
-                          f"Opp={opponent_scores} | Rank={ranking}/4")
+                    print(
+                        f"  Game {game_num+1:3d}: Score={agent_score:4d} | "
+                        f"Opp={opponent_scores} | Rank={ranking}/4"
+                    )
 
         env.close()
 
@@ -150,18 +153,20 @@ def evaluate_model_comprehensive(
         print(f"    Avg reward: {np.mean(rewards):.2f}")
 
         if bidding_errors:
-            perfect_pct = 100 * results[key]["bidding_accuracy"]["perfect_bids"] / len(bidding_errors)
+            perfect_pct = (
+                100 * results[key]["bidding_accuracy"]["perfect_bids"] / len(bidding_errors)
+            )
             within1_pct = 100 * results[key]["bidding_accuracy"]["within_1"] / len(bidding_errors)
             print(f"    Bidding: {perfect_pct:.1f}% perfect, {within1_pct:.1f}% within ±1")
 
     return results
 
 
-def compare_models(model_paths: List[str], n_games: int = 50):
+def compare_models(model_paths: list[str], n_games: int = 50):
     """Compare multiple trained models."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("MODEL COMPARISON")
-    print("="*70)
+    print("=" * 70)
 
     all_results = {}
     for model_path in model_paths:
@@ -169,9 +174,9 @@ def compare_models(model_paths: List[str], n_games: int = 50):
         all_results[model_name] = evaluate_model_comprehensive(model_path, n_games)
 
     # Generate comparison table
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("COMPARISON SUMMARY")
-    print("="*70)
+    print("=" * 70)
 
     opponent_types = list(all_results[list(all_results.keys())[0]].keys())
 
@@ -183,13 +188,19 @@ def compare_models(model_paths: List[str], n_games: int = 50):
         for model_name, results in all_results.items():
             stats = results[opp_type]
             bid_acc = stats["bidding_accuracy"]
-            perfect_pct = 100 * bid_acc["perfect_bids"] / bid_acc["total_bids"] if bid_acc["total_bids"] > 0 else 0
+            perfect_pct = (
+                100 * bid_acc["perfect_bids"] / bid_acc["total_bids"]
+                if bid_acc["total_bids"] > 0
+                else 0
+            )
 
-            print(f"{model_name:<30} "
-                  f"{100*stats['win_rate']:<10.1f} "
-                  f"{100*stats['top2_rate']:<10.1f} "
-                  f"{stats['avg_ranking']:<12.2f} "
-                  f"{perfect_pct:<10.1f}")
+            print(
+                f"{model_name:<30} "
+                f"{100*stats['win_rate']:<10.1f} "
+                f"{100*stats['top2_rate']:<10.1f} "
+                f"{stats['avg_ranking']:<12.2f} "
+                f"{perfect_pct:<10.1f}"
+            )
 
     # Save results to JSON
     output_path = "./models/comparison_results.json"
@@ -216,7 +227,7 @@ def analyze_checkpoints(checkpoint_dir: str):
 
     if not checkpoint_files:
         print(f"❌ No checkpoints found in {checkpoint_dir}")
-        return
+        return None
 
     print(f"Found {len(checkpoint_files)} checkpoints")
 
@@ -275,25 +286,27 @@ def analyze_checkpoints(checkpoint_dir: str):
         win_rate = wins / 10
         avg_bid_error = np.mean(bidding_errors) if bidding_errors else 0
 
-        progression.append({
-            "steps": steps,
-            "win_rate": win_rate,
-            "avg_bid_error": avg_bid_error,
-        })
+        progression.append(
+            {
+                "steps": steps,
+                "win_rate": win_rate,
+                "avg_bid_error": avg_bid_error,
+            }
+        )
 
         print(f"  Win rate: {100*win_rate:.0f}%, Avg bid error: {avg_bid_error:.2f}")
 
     # Print progression summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TRAINING PROGRESSION")
-    print("="*70)
+    print("=" * 70)
     print(f"{'Steps':<15} {'Win Rate':<15} {'Bid Error':<15} {'Improvement':<15}")
     print("-" * 70)
 
     for i, data in enumerate(progression):
         improvement = ""
         if i > 0:
-            prev_win = progression[i-1]["win_rate"]
+            prev_win = progression[i - 1]["win_rate"]
             delta = data["win_rate"] - prev_win
             if delta > 0:
                 improvement = f"+{100*delta:.1f}%"
@@ -302,10 +315,12 @@ def analyze_checkpoints(checkpoint_dir: str):
             else:
                 improvement = "="
 
-        print(f"{data['steps']:<15,} "
-              f"{100*data['win_rate']:<15.1f} "
-              f"{data['avg_bid_error']:<15.2f} "
-              f"{improvement:<15}")
+        print(
+            f"{data['steps']:<15,} "
+            f"{100*data['win_rate']:<15.1f} "
+            f"{data['avg_bid_error']:<15.2f} "
+            f"{improvement:<15}"
+        )
 
     return progression
 

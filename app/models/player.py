@@ -1,7 +1,6 @@
 """Player model."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 from app.models.card import CardId
 
@@ -33,8 +32,8 @@ class Player:
     index: int = 0
     is_connected: bool = True
     is_bot: bool = False
-    hand: List[CardId] = field(default_factory=list)
-    bid: Optional[int] = None
+    hand: list[CardId] = field(default_factory=list)
+    bid: int | None = None
     tricks_won: int = 0
 
     def reset_round(self) -> None:

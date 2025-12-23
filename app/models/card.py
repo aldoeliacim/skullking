@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional
 
 from app.models.enums import CardType
 
@@ -17,7 +16,7 @@ class CardId(IntEnum):
     MERMAID1 = 4
     MERMAID2 = 5
 
-    # Pirates (5)
+    # Pirate cards - there are 5 of them
     PIRATE1 = 6
     PIRATE2 = 7
     PIRATE3 = 8
@@ -187,7 +186,6 @@ _CARDS: dict[CardId, Card] = {
     CardId.KRAKEN: Card(CardId.KRAKEN, 0, CardType.KRAKEN),
     CardId.MERMAID1: Card(CardId.MERMAID1, 0, CardType.MERMAID),
     CardId.MERMAID2: Card(CardId.MERMAID2, 0, CardType.MERMAID),
-
     # Pirates
     CardId.PIRATE1: Card(CardId.PIRATE1, 0, CardType.PIRATE),
     CardId.PIRATE2: Card(CardId.PIRATE2, 0, CardType.PIRATE),
@@ -230,7 +228,7 @@ def get_all_cards() -> dict[CardId, Card]:
     return _CARDS.copy()
 
 
-def determine_winner(card_ids: list[CardId]) -> Optional[CardId]:
+def determine_winner(card_ids: list[CardId]) -> CardId | None:
     """
     Determine the winner of a trick given the cards played.
 
@@ -254,9 +252,9 @@ def determine_winner(card_ids: list[CardId]) -> Optional[CardId]:
     if not card_ids:
         return None
 
-    lead: Optional[Card] = None
-    suit_lead: Optional[Card] = None
-    mermaid_lead: Optional[Card] = None
+    lead: Card | None = None
+    suit_lead: Card | None = None
+    mermaid_lead: Card | None = None
     has_pirate = False
     has_king = False
 
@@ -270,9 +268,8 @@ def determine_winner(card_ids: list[CardId]) -> Optional[CardId]:
             has_king = True
 
         # Track suit leader (highest suit card)
-        if card.is_suit():
-            if suit_lead is None or suit_lead.number < card.number:
-                suit_lead = card
+        if card.is_suit() and (suit_lead is None or suit_lead.number < card.number):
+            suit_lead = card
 
         # Track first mermaid
         if card.is_mermaid() and mermaid_lead is None:
@@ -287,36 +284,20 @@ def determine_winner(card_ids: list[CardId]) -> Optional[CardId]:
         if lead.card_type == card.card_type:
             if lead.number < card.number:
                 lead = card
-        else:
-            # Different types: apply special rules
+        # Different types: apply special rules
 
-            # Beasts beat everything except themselves
-            if card.is_whale() or card.is_kraken():
-                lead = card
-
-            # Standard suit beats escape
-            elif card.is_standard_suit() and lead.is_escape():
-                lead = card
-
-            # Jolly Roger beats standard suits and escapes
-            elif card.is_roger() and (lead.is_standard_suit() or lead.is_escape()):
-                lead = card
-
-            # Characters beat suits and escapes
-            elif card.is_character() and (lead.is_suit() or lead.is_escape()):
-                lead = card
-
-            # Pirate beats Mermaid
-            elif card.is_pirate() and lead.is_mermaid():
-                lead = card
-
-            # Skull King beats Pirate
-            elif card.is_king() and lead.is_pirate():
-                lead = card
-
-            # Mermaid beats Skull King
-            elif card.is_mermaid() and lead.is_king():
-                lead = card
+        # Beasts beat everything except themselves
+        elif (
+            card.is_whale()
+            or card.is_kraken()
+            or (card.is_standard_suit() and lead.is_escape())
+            or (card.is_roger() and (lead.is_standard_suit() or lead.is_escape()))
+            or (card.is_character() and (lead.is_suit() or lead.is_escape()))
+            or (card.is_pirate() and lead.is_mermaid())
+            or (card.is_king() and lead.is_pirate())
+            or (card.is_mermaid() and lead.is_king())
+        ):
+            lead = card
 
     # Special end-game rules
 

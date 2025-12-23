@@ -1,7 +1,6 @@
 """Trick model for a single trick within a round."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 from app.models.card import CardId, determine_winner, get_card
 
@@ -34,15 +33,15 @@ class Trick:
     number: int
     starter_player_index: int
     picking_player_id: str = ""
-    picked_cards: List[PickedCard] = field(default_factory=list)
-    winner_player_id: Optional[str] = None
-    winner_card_id: Optional[CardId] = None
+    picked_cards: list[PickedCard] = field(default_factory=list)
+    winner_player_id: str | None = None
+    winner_card_id: CardId | None = None
 
     def has_player_picked(self, player_id: str) -> bool:
         """Check if a player has already picked a card in this trick."""
         return any(pc.player_id == player_id for pc in self.picked_cards)
 
-    def get_all_card_ids(self) -> List[CardId]:
+    def get_all_card_ids(self) -> list[CardId]:
         """Get all card IDs picked in this trick."""
         return [pc.card_id for pc in self.picked_cards]
 
@@ -50,7 +49,7 @@ class Trick:
         """Add a picked card to this trick."""
         self.picked_cards.append(PickedCard(player_id, card_id))
 
-    def determine_winner(self) -> Tuple[Optional[CardId], Optional[str]]:
+    def determine_winner(self) -> tuple[CardId | None, str | None]:
         """
         Determine the winner of this trick.
 
@@ -101,15 +100,15 @@ class Trick:
         winner_card = get_card(self.winner_card_id)
 
         # Special card IDs for 14s
-        from app.models.card import CardId as CID
+        from app.models.card import CardId
 
         for picked_card in self.picked_cards:
             card = get_card(picked_card.card_id)
 
             # Bonus for capturing 14s
-            if picked_card.card_id in [CID.PARROT14, CID.CHEST14, CID.MAP14]:
+            if picked_card.card_id in [CardId.PARROT14, CardId.CHEST14, CardId.MAP14]:
                 bonus += 10
-            elif picked_card.card_id == CID.ROGER14:
+            elif picked_card.card_id == CardId.ROGER14:
                 bonus += 20
 
             # Character bonuses

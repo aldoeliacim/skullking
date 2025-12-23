@@ -5,11 +5,10 @@ This enables advanced training where the agent trains against copies of itself,
 leading to emergent strategies and continuous improvement.
 """
 
-import os
-from typing import List, Optional
+from pathlib import Path
 
-from stable_baselines3 import PPO
 import numpy as np
+from stable_baselines3 import PPO
 
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import CardId
@@ -42,14 +41,14 @@ class SelfPlayBot(BaseBot):
         """
         super().__init__(player_id, difficulty)
 
-        if not os.path.exists(model_path):
+        if not Path(model_path).exists():
             raise ValueError(f"Model not found: {model_path}")
 
         self.model = PPO.load(model_path)
         self.deterministic = deterministic
-        self.last_observation: Optional[np.ndarray] = None
+        self.last_observation: np.ndarray | None = None
 
-    def make_bid(self, game: Game, round_number: int, hand: List[CardId]) -> int:
+    def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
         """
         Make a bid using the trained model.
 
@@ -62,6 +61,7 @@ class SelfPlayBot(BaseBot):
 
         for card_id in hand:
             from app.models.card import get_card
+
             card = get_card(card_id)
 
             if card.is_king():
@@ -91,9 +91,9 @@ class SelfPlayBot(BaseBot):
     def pick_card(
         self,
         game: Game,
-        hand: List[CardId],
-        cards_in_trick: List[CardId],
-        valid_cards: Optional[List[CardId]] = None,
+        hand: list[CardId],
+        cards_in_trick: list[CardId],
+        valid_cards: list[CardId] | None = None,
     ) -> CardId:
         """
         Pick a card using the trained model.

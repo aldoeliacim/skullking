@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import redis.asyncio as redis
 from redis.exceptions import RedisError
@@ -21,7 +21,7 @@ class PublisherService:
 
     def __init__(self) -> None:
         """Initialize publisher service."""
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: redis.Redis | None = None
         self._connect()
 
     def _connect(self) -> None:
@@ -33,11 +33,11 @@ class PublisherService:
                 decode_responses=True,
             )
             logger.info("Connected to Redis")
-        except RedisError as e:
-            logger.error(f"Failed to connect to Redis: {e}")
+        except RedisError:
+            logger.exception("Failed to connect to Redis")
             self.redis_client = None
 
-    async def publish(self, channel: str, message: Dict[str, Any]) -> bool:
+    async def publish(self, channel: str, message: dict[str, Any]) -> bool:
         """
         Publish message to Redis channel.
 
@@ -55,16 +55,14 @@ class PublisherService:
         try:
             message_json = json.dumps(message)
             await self.redis_client.publish(channel, message_json)
-            logger.debug(f"Published message to channel {channel}")
+            logger.debug("Published message to channel %s", channel)
             return True
 
-        except (RedisError, json.JSONEncodeError) as e:
-            logger.error(f"Error publishing message: {e}")
+        except (RedisError, json.JSONEncodeError):
+            logger.exception("Error publishing message")
             return False
 
-    async def publish_game_event(
-        self, event_type: str, game_id: str, data: Dict[str, Any]
-    ) -> bool:
+    async def publish_game_event(self, event_type: str, game_id: str, data: dict[str, Any]) -> bool:
         """
         Publish game event.
 

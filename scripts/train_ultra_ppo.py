@@ -15,7 +15,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -26,8 +25,7 @@ from stable_baselines3.common.callbacks import (
     EvalCallback,
 )
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
-from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
 
@@ -68,12 +66,7 @@ class CurriculumCallback(BaseCallback):
 
                 # Update all sub-environments
                 for env_idx in range(self.vec_env.num_envs):
-                    self.vec_env.env_method(
-                        "set_opponent",
-                        next_type,
-                        next_diff,
-                        indices=[env_idx]
-                    )
+                    self.vec_env.env_method("set_opponent", next_type, next_diff, indices=[env_idx])
 
                 self.current_phase += 1
 
@@ -93,7 +86,7 @@ def train_ultra_ppo(
     total_timesteps: int = 2_000_000,
     n_envs: int = 4,
     save_dir: str = "./models/ultra_ppo",
-    load_path: Optional[str] = None,
+    load_path: str | None = None,
 ):
     """
     Train PPO agent with 4-phase curriculum.
@@ -104,23 +97,23 @@ def train_ultra_ppo(
         save_dir: Directory to save models
         load_path: Optional path to load existing model
     """
-    print("="*60)
+    print("=" * 60)
     print("ULTRA PPO TRAINING - 4-Phase Curriculum")
-    print("="*60)
+    print("=" * 60)
     print(f"Total timesteps: {total_timesteps:,}")
     print(f"Parallel envs: {n_envs}")
     print(f"Save directory: {save_dir}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(f"{save_dir}/checkpoints", exist_ok=True)
 
     # Define 4-phase curriculum
     curriculum = [
-        (0, "random", "medium"),                  # Phase 1: Learn basics
-        (200_000, "rule_based", "easy"),         # Phase 2: Learn strategy
-        (600_000, "rule_based", "medium"),       # Phase 3: Refine
-        (1_400_000, "rule_based", "hard"),       # Phase 4: Master
+        (0, "random", "medium"),  # Phase 1: Learn basics
+        (200_000, "rule_based", "easy"),  # Phase 2: Learn strategy
+        (600_000, "rule_based", "medium"),  # Phase 3: Refine
+        (1_400_000, "rule_based", "hard"),  # Phase 4: Master
     ]
 
     print("Curriculum Schedule:")
@@ -216,10 +209,10 @@ def train_ultra_ppo(
     vec_env.close()
     eval_env.close()
 
-    print(f"\n✅ Training complete!")
+    print("\n✅ Training complete!")
     print(f"Final model saved to: {final_path}.zip")
     print(f"Best model saved to: {save_dir}/best_model/best_model.zip")
-    print(f"\nTo view training progress:")
+    print("\nTo view training progress:")
     print(f"  tensorboard --logdir {save_dir}/tensorboard")
 
 
@@ -276,10 +269,12 @@ def evaluate_model(model_path: str, n_games: int = 50):
         print(f"  Win rate: {100*wins/n_games:.1f}%")
         print(f"  Avg reward: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
         print(f"  Avg ranking: {np.mean(rankings):.2f}")
-        print(f"  Rank distribution: 1st={sum(r==1 for r in rankings)}, "
-              f"2nd={sum(r==2 for r in rankings)}, "
-              f"3rd={sum(r==3 for r in rankings)}, "
-              f"4th={sum(r==4 for r in rankings)}")
+        print(
+            f"  Rank distribution: 1st={sum(r==1 for r in rankings)}, "
+            f"2nd={sum(r==2 for r in rankings)}, "
+            f"3rd={sum(r==3 for r in rankings)}, "
+            f"4th={sum(r==4 for r in rankings)}"
+        )
 
 
 def main():

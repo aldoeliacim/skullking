@@ -3,11 +3,13 @@
 Simple standalone Skull King server.
 Runs without MongoDB/Redis for easy local gameplay.
 """
+
+import os
+
 import uvicorn
 from fastapi import FastAPI, WebSocket
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import os
+from fastapi.staticfiles import StaticFiles
 
 # Create app
 app = FastAPI(title="Skull King Game")
@@ -18,15 +20,18 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 # Mount static files
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+
 @app.get("/")
 async def root():
     """Serve the game UI."""
     return FileResponse(os.path.join(static_dir, "index.html"))
 
+
 @app.get("/health")
 async def health():
     """Health check."""
     return {"status": "healthy"}
+
 
 @app.websocket("/ws/game")
 async def websocket_endpoint(websocket: WebSocket):
@@ -40,15 +45,11 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         pass
 
+
 if __name__ == "__main__":
     print("🎮 Starting Skull King Game Server...")
     print("📱 Open your browser to: http://localhost:8000")
     print("🎯 Press CTRL+C to stop")
     print()
 
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

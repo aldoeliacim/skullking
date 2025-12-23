@@ -1,13 +1,11 @@
 """Game model for managing game state."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from app.models.deck import Deck
-from app.models.enums import GameState, MAX_PLAYERS, MAX_ROUNDS
+from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, GameState
 from app.models.player import Player
 from app.models.round import Round
-from app.models.trick import Trick
 
 
 @dataclass
@@ -32,11 +30,11 @@ class Game:
     id: str
     slug: str
     state: GameState = GameState.PENDING
-    players: List[Player] = field(default_factory=list)
-    rounds: List[Round] = field(default_factory=list)
+    players: list[Player] = field(default_factory=list)
+    rounds: list[Round] = field(default_factory=list)
     current_round_number: int = 0
     deck: Deck = field(default_factory=Deck)
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
     def add_player(self, player: Player) -> bool:
         """Add a player to the game."""
@@ -61,14 +59,14 @@ class Game:
                 return True
         return False
 
-    def get_player(self, player_id: str) -> Optional[Player]:
+    def get_player(self, player_id: str) -> Player | None:
         """Get a player by ID."""
         for player in self.players:
             if player.id == player_id:
                 return player
         return None
 
-    def get_player_by_index(self, index: int) -> Optional[Player]:
+    def get_player_by_index(self, index: int) -> Player | None:
         """Get a player by their turn index."""
         if 0 <= index < len(self.players):
             return self.players[index]
@@ -82,7 +80,7 @@ class Game:
         """Check if game has enough players to start."""
         return len(self.players) >= 2
 
-    def get_current_round(self) -> Optional[Round]:
+    def get_current_round(self) -> Round | None:
         """Get the current round."""
         if self.rounds:
             return self.rounds[-1]
@@ -114,7 +112,7 @@ class Game:
         self.deck.shuffle()
         hands = self.deck.deal(len(self.players), self.current_round_number)
 
-        for player, hand in zip(self.players, hands):
+        for player, hand in zip(self.players, hands, strict=False):
             player.hand = hand
             current_round.dealt_cards[player.id] = hand.copy()
 
@@ -122,7 +120,7 @@ class Game:
         """Check if all rounds are complete."""
         return self.current_round_number >= MAX_ROUNDS
 
-    def get_leaderboard(self) -> List[Dict[str, any]]:
+    def get_leaderboard(self) -> list[dict[str, any]]:
         """Get sorted leaderboard."""
         sorted_players = sorted(self.players, key=lambda p: p.score, reverse=True)
         return [
@@ -135,7 +133,7 @@ class Game:
             for p in sorted_players
         ]
 
-    def get_winner(self) -> Optional[Player]:
+    def get_winner(self) -> Player | None:
         """Get the winning player."""
         if not self.is_game_complete():
             return None
@@ -143,4 +141,7 @@ class Game:
 
     def __str__(self) -> str:
         """String representation."""
-        return f"Game {self.slug}: {len(self.players)} players, Round {self.current_round_number}, State: {self.state.value}"
+        return (
+            f"Game {self.slug}: {len(self.players)} players, "
+            f"Round {self.current_round_number}, State: {self.state.value}"
+        )

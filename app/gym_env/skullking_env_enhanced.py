@@ -8,15 +8,16 @@ Key improvements:
 4. Better observation encoding for bid tracking
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
+
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from app.bots import RandomBot, RuleBasedBot
 from app.bots.base_bot import BotDifficulty
-from app.models.card import CardId, get_card
-from app.models.enums import GameState, MAX_PLAYERS, MAX_ROUNDS
+from app.models.card import CardId
+from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, GameState
 from app.models.game import Game
 from app.models.player import Player
 from app.models.trick import Trick
@@ -33,14 +34,14 @@ class SkullKingEnvEnhanced(gym.Env):
     - Progressive opponent difficulty option
     """
 
-    metadata = {"render_modes": ["human", "ansi"], "render_fps": 1}
+    metadata: ClassVar[dict[str, Any]] = {"render_modes": ["human", "ansi"], "render_fps": 1}
 
     def __init__(
         self,
         num_opponents: int = 3,
         opponent_bot_type: str = "rule_based",
         opponent_difficulty: str = "medium",
-        render_mode: Optional[str] = None,
+        render_mode: str | None = None,
     ):
         """Initialize enhanced environment."""
         super().__init__()
@@ -67,17 +68,15 @@ class SkullKingEnvEnhanced(gym.Env):
         metadata_size = 5  # round, tricks_won, tricks_remaining, tricks_needed, bid_accuracy
 
         obs_size = hand_size + trick_size + bid_size + score_size + metadata_size
-        self.observation_space = spaces.Box(
-            low=-100, high=100, shape=(obs_size,), dtype=np.float32
-        )
+        self.observation_space = spaces.Box(low=-100, high=100, shape=(obs_size,), dtype=np.float32)
 
         # Action space: bid (0-10) or pick card (0-9)
         self.action_space = spaces.Discrete(11)  # Max 10 cards + 1 for bidding
 
         # Game state
-        self.game: Optional[Game] = None
+        self.game: Game | None = None
         self.agent_player_id: str = ""
-        self.bots: List[Tuple[str, Any]] = []
+        self.bots: list[tuple[str, Any]] = []
         self.invalid_move_count = 0
 
         # Enhanced tracking
@@ -85,8 +84,8 @@ class SkullKingEnvEnhanced(gym.Env):
         self.previous_tricks_won = 0
 
     def reset(
-        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
-    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        self, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[np.ndarray, dict[str, Any]]:
         """Reset environment."""
         super().reset(seed=seed)
 
@@ -110,7 +109,7 @@ class SkullKingEnvEnhanced(gym.Env):
             bot_id = f"bot_{i}"
             bot_player = Player(
                 id=bot_id,
-                username=f"Bot{i+1}",
+                username=f"Bot{i + 1}",
                 game_id=self.game.id,
                 index=i + 1,
                 is_bot=True,
@@ -136,7 +135,7 @@ class SkullKingEnvEnhanced(gym.Env):
 
         return observation, info
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """Execute action and return result with enhanced rewards."""
         if self.game is None:
             raise RuntimeError("Environment not initialized. Call reset() first.")
@@ -307,7 +306,7 @@ class SkullKingEnvEnhanced(gym.Env):
                 bids[i] = player.bid / 10.0
         obs.extend(bids)
 
-        # Scores (normalized)
+        # Player scores normalized to 0-1 range
         scores = np.zeros(MAX_PLAYERS, dtype=np.float32)
         for i, player in enumerate(self.game.players[:MAX_PLAYERS]):
             scores[i] = player.score / 100.0
@@ -332,7 +331,7 @@ class SkullKingEnvEnhanced(gym.Env):
 
         return np.array(obs, dtype=np.float32)
 
-    def _get_info(self) -> Dict[str, Any]:
+    def _get_info(self) -> dict[str, Any]:
         """Get additional information."""
         info = {}
         if self.game:
@@ -491,11 +490,12 @@ class SkullKingEnvEnhanced(gym.Env):
                     bot_found = True
                     break
 
-            # If no bot was found for current player, something's wrong - break to avoid infinite loop
+            # If no bot was found for current player, something's wrong
+            # Break to avoid infinite loop
             if not bot_found:
                 break
 
-    def render(self) -> Optional[str]:
+    def render(self) -> str | None:
         """Render the environment."""
         if self.render_mode == "ansi":
             return self._render_ansi()

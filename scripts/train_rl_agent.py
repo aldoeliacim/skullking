@@ -51,14 +51,14 @@ def train_ppo_agent(
         save_dir: Directory to save models
         eval_freq: Frequency of evaluation
     """
-    print("="*60)
+    print("=" * 60)
     print("Training PPO Agent for Skull King")
-    print("="*60)
+    print("=" * 60)
     print(f"Total timesteps: {total_timesteps:,}")
     print(f"Parallel environments: {n_envs}")
     print(f"Opponent type: {opponent_type}")
     print(f"Save directory: {save_dir}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Create save directory
     os.makedirs(save_dir, exist_ok=True)
@@ -145,13 +145,13 @@ def evaluate_agent(
         opponent_type: Type of opponent bots
         render: Whether to render games
     """
-    print("="*60)
+    print("=" * 60)
     print("Evaluating PPO Agent")
-    print("="*60)
+    print("=" * 60)
     print(f"Model: {model_path}")
     print(f"Episodes: {n_episodes}")
     print(f"Opponent type: {opponent_type}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Load model
     model = PPO.load(model_path)
@@ -189,21 +189,24 @@ def evaluate_agent(
             wins += 1
 
         if (episode + 1) % 10 == 0:
-            print(f"Episode {episode + 1}/{n_episodes}: Avg Reward = {total_reward/(episode+1):.2f}, Win Rate = {wins/(episode+1)*100:.1f}%")
+            print(
+                f"Episode {episode + 1}/{n_episodes}: Avg Reward = {total_reward/(episode+1):.2f}, Win Rate = {wins/(episode+1)*100:.1f}%"
+            )
 
     env.close()
 
     # Print statistics
     import numpy as np
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("Evaluation Results")
-    print("="*60)
+    print("=" * 60)
     print(f"Average reward: {total_reward/n_episodes:.2f}")
     print(f"Win rate: {wins/n_episodes*100:.1f}%")
     print(f"Average score: {np.mean(scores):.2f} ± {np.std(scores):.2f}")
     print(f"Best score: {max(scores)}")
     print(f"Worst score: {min(scores)}")
-    print("="*60)
+    print("=" * 60)
 
 
 def main():

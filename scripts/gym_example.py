@@ -21,9 +21,9 @@ from app.gym_env import SkullKingEnv
 
 def random_agent_example():
     """Run a game with random actions."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Skull King Gymnasium Environment - Random Agent Example")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Create environment
     env = SkullKingEnv(
@@ -56,7 +56,7 @@ def random_agent_example():
 
         # Check if episode is done
         if terminated or truncated:
-            print(f"\nEpisode finished!")
+            print("\nEpisode finished!")
             print(f"  Total steps: {step_count}")
             print(f"  Total reward: {total_reward:.2f}")
             print(f"  Final agent score: {info.get('agent_score', 0)}")
@@ -67,9 +67,9 @@ def random_agent_example():
 
 def multiple_episodes_example():
     """Run multiple episodes to collect statistics."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Running 5 episodes with random actions")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     env = SkullKingEnv(
         num_opponents=3,
@@ -104,7 +104,7 @@ def multiple_episodes_example():
 
     env.close()
 
-    print(f"\nStatistics over 5 episodes:")
+    print("\nStatistics over 5 episodes:")
     print(f"  Average reward: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
     print(f"  Average score: {np.mean(scores):.2f} ± {np.std(scores):.2f}")
     print(f"  Win rate: {wins}/5 ({wins/5*100:.0f}%)")

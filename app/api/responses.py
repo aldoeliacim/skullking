@@ -1,11 +1,10 @@
 """Response models and DTOs."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
-from app.models.card import CardId
 from app.models.enums import Command
 
 
@@ -34,7 +33,7 @@ class GameInfo(BaseModel):
     id: str
     slug: str
     state: str
-    players: List[PlayerInfo]
+    players: list[PlayerInfo]
     current_round: int
 
 
@@ -82,7 +81,7 @@ class ServerMessage:
     receiver_id: str = ""
     excluded_id: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "command": self.command.value,
@@ -93,7 +92,7 @@ class ServerMessage:
 class CardListResponse(BaseModel):
     """Response for card list endpoint."""
 
-    cards: List[Dict[str, Any]]
+    cards: list[dict[str, Any]]
 
 
 class CreateGameRequest(BaseModel):
@@ -114,4 +113,4 @@ class ErrorResponse(BaseModel):
     """Error response."""
 
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None

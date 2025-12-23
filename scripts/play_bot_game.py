@@ -6,8 +6,6 @@ This script creates a game with multiple bot players and simulates
 a complete game, displaying the results.
 """
 
-import asyncio
-import random
 import sys
 import time
 from pathlib import Path
@@ -195,7 +193,7 @@ class BotGameSimulator:
             winner.tricks_won += 1
             print(f"  → Winner: {winner.username} with {winner_card}")
         else:
-            print(f"  → Kraken! No one wins this trick")
+            print("  → Kraken! No one wins this trick")
 
         time.sleep(0.5)
 

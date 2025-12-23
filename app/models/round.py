@@ -1,7 +1,6 @@
 """Round model representing one round of the game."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from app.models.card import CardId
 from app.models.trick import Trick
@@ -26,25 +25,25 @@ class Round:
 
     number: int
     starter_player_index: int
-    dealt_cards: Dict[str, List[CardId]] = field(default_factory=dict)
-    bids: Dict[str, int] = field(default_factory=dict)
-    tricks: List[Trick] = field(default_factory=list)
-    scores: Dict[str, int] = field(default_factory=dict)
+    dealt_cards: dict[str, list[CardId]] = field(default_factory=dict)
+    bids: dict[str, int] = field(default_factory=dict)
+    tricks: list[Trick] = field(default_factory=list)
+    scores: dict[str, int] = field(default_factory=dict)
 
-    def get_player_hand(self, player_id: str) -> List[CardId]:
+    def get_player_hand(self, player_id: str) -> list[CardId]:
         """Get the cards dealt to a player."""
         return self.dealt_cards.get(player_id, [])
 
-    def get_picked_cards(self, player_id: str) -> List[CardId]:
+    def get_picked_cards(self, player_id: str) -> list[CardId]:
         """Get all cards a player has picked in this round."""
-        picked = []
-        for trick in self.tricks:
-            for picked_card in trick.picked_cards:
-                if picked_card.player_id == player_id:
-                    picked.append(picked_card.card_id)
-        return picked
+        return [
+            picked_card.card_id
+            for trick in self.tricks
+            for picked_card in trick.picked_cards
+            if picked_card.player_id == player_id
+        ]
 
-    def get_remaining_cards(self, player_id: str) -> List[CardId]:
+    def get_remaining_cards(self, player_id: str) -> list[CardId]:
         """Get cards remaining in player's hand."""
         dealt = self.get_player_hand(player_id)
         picked = self.get_picked_cards(player_id)
@@ -52,9 +51,7 @@ class Round:
 
     def get_tricks_won(self, player_id: str) -> int:
         """Count how many tricks a player has won."""
-        return sum(
-            1 for trick in self.tricks if trick.winner_player_id == player_id
-        )
+        return sum(1 for trick in self.tricks if trick.winner_player_id == player_id)
 
     def has_player_bid(self, player_id: str) -> bool:
         """Check if a player has made their bid."""
@@ -82,7 +79,7 @@ class Round:
         - Bid wrong (non-zero): -10 * difference
         - Bid wrong (zero): -10 * round_number
         """
-        won_tricks: Dict[str, int] = {}
+        won_tricks: dict[str, int] = {}
 
         # Count tricks won by each player
         for player_id in self.bids:
@@ -99,13 +96,12 @@ class Round:
                 else:
                     bonus = self.get_bonus_points(player_id)
                     self.scores[player_id] = 20 * bid + bonus
+            # Bid wrong
+            elif bid == 0:
+                self.scores[player_id] = -10 * self.number
             else:
-                # Bid wrong
-                if bid == 0:
-                    self.scores[player_id] = -10 * self.number
-                else:
-                    diff = abs(tricks_won - bid)
-                    self.scores[player_id] = -10 * diff
+                diff = abs(tricks_won - bid)
+                self.scores[player_id] = -10 * diff
 
     def is_complete(self) -> bool:
         """Check if the round is complete (all tricks played)."""
@@ -113,7 +109,7 @@ class Round:
         # regardless of whether they have winners (Kraken can result in no winner)
         return len(self.tricks) == self.number
 
-    def get_current_trick(self) -> Optional[Trick]:
+    def get_current_trick(self) -> Trick | None:
         """Get the current (incomplete) trick, if any."""
         if not self.tricks:
             return None

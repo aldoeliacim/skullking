@@ -5,7 +5,7 @@ This environment allows training reinforcement learning agents to play Skull Kin
 The agent controls one player, while other players can be controlled by bots or other agents.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
 
 import gymnasium as gym
 import numpy as np
@@ -13,7 +13,7 @@ from gymnasium import spaces
 
 from app.bots import RandomBot, RuleBasedBot
 from app.models.card import CardId, get_card
-from app.models.enums import GameState, MAX_PLAYERS, MAX_ROUNDS
+from app.models.enums import MAX_ROUNDS, GameState
 from app.models.game import Game
 from app.models.player import Player
 from app.models.trick import Trick
@@ -46,13 +46,13 @@ class SkullKingEnv(gym.Env):
         - Invalid move threshold reached
     """
 
-    metadata = {"render_modes": ["human", "ansi"], "render_fps": 1}
+    metadata: ClassVar[dict[str, Any]] = {"render_modes": ["human", "ansi"], "render_fps": 1}
 
     def __init__(
         self,
         num_opponents: int = 3,
         opponent_bot_type: str = "rule_based",
-        render_mode: Optional[str] = None,
+        render_mode: str | None = None,
     ):
         """
         Initialize the Skull King environment.
@@ -71,9 +71,9 @@ class SkullKingEnv(gym.Env):
         self.render_mode = render_mode
 
         # Game state
-        self.game: Optional[Game] = None
+        self.game: Game | None = None
         self.agent_player_id = "agent_0"
-        self.bots: List[Any] = []
+        self.bots: list[Any] = []
 
         # Observation space: vectorized game state
         # Cards: 63 physical cards; 71 one-hot indices (CardId values 1-71)
@@ -91,9 +91,7 @@ class SkullKingEnv(gym.Env):
             + 10  # Metadata (round, phase, etc.)
         )
 
-        self.observation_space = spaces.Box(
-            low=0.0, high=1.0, shape=(obs_size,), dtype=np.float32
-        )
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_size,), dtype=np.float32)
 
         # Action space: either bid (0-10) or pick card (0-9 for max 10 cards)
         self.action_space = spaces.Discrete(11)  # Max action is bid 10 or pick card at index 10
@@ -102,8 +100,8 @@ class SkullKingEnv(gym.Env):
         self.max_invalid_moves = 10
 
     def reset(
-        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
-    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        self, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[np.ndarray, dict[str, Any]]:
         """
         Reset the environment for a new game.
 
@@ -165,7 +163,7 @@ class SkullKingEnv(gym.Env):
 
         return observation, info
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Take a step in the environment.
 
@@ -301,9 +299,9 @@ class SkullKingEnv(gym.Env):
 
         return np.concatenate(obs).astype(np.float32)
 
-    def _get_info(self) -> Dict[str, Any]:
+    def _get_info(self) -> dict[str, Any]:
         """Get additional info about current state."""
-        info: Dict[str, Any] = {}
+        info: dict[str, Any] = {}
 
         if self.game:
             info["round"] = self.game.current_round_number
@@ -355,9 +353,7 @@ class SkullKingEnv(gym.Env):
                 continue
 
             # Bot picks a card
-            card_to_play = bot.pick_card(
-                self.game, player.hand, current_trick.get_all_card_ids()
-            )
+            card_to_play = bot.pick_card(self.game, player.hand, current_trick.get_all_card_ids())
             self._play_card(bot_id, card_to_play)
             return  # Exit after one bot plays to avoid recursion
 
@@ -475,7 +471,7 @@ class SkullKingEnv(gym.Env):
             self.game.deal_cards()
             self.game.state = GameState.BIDDING
 
-    def render(self) -> Optional[str]:
+    def render(self) -> str | None:
         """Render the environment."""
         if self.render_mode is None:
             return None
@@ -484,10 +480,10 @@ class SkullKingEnv(gym.Env):
             return "No game in progress"
 
         output = []
-        output.append(f"\n{'='*60}")
+        output.append(f"\n{'=' * 60}")
         output.append(f"Skull King - Round {self.game.current_round_number}")
         output.append(f"State: {self.game.state.value}")
-        output.append(f"{'='*60}")
+        output.append(f"{'=' * 60}")
 
         # Player scores
         output.append("\nScores:")
@@ -507,7 +503,7 @@ class SkullKingEnv(gym.Env):
             # Current trick
             current_trick = current_round.get_current_trick()
             if current_trick and current_trick.picked_cards:
-                output.append(f"\nCurrent Trick:")
+                output.append("\nCurrent Trick:")
                 for picked_card in current_trick.picked_cards:
                     player = self.game.get_player(picked_card.player_id)
                     card = get_card(picked_card.card_id)
@@ -516,12 +512,12 @@ class SkullKingEnv(gym.Env):
         # Agent's hand
         agent_player = self.game.get_player(self.agent_player_id)
         if agent_player and agent_player.hand:
-            output.append(f"\nAgent's Hand:")
+            output.append("\nAgent's Hand:")
             for i, card_id in enumerate(agent_player.hand):
                 card = get_card(card_id)
                 output.append(f"  [{i}] {card}")
 
-        output.append(f"{'='*60}\n")
+        output.append(f"{'=' * 60}\n")
 
         result = "\n".join(output)
 

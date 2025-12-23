@@ -1,7 +1,6 @@
 """Game repository for MongoDB persistence."""
 
 import logging
-from typing import Optional
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.errors import PyMongoError
@@ -21,8 +20,8 @@ class GameRepository:
 
     def __init__(self) -> None:
         """Initialize repository."""
-        self.client: Optional[AsyncIOMotorClient] = None
-        self.db: Optional[AsyncIOMotorDatabase] = None
+        self.client: AsyncIOMotorClient | None = None
+        self.db: AsyncIOMotorDatabase | None = None
 
     async def connect(self) -> None:
         """Connect to MongoDB."""
@@ -32,10 +31,10 @@ class GameRepository:
 
             # Verify connection
             await self.client.admin.command("ping")
-            logger.info(f"Connected to MongoDB: {settings.mongodb_database}")
+            logger.info("Connected to MongoDB: %s", settings.mongodb_database)
 
-        except PyMongoError as e:
-            logger.error(f"Failed to connect to MongoDB: {e}")
+        except PyMongoError:
+            logger.exception("Failed to connect to MongoDB")
             raise
 
     async def disconnect(self) -> None:
@@ -78,14 +77,14 @@ class GameRepository:
             }
 
             await self.db.games.insert_one(game_dict)
-            logger.info(f"Game {game.id} saved to database")
+            logger.info("Game %s saved to database", game.id)
             return True
 
-        except PyMongoError as e:
-            logger.error(f"Error saving game {game.id}: {e}")
+        except PyMongoError:
+            logger.exception("Error saving game %s", game.id)
             return False
 
-    async def find_by_id(self, game_id: str) -> Optional[dict]:
+    async def find_by_id(self, game_id: str) -> dict | None:
         """
         Find game by ID.
 
@@ -100,8 +99,8 @@ class GameRepository:
 
         try:
             return await self.db.games.find_one({"_id": game_id})
-        except PyMongoError as e:
-            logger.error(f"Error finding game {game_id}: {e}")
+        except PyMongoError:
+            logger.exception("Error finding game %s", game_id)
             return None
 
     async def update(self, game: Game) -> bool:
@@ -133,12 +132,10 @@ class GameRepository:
                 ],
             }
 
-            result = await self.db.games.update_one(
-                {"_id": game.id}, {"$set": update_dict}
-            )
+            result = await self.db.games.update_one({"_id": game.id}, {"$set": update_dict})
 
             return result.modified_count > 0
 
-        except PyMongoError as e:
-            logger.error(f"Error updating game {game.id}: {e}")
+        except PyMongoError:
+            logger.exception("Error updating game %s", game.id)
             return False

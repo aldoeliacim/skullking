@@ -1,7 +1,6 @@
 """Logging service."""
 
 import logging
-from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ class LogService:
     Provides consistent logging across the application.
     """
 
-    def info(self, data: Dict[str, str]) -> None:
+    def info(self, data: dict[str, str]) -> None:
         """
         Log info message.
 
@@ -23,7 +22,7 @@ class LogService:
         message = " | ".join(f"{k}={v}" for k, v in data.items())
         logger.info(message)
 
-    def error(self, data: Dict[str, str]) -> None:
+    def error(self, data: dict[str, str]) -> None:
         """
         Log error message.
 
@@ -33,7 +32,7 @@ class LogService:
         message = " | ".join(f"{k}={v}" for k, v in data.items())
         logger.error(message)
 
-    def warning(self, data: Dict[str, str]) -> None:
+    def warning(self, data: dict[str, str]) -> None:
         """
         Log warning message.
 
@@ -43,7 +42,7 @@ class LogService:
         message = " | ".join(f"{k}={v}" for k, v in data.items())
         logger.warning(message)
 
-    def debug(self, data: Dict[str, str]) -> None:
+    def debug(self, data: dict[str, str]) -> None:
         """
         Log debug message.
 

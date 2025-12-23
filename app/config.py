@@ -1,7 +1,5 @@
 """Application configuration using Pydantic settings."""
 
-from typing import Optional
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,13 +24,13 @@ class Settings(BaseSettings):
     mongodb_host: str = Field(default="localhost", description="MongoDB host")
     mongodb_port: int = Field(default=27017, description="MongoDB port")
     mongodb_database: str = Field(default="skullking", description="MongoDB database name")
-    mongodb_username: Optional[str] = Field(default=None, description="MongoDB username")
-    mongodb_password: Optional[str] = Field(default=None, description="MongoDB password")
+    mongodb_username: str | None = Field(default=None, description="MongoDB username")
+    mongodb_password: str | None = Field(default=None, description="MongoDB password")
 
     # Redis
     broker_redis_host: str = Field(default="localhost", description="Redis host")
     broker_redis_port: int = Field(default=6379, description="Redis port")
-    broker_redis_password: Optional[str] = Field(default=None, description="Redis password")
+    broker_redis_password: str | None = Field(default=None, description="Redis password")
     redis_db: int = Field(default=0, description="Redis database number")
 
     # JWT Authentication

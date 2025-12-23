@@ -1,9 +1,10 @@
 """FastAPI main application."""
 
 import asyncio
-import os
+import contextlib
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
@@ -60,23 +61,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Cancel WebSocket manager task
     websocket_task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await websocket_task
-    except asyncio.CancelledError:
-        pass
 
     # Close database connection if exists
     if app.state.game_repository:
-        try:
+        with contextlib.suppress(Exception):
             await app.state.game_repository.disconnect()
-        except Exception:
-            pass
 
     # Close Redis connection
-    try:
+    with contextlib.suppress(Exception):
         await app.state.publisher_service.close()
-    except Exception:
-        pass
 
     print("✅ Server shutdown complete")
 
@@ -102,17 +97,17 @@ app.add_middleware(
 app.include_router(router)
 
 # Mount static files
-static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 @app.get("/")
 async def root():
     """Serve the main game UI or API info."""
-    static_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(static_path):
-        return FileResponse(static_path)
+    static_path = static_dir / "index.html"
+    if static_path.exists():
+        return FileResponse(str(static_path))
     return {
         "message": "Skull King API",
         "version": "2.0.0",

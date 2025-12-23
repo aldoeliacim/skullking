@@ -33,11 +33,13 @@ class Command(str, Enum):
     END_GAME = "END_GAME"
     REPORT_ERROR = "REPORT_ERROR"
     STATISTICS_FETCHED = "STATISTICS_FETCHED"
+    GAME_STATE = "GAME_STATE"  # Full state sync
 
     # Commands from client
     PICK = "PICK"
     BID = "BID"
     FETCH_STATISTICS = "FETCH_STATISTICS"
+    SYNC_STATE = "SYNC_STATE"  # Request state sync
 
 
 class CardType(str, Enum):

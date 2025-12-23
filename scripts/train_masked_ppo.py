@@ -3,14 +3,14 @@
 Train MaskablePPO with critical improvements:
 1. Action masking (only sample valid actions)
 2. Dense reward shaping (trick-level, bid quality)
-3. Compact observations (151 dims vs 1226)
+3. Enhanced observations (171 dims with context awareness)
+4. Refined curriculum for faster learning
 """
 
 import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -22,7 +22,7 @@ from stable_baselines3.common.callbacks import (
     EvalCallback,
 )
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from app.gym_env.skullking_env_masked import SkullKingEnvMasked
 
@@ -56,12 +56,7 @@ class CurriculumCallback(BaseCallback):
 
                 # Update all sub-environments
                 for env_idx in range(self.vec_env.num_envs):
-                    self.vec_env.env_method(
-                        "set_opponent",
-                        next_type,
-                        next_diff,
-                        indices=[env_idx]
-                    )
+                    self.vec_env.env_method("set_opponent", next_type, next_diff, indices=[env_idx])
 
                 self.current_phase += 1
 
@@ -88,7 +83,7 @@ def train_masked_ppo(
     total_timesteps: int = 1_500_000,
     n_envs: int = 4,
     save_dir: str = "./models/masked_ppo",
-    load_path: Optional[str] = None,
+    load_path: str | None = None,
 ):
     """
     Train MaskablePPO agent with optimized curriculum.
@@ -99,24 +94,28 @@ def train_masked_ppo(
         save_dir: Directory to save models
         load_path: Optional path to load existing model
     """
-    print("="*60)
+    print("=" * 60)
     print("MASKABLE PPO TRAINING - Optimized Curriculum")
-    print("="*60)
+    print("=" * 60)
     print(f"Total timesteps: {total_timesteps:,}")
     print(f"Parallel envs: {n_envs}")
     print(f"Save directory: {save_dir}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(f"{save_dir}/checkpoints", exist_ok=True)
 
-    # Define optimized curriculum
+    # Define refined curriculum (based on ULTRATHINK_ANALYSIS recommendations)
+    # Key changes: earlier intro to rule-based, more gradual progression
     curriculum = [
-        (0, "random", "medium"),           # Phase 1: Learn basics (0-100k)
-        (100_000, "random", "hard"),       # Phase 2: Refine basics (100k-300k)
-        (300_000, "rule_based", "easy"),   # Phase 3: Learn strategy (300k-600k)
-        (600_000, "rule_based", "medium"), # Phase 4: Refine strategy (600k-1M)
-        (1_000_000, "rule_based", "hard"), # Phase 5: Master tactics (1M-1.5M)
+        (0, "random", "easy"),  # Phase 1: Faster basic learning (0-50k)
+        (50_000, "random", "medium"),  # Phase 2: Extended core learning (50k-150k)
+        (150_000, "random", "hard"),  # Phase 3: Challenge basics (150k-250k)
+        (250_000, "rule_based", "easy"),  # Phase 4: Learn strategy (250k-400k)
+        (400_000, "rule_based", "medium"),  # Phase 5: Refine strategy (400k-600k)
+        (600_000, "rule_based", "hard"),  # Phase 6: Advanced tactics (600k-850k)
+        (850_000, "rule_based", "medium"),  # Phase 7: Robustness check (850k-1.1M)
+        (1_100_000, "rule_based", "hard"),  # Phase 8: Final mastery (1.1M-1.5M)
     ]
 
     print("Curriculum Schedule:")
@@ -125,9 +124,10 @@ def train_masked_ppo(
     print()
 
     # Create vectorized environment with action masking
+    # Start with random easy opponents (Phase 1)
     print(f"Creating {n_envs} parallel masked environments...")
     vec_env = make_vec_env(
-        lambda: create_masked_env("random", "medium"),
+        lambda: create_masked_env("random", "easy"),
         n_envs=n_envs,
         vec_env_cls=SubprocVecEnv,
     )
@@ -215,10 +215,10 @@ def train_masked_ppo(
     vec_env.close()
     eval_env.close()
 
-    print(f"\n✅ Training complete!")
+    print("\n✅ Training complete!")
     print(f"Final model saved to: {final_path}.zip")
     print(f"Best model saved to: {save_dir}/best_model/best_model.zip")
-    print(f"\nTo view training progress:")
+    print("\nTo view training progress:")
     print(f"  tensorboard --logdir {save_dir}/tensorboard")
 
 
