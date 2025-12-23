@@ -48,7 +48,7 @@ Sparse rewards (per-round/game):
   - Perfect bid: +20
   - Off by 1: +8
   - Off by 10: -80 (in round 10!)
-  
+
 - Game completion: **-35 to +80** ❌ EXTREME!
   - Rank 1: +80 (+50 + 30 bonus)
   - Rank 2: +15
@@ -155,11 +155,11 @@ Per-step range: [-5, +11.5]
 1. **Dense rewards become meaningful**
    - Before: Trick reward (+3) drowned out by round penalty (-80)
    - After: Trick reward (+3) comparable to round penalty (-5)
-   
+
 2. **Value function can learn**
    - Before: Returns vary wildly (-1100 to +1063)
    - After: Stable returns (26 to 66)
-   
+
 3. **Credit assignment works**
    - Before: Agent learns "avoid bad rounds" (too coarse)
    - After: Agent learns "win needed tricks, avoid overbidding" (fine-grained)
@@ -169,11 +169,11 @@ Per-step range: [-5, +11.5]
 1. **More value updates (n_epochs: 20)**
    - Normalized rewards → smoother targets
    - Value function can converge with more updates
-   
+
 2. **Stronger value coefficient (vf_coef: 1.0)**
    - Equal weight to value and policy losses
    - Value function learns as fast as policy
-   
+
 3. **Better credit (gae_lambda: 0.99)**
    - 55-step episodes need long-horizon credit
    - Higher lambda = better propagation of rewards
