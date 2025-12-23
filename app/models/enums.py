@@ -35,11 +35,24 @@ class Command(str, Enum):
     STATISTICS_FETCHED = "STATISTICS_FETCHED"
     GAME_STATE = "GAME_STATE"  # Full state sync
 
+    # Pirate ability commands (sent to players)
+    ABILITY_TRIGGERED = "ABILITY_TRIGGERED"  # Notify player of triggered ability
+    ABILITY_RESOLVED = "ABILITY_RESOLVED"  # Confirm ability resolution
+    SHOW_DECK = "SHOW_DECK"  # Show undealt cards (Jade)
+    HARRY_PROMPT = "HARRY_PROMPT"  # Prompt for Harry's bid modifier
+
     # Commands from client
     PICK = "PICK"
     BID = "BID"
     FETCH_STATISTICS = "FETCH_STATISTICS"
     SYNC_STATE = "SYNC_STATE"  # Request state sync
+
+    # Pirate ability commands (from client)
+    RESOLVE_ROSIE = "RESOLVE_ROSIE"  # Choose next trick starter
+    RESOLVE_BENDT = "RESOLVE_BENDT"  # Discard cards after drawing
+    RESOLVE_ROATAN = "RESOLVE_ROATAN"  # Declare extra bet
+    RESOLVE_JADE = "RESOLVE_JADE"  # Acknowledge deck view
+    RESOLVE_HARRY = "RESOLVE_HARRY"  # Choose bid modifier
 
 
 class CardType(str, Enum):

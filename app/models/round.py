@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from app.models.card import CardId
+from app.models.pirate_ability import AbilityState
 from app.models.trick import Trick
 
 
@@ -29,6 +30,7 @@ class Round:
     bids: dict[str, int] = field(default_factory=dict)
     tricks: list[Trick] = field(default_factory=list)
     scores: dict[str, int] = field(default_factory=dict)
+    ability_state: AbilityState = field(default_factory=AbilityState)
 
     def get_player_hand(self, player_id: str) -> list[CardId]:
         """Get the cards dealt to a player."""
@@ -82,6 +84,10 @@ class Round:
         - Bid correct (zero): 10 * round_number
         - Bid wrong (non-zero): -10 * difference
         - Bid wrong (zero): -10 * round_number
+
+        Pirate abilities affecting scoring:
+        - Harry: Modify effective bid by ±1 before checking
+        - Roatán: Extra bet added/subtracted based on bid correctness
         """
         won_tricks: dict[str, int] = {}
 
@@ -93,19 +99,30 @@ class Round:
         for player_id, bid in self.bids.items():
             tricks_won = won_tricks[player_id]
 
-            if tricks_won == bid:
+            # Apply Harry's bid modifier if active
+            effective_bid = bid + self.ability_state.get_harry_modifier(player_id)
+            # Bid cannot go below 0
+            effective_bid = max(0, effective_bid)
+
+            bid_correct = tricks_won == effective_bid
+
+            if bid_correct:
                 # Bid correct
-                if bid == 0:
+                if effective_bid == 0:
                     self.scores[player_id] = 10 * self.number
                 else:
                     bonus = self.get_bonus_points(player_id)
-                    self.scores[player_id] = 20 * bid + bonus
+                    self.scores[player_id] = 20 * effective_bid + bonus
             # Bid wrong
-            elif bid == 0:
+            elif effective_bid == 0:
                 self.scores[player_id] = -10 * self.number
             else:
-                diff = abs(tricks_won - bid)
+                diff = abs(tricks_won - effective_bid)
                 self.scores[player_id] = -10 * diff
+
+            # Apply Roatán's extra bet bonus/penalty
+            roatan_bonus = self.ability_state.get_roatan_bonus(player_id, bid_correct)
+            self.scores[player_id] += roatan_bonus
 
     def is_complete(self) -> bool:
         """Check if the round is complete (all tricks played)."""
@@ -121,6 +138,23 @@ class Round:
         if last_trick.winner_player_id is None:
             return last_trick
         return None
+
+    def get_next_trick_starter(self, default_player_id: str) -> str:
+        """Get the player who should start the next trick.
+
+        This accounts for Rosie's ability which can override the normal starter.
+
+        Args:
+            default_player_id: The normal starter (usually previous trick winner)
+
+        Returns:
+            Player ID who should start the next trick
+        """
+        if self.ability_state.rosie_next_starter:
+            starter = self.ability_state.rosie_next_starter
+            self.ability_state.clear_rosie_override()
+            return starter
+        return default_player_id
 
     def __str__(self) -> str:
         """String representation."""

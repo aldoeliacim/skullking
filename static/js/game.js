@@ -66,6 +66,32 @@ class SkullKingGame {
         document.getElementById('log-toggle').addEventListener('click', () => {
             document.getElementById('game-log').classList.toggle('collapsed');
         });
+
+        // Rules modal
+        document.getElementById('rules-toggle').addEventListener('click', () => {
+            document.getElementById('rules-modal').classList.remove('hidden');
+        });
+        document.getElementById('rules-close').addEventListener('click', () => {
+            document.getElementById('rules-modal').classList.add('hidden');
+        });
+        document.getElementById('rules-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'rules-modal') {
+                document.getElementById('rules-modal').classList.add('hidden');
+            }
+        });
+
+        // Scoreboard toggle
+        document.getElementById('scoreboard-toggle').addEventListener('click', () => {
+            document.getElementById('scoreboard-panel').classList.toggle('hidden');
+        });
+        document.getElementById('scoreboard-close').addEventListener('click', () => {
+            document.getElementById('scoreboard-panel').classList.add('hidden');
+        });
+
+        // Continue button
+        document.getElementById('continue-btn').addEventListener('click', () => {
+            this.confirmContinue();
+        });
     }
 
     async createGame() {
@@ -162,7 +188,7 @@ class SkullKingGame {
                 this.updateLobby();
                 break;
             case 'JOINED':
-                this.addLog(window.i18n.t('log.playerJoined', { username: message.content.username }));
+                this.addLog(window.i18n.t('log.playerJoined', { username: message.content.username }), 'info', '&#128100;');
                 break;
             case 'LEFT':
             case 'PLAYER_LEFT':
@@ -195,7 +221,7 @@ class SkullKingGame {
                 }
                 break;
             case 'STARTED':
-                this.addLog(window.i18n.t('log.gameStarted', { count: message.content.player_count }));
+                this.addLog(window.i18n.t('log.gameStarted', { count: message.content.player_count }), 'round', '&#127919;');
                 this.switchScreen('game');
                 break;
             case 'DEAL':
@@ -215,7 +241,7 @@ class SkullKingGame {
                 }
                 console.log('[DEAL] Updated gameState.hand:', this.gameState.hand);
                 this.updateGameScreen();
-                this.addLog(window.i18n.t('log.cardsDealt', { round: message.content.round }));
+                this.addLog(window.i18n.t('log.cardsDealt', { round: message.content.round }), 'round', '&#127183;');
                 break;
             case 'START_BIDDING':
                 this.gameState = this.gameState || {};
@@ -243,7 +269,7 @@ class SkullKingGame {
                 this.addLog(window.i18n.t('log.playerBid', {
                     player: message.content.player_id === this.playerId ? 'You' : bidPlayerName,
                     bid: message.content.bid
-                }));
+                }), 'bid');
                 this.updateGameScreen();
                 break;
             case 'END_BIDDING':
@@ -267,7 +293,7 @@ class SkullKingGame {
                         }
                     });
                 }
-                this.addLog(window.i18n.t('log.biddingComplete'));
+                this.addLog(window.i18n.t('log.biddingComplete'), 'bid', '&#10004;');
                 this.updateGameScreen();
                 break;
             case 'START_PICKING':
@@ -435,6 +461,9 @@ class SkullKingGame {
 
         // Update trick area
         this.updateTrickArea();
+
+        // Update scoreboard
+        this.updateScoreboard();
     }
 
     updateOpponents() {
@@ -1065,14 +1094,99 @@ class SkullKingGame {
         });
     }
 
-    addLog(message) {
+    addLog(message, type = 'info', icon = null) {
         const logContainer = document.getElementById('log-messages');
         const entry = document.createElement('div');
-        entry.className = 'log-entry';
+        entry.className = `log-entry log-${type}`;
+
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        entry.textContent = `[${time}] ${message}`;
+
+        // Default icons based on type
+        const defaultIcons = {
+            'info': '',
+            'bid': '&#128176;',
+            'play': '&#127183;',
+            'win': '&#127942;',
+            'score': '&#10004;',
+            'round': '&#128161;'
+        };
+
+        const displayIcon = icon || defaultIcons[type] || '';
+
+        if (displayIcon) {
+            entry.innerHTML = `<span class="log-icon">${displayIcon}</span><span class="log-text">[${time}] ${message}</span>`;
+        } else {
+            entry.innerHTML = `<span class="log-text">[${time}] ${message}</span>`;
+        }
+
         logContainer.appendChild(entry);
         logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    updateScoreboard() {
+        const tbody = document.getElementById('scoreboard-body');
+        if (!tbody || !this.gameState?.players) return;
+
+        tbody.innerHTML = '';
+
+        // Sort players by score
+        const sortedPlayers = [...this.gameState.players].sort((a, b) => (b.score || 0) - (a.score || 0));
+
+        sortedPlayers.forEach((player, index) => {
+            const tr = document.createElement('tr');
+            const isYou = player.id === this.playerId;
+            const isCurrentTurn = player.id === this.gameState.picking_player_id;
+            const bid = player.bid ?? this.gameState.bids?.[player.id] ?? null;
+            const tricksWon = player.tricks_won || 0;
+
+            if (isYou) tr.classList.add('is-you');
+            if (isCurrentTurn) tr.classList.add('current-turn');
+
+            // Bid progress indicator
+            if (bid !== null) {
+                if (tricksWon === bid) {
+                    tr.classList.add('bid-match');
+                } else if (tricksWon > bid) {
+                    tr.classList.add('bid-over');
+                }
+            }
+
+            tr.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${player.is_bot ? '&#129302; ' : ''}${player.username}${isYou ? ' &#11088;' : ''}</td>
+                <td>${bid !== null ? bid : '-'}</td>
+                <td>${tricksWon}</td>
+                <td><strong>${player.score || 0}</strong></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    confirmContinue() {
+        // Send continue confirmation to server
+        this.sendMessage('CONTINUE', {});
+        // Hide the modal
+        document.getElementById('continue-modal').classList.add('hidden');
+    }
+
+    showContinueModal(winnerName, bonusPoints = 0) {
+        const modal = document.getElementById('continue-modal');
+        const winnerDiv = document.getElementById('continue-winner');
+        const readyList = document.getElementById('ready-list');
+
+        winnerDiv.innerHTML = `&#127942; ${winnerName} won the trick!${bonusPoints > 0 ? ` (+${bonusPoints} bonus)` : ''}`;
+
+        // Show player ready states
+        readyList.innerHTML = '';
+        this.gameState.players.forEach(player => {
+            const span = document.createElement('span');
+            span.className = `player-ready ${player.is_bot ? 'ready' : 'waiting'}`;
+            span.textContent = player.is_bot ? `${player.username} &#10004;` : player.username;
+            span.innerHTML = `${player.username} ${player.is_bot ? '&#10004;' : '&#8987;'}`;
+            readyList.appendChild(span);
+        });
+
+        modal.classList.remove('hidden');
     }
 
     switchScreen(screenName) {

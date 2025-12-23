@@ -49,7 +49,7 @@ htmlcov/
 logs/
 
 # Trained models (too large for git)
-models/
+/models/
 
 # Poetry
 poetry.lock

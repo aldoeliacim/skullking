@@ -1869,6 +1869,525 @@ input[type="text"]::placeholder {
 }
 
 /* ============================================
+   RULES BUTTON
+   ============================================ */
+
+.rules-btn {
+    position: fixed;
+    top: var(--spacing-md);
+    right: calc(var(--spacing-md) + 60px);
+    z-index: 1000;
+    background: var(--bg-panel);
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all 0.2s ease;
+}
+
+.rules-btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    transform: scale(1.05);
+}
+
+/* ============================================
+   SCOREBOARD PANEL
+   ============================================ */
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.topbar-btn {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all 0.2s ease;
+}
+
+.topbar-btn:hover {
+    color: var(--accent-gold);
+    border-color: var(--accent-gold);
+}
+
+.scoreboard-panel {
+    position: fixed;
+    top: 60px;
+    right: var(--spacing-lg);
+    width: 320px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    z-index: 80;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: slideIn 0.3s ease-out;
+}
+
+.scoreboard-panel.hidden {
+    display: none;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.scoreboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-header h4 {
+    margin: 0;
+    color: var(--accent-gold);
+    font-family: 'Pirata One', cursive;
+    font-size: 1.2rem;
+}
+
+.scoreboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.scoreboard-table th,
+.scoreboard-table td {
+    padding: var(--spacing-sm);
+    text-align: center;
+}
+
+.scoreboard-table th {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+}
+
+.scoreboard-table tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-table tr:last-child {
+    border-bottom: none;
+}
+
+.scoreboard-table tr.is-you {
+    background: rgba(67, 97, 238, 0.15);
+}
+
+.scoreboard-table tr.current-turn {
+    background: rgba(255, 215, 0, 0.1);
+}
+
+.scoreboard-table tr.bid-match {
+    color: var(--accent-green);
+}
+
+.scoreboard-table tr.bid-over {
+    color: var(--accent-red);
+}
+
+/* ============================================
+   CONTINUE MODAL
+   ============================================ */
+
+.continue-content {
+    text-align: center;
+    max-width: 400px;
+}
+
+.continue-winner {
+    font-size: 1.5rem;
+    color: var(--accent-gold);
+    margin: var(--spacing-md) 0;
+    font-family: 'Pirata One', cursive;
+}
+
+.continue-waiting {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+}
+
+.player-ready-list {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.player-ready {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+}
+
+.player-ready.ready {
+    background: rgba(46, 196, 182, 0.2);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.player-ready.waiting {
+    opacity: 0.5;
+}
+
+/* ============================================
+   RULEBOOK MODAL
+   ============================================ */
+
+.rules-content {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+.rules-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.rules-header h3 {
+    font-family: 'Pirata One', cursive;
+    font-size: 1.5rem;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+.rules-body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.rules-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.rules-section:last-child {
+    margin-bottom: 0;
+}
+
+.rules-section h4 {
+    color: var(--accent-blue);
+    font-size: 1rem;
+    margin-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
+}
+
+.rules-section p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Card Hierarchy */
+.card-hierarchy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.hierarchy-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--bg-dark);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--border-color);
+}
+
+.hierarchy-item.special {
+    border-left-color: var(--suit-special);
+}
+
+.hierarchy-item.trump {
+    border-left-color: #1f2937;
+}
+
+.hierarchy-item.suits {
+    border-left-color: var(--accent-blue);
+}
+
+.h-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    text-align: center;
+}
+
+.h-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 100px;
+}
+
+.h-desc {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* Special Cards Grid */
+.special-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.special-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-sm);
+    background: var(--bg-dark);
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+.s-icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-xs);
+}
+
+.s-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.s-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* Scoring Rules */
+.scoring-rules {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-sm);
+    background: var(--bg-dark);
+    border-radius: var(--radius-sm);
+}
+
+.score-item.correct {
+    border-left: 3px solid var(--accent-green);
+}
+
+.score-item.wrong {
+    border-left: 3px solid var(--accent-red);
+}
+
+.score-label {
+    color: var(--text-secondary);
+}
+
+.score-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.score-item.correct .score-value {
+    color: var(--accent-green);
+}
+
+.score-item.wrong .score-value {
+    color: var(--accent-red);
+}
+
+/* Bonus List */
+.bonus-list {
+    list-style: none;
+    padding: 0;
+}
+
+.bonus-list li {
+    padding: var(--spacing-xs) 0;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.bonus-list li:last-child {
+    border-bottom: none;
+}
+
+.bonus-list strong {
+    color: var(--accent-green);
+}
+
+/* ============================================
+   ENHANCED GAME LOG
+   ============================================ */
+
+.log-entry {
+    padding: var(--spacing-sm) 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry .log-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.log-entry .log-text {
+    flex: 1;
+}
+
+.log-entry.log-bid {
+    color: var(--accent-blue);
+}
+
+.log-entry.log-play {
+    color: var(--text-secondary);
+}
+
+.log-entry.log-win {
+    color: var(--accent-gold);
+}
+
+.log-entry.log-score {
+    color: var(--accent-green);
+}
+
+.log-entry.log-round {
+    color: var(--accent-gold);
+    font-weight: 600;
+    background: rgba(255, 215, 0, 0.05);
+    margin: var(--spacing-xs) calc(-1 * var(--spacing-md));
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+/* ============================================
+   CARD TOOLTIPS/HINTS
+   ============================================ */
+
+.card-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+}
+
+.card:hover .card-tooltip {
+    opacity: 1;
+}
+
+.card-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--border-color);
+}
+
+/* ============================================
+   VISUAL CUES - ENHANCED TURN INDICATOR
+   ============================================ */
+
+.opponent-card.current-turn::before {
+    content: 'Playing...';
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-gold);
+    color: var(--bg-dark);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.65rem;
+    font-weight: 600;
+    animation: turnBadgePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes turnBadgePulse {
+    0%, 100% {
+        transform: translateX(-50%) scale(1);
+    }
+    50% {
+        transform: translateX(-50%) scale(1.1);
+    }
+}
+
+.opponent-card {
+    position: relative;
+}
+
+/* Bid progress indicator */
+.bid-progress {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: var(--spacing-xs);
+}
+
+.bid-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-color);
+}
+
+.bid-dot.won {
+    background: var(--accent-green);
+}
+
+.bid-dot.needed {
+    background: var(--accent-gold);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 

@@ -17,6 +17,11 @@
             <span id="lang-flag">EN</span>
         </button>
 
+        <!-- Rulebook Button -->
+        <button id="rules-toggle" class="rules-btn" title="View Rules">
+            <span>&#128214;</span>
+        </button>
+
         <!-- Login Screen -->
         <div id="login-screen" class="screen active">
             <div class="login-container">
@@ -136,11 +141,36 @@
                         <strong><span id="current-round">1</span>/10</strong>
                     </div>
                     <div class="game-phase" id="game-status-text" data-i18n="game.waiting">Waiting...</div>
-                    <div class="score-display">
-                        <span data-i18n="game.yourScore">Your Score:</span>
-                        <strong id="player-score">0</strong>
+                    <div class="topbar-right">
+                        <button id="scoreboard-toggle" class="topbar-btn" title="Toggle Scoreboard">
+                            <span>&#127942;</span>
+                        </button>
+                        <div class="score-display">
+                            <span data-i18n="game.yourScore">Your Score:</span>
+                            <strong id="player-score">0</strong>
+                        </div>
                     </div>
                 </header>
+
+                <!-- Scoreboard Panel -->
+                <aside class="scoreboard-panel hidden" id="scoreboard-panel">
+                    <div class="scoreboard-header">
+                        <h4 data-i18n="game.scoreboard">Scoreboard</h4>
+                        <button id="scoreboard-close" class="btn-icon-only" title="Close">&#10005;</button>
+                    </div>
+                    <table class="scoreboard-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th data-i18n="results.player">Player</th>
+                                <th data-i18n="game.bid">Bid</th>
+                                <th data-i18n="game.tricks">Won</th>
+                                <th data-i18n="results.score">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoreboard-body"></tbody>
+                    </table>
+                </aside>
 
                 <!-- Main Game Area -->
                 <main class="game-main">
@@ -207,6 +237,137 @@
                                 <span data-i18n="game.tigressEscape">Escape</span>
                                 <small data-i18n="game.tigressEscapeDesc">Lose on purpose</small>
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Continue Button Modal (between turns) -->
+                <div id="continue-modal" class="modal hidden">
+                    <div class="modal-content continue-content">
+                        <h3 data-i18n="game.trickComplete">Trick Complete!</h3>
+                        <div id="continue-winner" class="continue-winner"></div>
+                        <div class="continue-waiting">
+                            <span data-i18n="game.waitingPlayers">Waiting for players...</span>
+                            <div class="player-ready-list" id="ready-list"></div>
+                        </div>
+                        <button id="continue-btn" class="btn btn-primary">
+                            <span data-i18n="game.continue">Continue</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rulebook Modal -->
+                <div id="rules-modal" class="modal hidden">
+                    <div class="modal-content rules-content">
+                        <div class="rules-header">
+                            <h3>&#128214; Skull King Rules</h3>
+                            <button id="rules-close" class="btn-icon-only" title="Close">&#10005;</button>
+                        </div>
+                        <div class="rules-body">
+                            <section class="rules-section">
+                                <h4>&#127183; Goal</h4>
+                                <p>Predict exactly how many tricks you'll win each round. Score points for correct predictions!</p>
+                            </section>
+
+                            <section class="rules-section">
+                                <h4>&#9878; Card Hierarchy (High to Low)</h4>
+                                <div class="card-hierarchy">
+                                    <div class="hierarchy-item special">
+                                        <span class="h-icon">&#128128;</span>
+                                        <span class="h-name">Skull King</span>
+                                        <span class="h-desc">Beats all except Mermaid</span>
+                                    </div>
+                                    <div class="hierarchy-item special">
+                                        <span class="h-icon">&#128126;</span>
+                                        <span class="h-name">Pirates (5)</span>
+                                        <span class="h-desc">Beat all suits, lose to King</span>
+                                    </div>
+                                    <div class="hierarchy-item special">
+                                        <span class="h-icon">&#129500;</span>
+                                        <span class="h-name">Mermaids (2)</span>
+                                        <span class="h-desc">Beat suits, lose to Pirates, capture King!</span>
+                                    </div>
+                                    <div class="hierarchy-item trump">
+                                        <span class="h-icon">&#127988;</span>
+                                        <span class="h-name">Black (Roger)</span>
+                                        <span class="h-desc">Trump suit, beats other suits</span>
+                                    </div>
+                                    <div class="hierarchy-item suits">
+                                        <span class="h-icon">&#128230;&#127803;&#128506;</span>
+                                        <span class="h-name">Other Suits</span>
+                                        <span class="h-desc">Yellow (Chest), Green (Parrot), Purple (Map)</span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="rules-section">
+                                <h4>&#10024; Special Cards</h4>
+                                <div class="special-cards">
+                                    <div class="special-item">
+                                        <span class="s-icon">&#127875;</span>
+                                        <span class="s-name">Escape</span>
+                                        <span class="s-desc">Always loses</span>
+                                    </div>
+                                    <div class="special-item">
+                                        <span class="s-icon">&#129417;</span>
+                                        <span class="s-name">Kraken</span>
+                                        <span class="s-desc">Destroys trick, no winner</span>
+                                    </div>
+                                    <div class="special-item">
+                                        <span class="s-icon">&#128011;</span>
+                                        <span class="s-name">White Whale</span>
+                                        <span class="s-desc">Highest number wins, specials destroyed</span>
+                                    </div>
+                                    <div class="special-item">
+                                        <span class="s-icon">&#127917;</span>
+                                        <span class="s-name">Tigress</span>
+                                        <span class="s-desc">Choose: Pirate or Escape</span>
+                                    </div>
+                                    <div class="special-item">
+                                        <span class="s-icon">&#128176;</span>
+                                        <span class="s-name">Loot</span>
+                                        <span class="s-desc">Like Escape, but has bonus</span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="rules-section">
+                                <h4>&#128181; Scoring</h4>
+                                <div class="scoring-rules">
+                                    <div class="score-item correct">
+                                        <span class="score-label">Correct Bid (non-zero)</span>
+                                        <span class="score-value">+20 x bid + bonuses</span>
+                                    </div>
+                                    <div class="score-item correct">
+                                        <span class="score-label">Correct Zero Bid</span>
+                                        <span class="score-value">+10 x round number</span>
+                                    </div>
+                                    <div class="score-item wrong">
+                                        <span class="score-label">Wrong Bid (non-zero)</span>
+                                        <span class="score-value">-10 x difference</span>
+                                    </div>
+                                    <div class="score-item wrong">
+                                        <span class="score-label">Wrong Zero Bid</span>
+                                        <span class="score-value">-10 x round number</span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="rules-section">
+                                <h4>&#127873; Bonus Points</h4>
+                                <ul class="bonus-list">
+                                    <li><strong>+10</strong> per standard 14 captured</li>
+                                    <li><strong>+20</strong> for Black 14 (Roger)</li>
+                                    <li><strong>+20</strong> Pirate captures Mermaid</li>
+                                    <li><strong>+30</strong> Skull King captures Pirate</li>
+                                    <li><strong>+40</strong> Mermaid captures Skull King</li>
+                                </ul>
+                            </section>
+
+                            <section class="rules-section">
+                                <h4>&#128712; Suit Following</h4>
+                                <p>You must follow the lead suit if you can. Special cards (King, Pirates, Mermaids, Escapes) can always be played.</p>
+                            </section>
                         </div>
                     </div>
                 </div>

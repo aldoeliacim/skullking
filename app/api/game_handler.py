@@ -12,6 +12,7 @@ from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import CardId, get_card
 from app.models.enums import GameState
 from app.models.game import Game
+from app.models.pirate_ability import AbilityType, PendingAbility, get_card_ability, get_pirate_type
 from app.models.player import Player
 from app.models.trick import TigressChoice, Trick
 
@@ -70,6 +71,12 @@ class GameHandler:
             "START_GAME": self._handle_start_game,
             "SYNC_STATE": self._handle_sync_state,
             "ADD_BOT": self._handle_add_bot,
+            # Pirate ability handlers
+            "RESOLVE_ROSIE": self._handle_resolve_rosie,
+            "RESOLVE_BENDT": self._handle_resolve_bendt,
+            "RESOLVE_ROATAN": self._handle_resolve_roatan,
+            "RESOLVE_JADE": self._handle_resolve_jade,
+            "RESOLVE_HARRY": self._handle_resolve_harry,
         }
 
         handler = handlers.get(command)
@@ -326,6 +333,7 @@ class GameHandler:
         """Start a new trick in the current round."""
         trick_number = len(current_round.tricks) + 1
         starter_index = current_round.starter_player_index
+        default_starter_id: str | None = None
 
         # Adjust starter for subsequent tricks (winner leads)
         if current_round.tricks:
@@ -334,6 +342,14 @@ class GameHandler:
                 winner = game.get_player(last_trick.winner_player_id)
                 if winner:
                     starter_index = winner.index
+                    default_starter_id = winner.id
+
+        # Check for Rosie's ability override
+        if default_starter_id:
+            actual_starter_id = current_round.get_next_trick_starter(default_starter_id)
+            actual_starter = game.get_player(actual_starter_id)
+            if actual_starter:
+                starter_index = actual_starter.index
 
         trick = Trick(
             number=trick_number,
@@ -405,20 +421,52 @@ class GameHandler:
             if winner:
                 winner.tricks_won += 1
 
+        # Check for pirate ability trigger
+        pending_ability: PendingAbility | None = None
+        if winner_card_id and winner_player_id:
+            ability_type = get_card_ability(winner_card_id)
+            if ability_type:
+                pending_ability = current_round.ability_state.trigger_ability(
+                    winner_player_id, winner_card_id, trick.number
+                )
+                if pending_ability:
+                    logger.info(
+                        "Pirate ability triggered: %s for player %s",
+                        ability_type.value,
+                        winner_player_id,
+                    )
+
+        # Build announce content
+        announce_content: dict[str, Any] = {
+            "trick": trick.number,
+            "winner_player_id": winner_player_id,
+            "winner_card_id": winner_card_id.value if winner_card_id else None,
+            "bonus_points": bonus_points,
+        }
+
+        # Add ability info if triggered
+        if pending_ability:
+            pirate_type = get_pirate_type(winner_card_id) if winner_card_id else None
+            announce_content["ability_triggered"] = {
+                "ability_type": pending_ability.ability_type.value,
+                "pirate_type": pirate_type.value if pirate_type else None,
+                "player_id": winner_player_id,
+            }
+
         # Broadcast trick winner
         await self.manager.broadcast_to_game(
             ServerMessage(
                 command=Command.ANNOUNCE_TRICK_WINNER,
                 game_id=game.id,
-                content={
-                    "trick": trick.number,
-                    "winner_player_id": winner_player_id,
-                    "winner_card_id": winner_card_id.value if winner_card_id else None,
-                    "bonus_points": bonus_points,
-                },
+                content=announce_content,
             ),
             game.id,
         )
+
+        # Handle pirate abilities that need immediate resolution
+        if pending_ability:
+            await self._handle_ability_trigger(game, current_round, pending_ability, trick)
+            return  # Wait for ability resolution before continuing
 
         # Check if round is complete
         if current_round.is_complete():
@@ -429,8 +477,191 @@ class GameHandler:
             # Process bot picks if first player is a bot
             await self._process_bot_actions(game)
 
+    async def _handle_ability_trigger(
+        self, game: Game, current_round: Any, ability: PendingAbility, trick: Trick
+    ) -> None:
+        """Handle a triggered pirate ability."""
+        player = game.get_player(ability.player_id)
+        is_bot = ability.player_id in self.bots.get(game.id, {})
+
+        if ability.ability_type == AbilityType.CHOOSE_STARTER:
+            # Rosie - choose who starts next trick
+            if is_bot:
+                # Bot just chooses itself (simple strategy)
+                current_round.ability_state.resolve_rosie(ability.player_id, ability.player_id)
+                await self._ability_resolved(game, current_round, ability, trick)
+            else:
+                # Send prompt to human player
+                await self._send_ability_prompt(
+                    game,
+                    ability,
+                    {
+                        "options": [
+                            {"player_id": p.id, "username": p.username} for p in game.players
+                        ]
+                    },
+                )
+
+        elif ability.ability_type == AbilityType.DRAW_DISCARD:
+            # Bendt - draw 2, discard 2
+            drawn_cards = self._draw_cards_from_deck(game, 2)
+            ability.drawn_cards = drawn_cards
+
+            if is_bot:
+                # Bot discards the weakest two cards
+                player_obj = game.get_player(ability.player_id)
+                if player_obj:
+                    # Add drawn cards to hand temporarily for selection
+                    player_obj.hand.extend(drawn_cards)
+                    # Pick two weakest to discard (just pick first two for simplicity)
+                    discard = (
+                        player_obj.hand[:2] if len(player_obj.hand) >= 2 else player_obj.hand[:]
+                    )
+                    for card in discard:
+                        player_obj.hand.remove(card)
+                    current_round.ability_state.resolve_bendt(
+                        ability.player_id, drawn_cards, discard
+                    )
+                await self._ability_resolved(game, current_round, ability, trick)
+            else:
+                # Send drawn cards to player, wait for discard choice
+                if player:
+                    player.hand.extend(drawn_cards)
+                await self._send_ability_prompt(
+                    game,
+                    ability,
+                    {
+                        "drawn_cards": [c.value for c in drawn_cards],
+                        "must_discard": min(2, len(drawn_cards)),
+                    },
+                )
+
+        elif ability.ability_type == AbilityType.EXTRA_BET:
+            # Roatán - declare extra bet
+            if is_bot:
+                # Bot always bets 10 (moderate risk)
+                current_round.ability_state.resolve_roatan(ability.player_id, 10)
+                await self._ability_resolved(game, current_round, ability, trick)
+            else:
+                await self._send_ability_prompt(game, ability, {"options": [0, 10, 20]})
+
+        elif ability.ability_type == AbilityType.VIEW_DECK:
+            # Jade - view undealt cards
+            undealt = self._get_undealt_cards(game)
+            current_round.ability_state.resolve_jade(ability.player_id)
+
+            if not is_bot:
+                # Send deck contents to human player
+                await self.manager.send_personal_message(
+                    ServerMessage(
+                        command=Command.SHOW_DECK,
+                        game_id=game.id,
+                        content={"undealt_cards": [c.value for c in undealt]},
+                    ),
+                    game.id,
+                    ability.player_id,
+                )
+
+            # Auto-resolve (no action needed)
+            await self._ability_resolved(game, current_round, ability, trick)
+
+        elif ability.ability_type == AbilityType.MODIFY_BID:
+            # Harry - this is handled at end of round, not here
+            # The trigger_ability method already set harry_armed
+            await self._ability_resolved(game, current_round, ability, trick)
+
+    async def _send_ability_prompt(
+        self, game: Game, ability: PendingAbility, extra_data: dict[str, Any]
+    ) -> None:
+        """Send an ability prompt to a player."""
+        await self.manager.send_personal_message(
+            ServerMessage(
+                command=Command.ABILITY_TRIGGERED,
+                game_id=game.id,
+                content={
+                    "ability_type": ability.ability_type.value,
+                    "pirate_type": ability.pirate_type.value,
+                    **extra_data,
+                },
+            ),
+            game.id,
+            ability.player_id,
+        )
+
+    async def _ability_resolved(
+        self, game: Game, current_round: Any, ability: PendingAbility, _trick: Trick
+    ) -> None:
+        """Handle ability resolution and continue game flow."""
+        # Notify all players that ability was resolved
+        await self.manager.broadcast_to_game(
+            ServerMessage(
+                command=Command.ABILITY_RESOLVED,
+                game_id=game.id,
+                content={
+                    "ability_type": ability.ability_type.value,
+                    "player_id": ability.player_id,
+                },
+            ),
+            game.id,
+        )
+
+        # Continue game flow
+        if current_round.is_complete():
+            await self._complete_round(game, current_round)
+        else:
+            await self._start_new_trick(game, current_round)
+            await self._process_bot_actions(game)
+
+    def _draw_cards_from_deck(self, game: Game, count: int) -> list[CardId]:
+        """Draw cards from the deck (undealt cards)."""
+        undealt = self._get_undealt_cards(game)
+        drawn = undealt[:count]
+        return drawn
+
+    def _get_undealt_cards(self, game: Game) -> list[CardId]:
+        """Get cards that weren't dealt this round."""
+        current_round = game.get_current_round()
+        if not current_round:
+            return []
+
+        # All dealt cards
+        dealt: set[CardId] = set()
+        for cards in current_round.dealt_cards.values():
+            dealt.update(cards)
+
+        # Return cards not in dealt set
+        return [card_id for card_id in game.deck.cards if card_id not in dealt]
+
     async def _complete_round(self, game: Game, current_round: Any) -> None:
         """Complete a round and calculate scores."""
+        # Check for Harry's ability before scoring
+        players_with_harry = [
+            player_id
+            for player_id in current_round.ability_state.harry_armed
+            if current_round.ability_state.harry_armed[player_id]
+        ]
+
+        for player_id in players_with_harry:
+            is_bot = player_id in self.bots.get(game.id, {})
+            if is_bot:
+                # Bot decides: adjust bid to match tricks won if possible
+                player = game.get_player(player_id)
+                if player:
+                    tricks_won = current_round.get_tricks_won(player_id)
+                    bid = player.bid if player.bid is not None else 0
+                    diff = tricks_won - bid
+                    if diff == 1:
+                        modifier = 1
+                    elif diff == -1:
+                        modifier = -1
+                    else:
+                        modifier = 0
+                    current_round.ability_state.resolve_harry(player_id, modifier)
+            else:
+                # Send prompt to human player - for now auto-resolve with 0
+                # In a full implementation, we'd wait for player input
+                current_round.ability_state.resolve_harry(player_id, 0)
+
         current_round.calculate_scores()
 
         logger.info("Round %d complete in game %s", current_round.number, game.id)
@@ -869,3 +1100,148 @@ class GameHandler:
             # Continue processing if next player is also a bot
             await asyncio.sleep(0.5)
             await self._process_bot_picks(game)
+
+    # Pirate ability resolution handlers
+
+    async def _handle_resolve_rosie(
+        self, game: Game, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Handle RESOLVE_ROSIE command - choose who starts next trick."""
+        current_round = game.get_current_round()
+        if not current_round:
+            await self._send_error(game.id, player_id, "No active round")
+            return
+
+        chosen_player_id = content.get("chosen_player_id")
+        if not chosen_player_id or not game.get_player(chosen_player_id):
+            await self._send_error(game.id, player_id, "Invalid player chosen")
+            return
+
+        if not current_round.ability_state.resolve_rosie(player_id, chosen_player_id):
+            await self._send_error(game.id, player_id, "Cannot resolve Rosie ability")
+            return
+
+        logger.info("Player %s chose %s to start next trick (Rosie)", player_id, chosen_player_id)
+
+        # Get the pending ability and last trick
+        ability = None
+        for ab in current_round.ability_state.pending_abilities:
+            if ab.player_id == player_id and ab.ability_type == AbilityType.CHOOSE_STARTER:
+                ability = ab
+                break
+
+        trick = current_round.tricks[-1] if current_round.tricks else None
+        if ability and trick:
+            await self._ability_resolved(game, current_round, ability, trick)
+
+    async def _handle_resolve_bendt(
+        self, game: Game, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Handle RESOLVE_BENDT command - discard cards after drawing."""
+        current_round = game.get_current_round()
+        if not current_round:
+            await self._send_error(game.id, player_id, "No active round")
+            return
+
+        discard_ids = content.get("discard_cards", [])
+        try:
+            discard_cards = [CardId(card_id) for card_id in discard_ids]
+        except (ValueError, TypeError):
+            await self._send_error(game.id, player_id, "Invalid card IDs")
+            return
+
+        # Get the pending ability
+        ability = current_round.ability_state.get_pending_ability(player_id)
+        if not ability or ability.ability_type != AbilityType.DRAW_DISCARD:
+            await self._send_error(game.id, player_id, "No pending Bendt ability")
+            return
+
+        # Verify player has these cards
+        player = game.get_player(player_id)
+        if not player:
+            await self._send_error(game.id, player_id, "Player not found")
+            return
+
+        for card_id in discard_cards:
+            if card_id not in player.hand:
+                await self._send_error(game.id, player_id, "Card not in hand")
+                return
+
+        # Remove discarded cards from hand
+        for card_id in discard_cards:
+            player.hand.remove(card_id)
+
+        if not current_round.ability_state.resolve_bendt(
+            player_id, ability.drawn_cards, discard_cards
+        ):
+            await self._send_error(game.id, player_id, "Cannot resolve Bendt ability")
+            return
+
+        logger.info("Player %s discarded %d cards (Bendt)", player_id, len(discard_cards))
+
+        trick = current_round.tricks[-1] if current_round.tricks else None
+        if trick:
+            await self._ability_resolved(game, current_round, ability, trick)
+
+    async def _handle_resolve_roatan(
+        self, game: Game, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Handle RESOLVE_ROATAN command - declare extra bet."""
+        current_round = game.get_current_round()
+        if not current_round:
+            await self._send_error(game.id, player_id, "No active round")
+            return
+
+        extra_bet = content.get("extra_bet")
+        if extra_bet not in (0, 10, 20):
+            await self._send_error(game.id, player_id, "Invalid bet amount (must be 0, 10, or 20)")
+            return
+
+        if not current_round.ability_state.resolve_roatan(player_id, extra_bet):
+            await self._send_error(game.id, player_id, "Cannot resolve Roatán ability")
+            return
+
+        logger.info("Player %s declared extra bet of %d (Roatán)", player_id, extra_bet)
+
+        # Get the pending ability
+        ability = None
+        for ab in current_round.ability_state.pending_abilities:
+            if ab.player_id == player_id and ab.ability_type == AbilityType.EXTRA_BET:
+                ability = ab
+                break
+
+        trick = current_round.tricks[-1] if current_round.tricks else None
+        if ability and trick:
+            await self._ability_resolved(game, current_round, ability, trick)
+
+    async def _handle_resolve_jade(
+        self, game: Game, player_id: str, _content: dict[str, Any]
+    ) -> None:
+        """Handle RESOLVE_JADE command - acknowledge deck view."""
+        current_round = game.get_current_round()
+        if not current_round:
+            await self._send_error(game.id, player_id, "No active round")
+            return
+
+        # Jade is auto-resolved, but player can acknowledge
+        logger.info("Player %s acknowledged deck view (Jade)", player_id)
+
+    async def _handle_resolve_harry(
+        self, game: Game, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Handle RESOLVE_HARRY command - modify bid at end of round."""
+        current_round = game.get_current_round()
+        if not current_round:
+            await self._send_error(game.id, player_id, "No active round")
+            return
+
+        modifier = content.get("modifier")
+        if modifier not in (-1, 0, 1):
+            await self._send_error(game.id, player_id, "Invalid modifier (must be -1, 0, or 1)")
+            return
+
+        if not current_round.ability_state.resolve_harry(player_id, modifier):
+            await self._send_error(game.id, player_id, "Cannot resolve Harry ability")
+            return
+
+        logger.info("Player %s modified bid by %d (Harry)", player_id, modifier)
