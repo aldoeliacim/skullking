@@ -1,14 +1,19 @@
 """WebSocket connection manager and hub."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
-from typing import Dict, Optional
+from typing import TYPE_CHECKING
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.api.responses import ServerMessage
 from app.models.game import Game
+
+if TYPE_CHECKING:
+    from app.api.game_handler import GameHandler
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +31,20 @@ class ConnectionManager:
     def __init__(self) -> None:
         """Initialize the connection manager."""
         # game_id -> player_id -> WebSocket
-        self.active_connections: Dict[str, Dict[str, WebSocket]] = {}
+        self.active_connections: dict[str, dict[str, WebSocket]] = {}
         # Message queue for broadcasting
         self.message_queue: asyncio.Queue[ServerMessage] = asyncio.Queue()
-        self.games: Dict[str, Game] = {}
+        self.games: dict[str, Game] = {}
+        self._game_handler: GameHandler | None = None
+
+    @property
+    def game_handler(self) -> GameHandler:
+        """Lazy-initialize game handler to avoid circular imports."""
+        if self._game_handler is None:
+            from app.api.game_handler import GameHandler
+
+            self._game_handler = GameHandler(self)
+        return self._game_handler
 
     async def connect(self, websocket: WebSocket, game_id: str, player_id: str) -> None:
         """
@@ -46,7 +61,11 @@ class ConnectionManager:
             self.active_connections[game_id] = {}
 
         self.active_connections[game_id][player_id] = websocket
-        logger.info(f"Player {player_id} connected to game {game_id}")
+        logger.info("Player %s connected to game %s", player_id, game_id)
+
+        # Send current game state if game exists
+        if game_id in self.games:
+            await self.game_handler.send_game_state(self.games[game_id], player_id)
 
     def disconnect(self, game_id: str, player_id: str) -> None:
         """
@@ -56,10 +75,9 @@ class ConnectionManager:
             game_id: Game identifier
             player_id: Player identifier
         """
-        if game_id in self.active_connections:
-            if player_id in self.active_connections[game_id]:
-                del self.active_connections[game_id][player_id]
-                logger.info(f"Player {player_id} disconnected from game {game_id}")
+        if game_id in self.active_connections and player_id in self.active_connections[game_id]:
+            del self.active_connections[game_id][player_id]
+            logger.info("Player %s disconnected from game %s", player_id, game_id)
 
             # Clean up empty game
             if not self.active_connections[game_id]:
@@ -78,20 +96,19 @@ class ConnectionManager:
             game_id: Game identifier
             player_id: Player identifier
         """
-        if game_id in self.active_connections:
-            if player_id in self.active_connections[game_id]:
-                websocket = self.active_connections[game_id][player_id]
-                try:
-                    await websocket.send_json(message.to_dict())
-                except Exception as e:
-                    logger.error(f"Error sending message to {player_id}: {e}")
-                    self.disconnect(game_id, player_id)
+        if game_id in self.active_connections and player_id in self.active_connections[game_id]:
+            websocket = self.active_connections[game_id][player_id]
+            try:
+                await websocket.send_json(message.to_dict())
+            except Exception:
+                logger.exception("Error sending message to %s", player_id)
+                self.disconnect(game_id, player_id)
 
     async def broadcast_to_game(
         self,
         message: ServerMessage,
         game_id: str,
-        excluded_player_id: Optional[str] = None,
+        excluded_player_id: str | None = None,
     ) -> None:
         """
         Broadcast message to all players in a game.
@@ -112,8 +129,8 @@ class ConnectionManager:
 
             try:
                 await websocket.send_json(message.to_dict())
-            except Exception as e:
-                logger.error(f"Error broadcasting to {player_id}: {e}")
+            except Exception:
+                logger.exception("Error broadcasting to %s", player_id)
                 disconnected.append(player_id)
 
         # Clean up disconnected players
@@ -143,25 +160,19 @@ class ConnectionManager:
                 message = await self.message_queue.get()
 
                 # Log message
-                logger.info(
-                    f"Dispatching {message.command.value} to game {message.game_id}"
-                )
+                logger.info("Dispatching %s to game %s", message.command.value, message.game_id)
 
                 # Send to specific recipient or broadcast
                 if message.receiver_id:
-                    await self.send_personal_message(
-                        message, message.game_id, message.receiver_id
-                    )
+                    await self.send_personal_message(message, message.game_id, message.receiver_id)
                 else:
-                    await self.broadcast_to_game(
-                        message, message.game_id, message.excluded_id
-                    )
+                    await self.broadcast_to_game(message, message.game_id, message.excluded_id)
 
             except asyncio.CancelledError:
                 logger.info("WebSocket manager shutting down")
                 break
-            except Exception as e:
-                logger.error(f"Error in WebSocket manager: {e}")
+            except Exception:
+                logger.exception("Error in WebSocket manager")
                 await asyncio.sleep(0.1)
 
     async def handle_player_message(
@@ -181,34 +192,30 @@ class ConnectionManager:
                 data = await websocket.receive_text()
                 message = json.loads(data)
 
-                command = message.get("command")
-                content = message.get("content")
+                command = message.get("command", "")
+                content = message.get("content", {})
 
-                logger.info(
-                    f"Received {command} from player {player_id} in game {game_id}"
-                )
+                logger.info("Received %s from player %s in game %s", command, player_id, game_id)
 
                 # Get game
                 if game_id not in self.games:
-                    logger.warning(f"Game {game_id} not found")
+                    logger.warning("Game %s not found", game_id)
                     continue
 
                 game = self.games[game_id]
 
-                # Handle command
-                # TODO: Implement game logic handlers
-                # For now, just log
-                logger.info(f"Game logic for {command} not yet implemented")
+                # Handle command via game handler
+                await self.game_handler.handle_command(game, player_id, command, content)
 
         except WebSocketDisconnect:
-            logger.info(f"Player {player_id} disconnected from game {game_id}")
+            logger.info("Player %s disconnected from game %s", player_id, game_id)
             self.disconnect(game_id, player_id)
 
-        except Exception as e:
-            logger.error(f"Error handling message from {player_id}: {e}")
+        except Exception:
+            logger.exception("Error handling message from %s", player_id)
             self.disconnect(game_id, player_id)
 
-    def get_game(self, game_id: str) -> Optional[Game]:
+    def get_game(self, game_id: str) -> Game | None:
         """Get game by ID."""
         return self.games.get(game_id)
 
