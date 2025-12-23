@@ -209,9 +209,15 @@ Per-step range: [-5, +11.5]
 
 ## Training Status
 
-**V2 Training:** Running (65k / 1.5M steps)
-- Log: `training_v2.log`
-- Models: `./models/masked_ppo/`
-- Tensorboard: `tensorboard --logdir ./models/masked_ppo/tensorboard`
+**Status:** Not started - ready to train
 
-**V1 Backup:** `./models/masked_ppo_old_v1/`
+**To start training:**
+```bash
+source .venv/bin/activate
+python scripts/train_masked_ppo.py train --timesteps 1500000 --envs 8
+```
+
+**Monitor progress:**
+```bash
+tensorboard --logdir ./models/masked_ppo/tensorboard
+```
