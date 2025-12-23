@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
 
     # Game Configuration
-    max_players: int = Field(default=7, description="Maximum players per game")
+    max_players: int = Field(default=8, description="Maximum players per game")
     rounds_count: int = Field(default=10, description="Number of rounds")
     wait_time_seconds: int = Field(default=15, description="Wait time for players")
 

@@ -600,7 +600,7 @@ class GameHandler:
             await self._send_error(game.id, player_id, "Cannot add bot after game started")
             return
 
-        if len(game.players) >= 7:
+        if len(game.players) >= 8:
             await self._send_error(game.id, player_id, "Game is full")
             return
 

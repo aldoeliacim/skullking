@@ -60,6 +60,6 @@ class CardType(str, Enum):
 
 
 # Game configuration constants
-MAX_PLAYERS = 7
+MAX_PLAYERS = 8
 MAX_ROUNDS = 10
 WAIT_TIME_SECONDS = 15

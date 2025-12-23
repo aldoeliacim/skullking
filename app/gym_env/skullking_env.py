@@ -78,16 +78,16 @@ class SkullKingEnv(gym.Env):
         # Observation space: vectorized game state
         # Cards: 63 physical cards; 71 one-hot indices (CardId values 1-71)
         # Player hand: 10 slots (max cards in round 10)
-        # Trick cards: 7 slots (max players)
-        # Bids: 7 players x 11 possible bids (0-10)
-        # Scores: 7 players (normalized)
+        # Trick cards: 8 slots (max players)
+        # Bids: 8 players x 11 possible bids (0-10)
+        # Scores: 8 players (normalized)
         # Metadata: round number, tricks won, etc.
         obs_size = (
             10 * 71  # Hand (10 cards x 71 card id indices)
-            + 7 * 71  # Trick cards (7 players x 71 card id indices)
-            + 7 * 11  # Bids (7 players x 11 bids)
-            + 7  # Scores
-            + 7  # Tricks won this round
+            + 8 * 71  # Trick cards (8 players x 71 card id indices)
+            + 8 * 11  # Bids (8 players x 11 bids)
+            + 8  # Scores
+            + 8  # Tricks won this round
             + 10  # Metadata (round, phase, etc.)
         )
 
@@ -258,33 +258,33 @@ class SkullKingEnv(gym.Env):
                 hand_encoding[i, int(card_id) - 1] = 1.0
         obs.append(hand_encoding.flatten())
 
-        # Encode trick cards (7 players x 71 card types)
-        trick_encoding = np.zeros((7, 71), dtype=np.float32)
+        # Encode trick cards (8 players x 71 card types)
+        trick_encoding = np.zeros((8, 71), dtype=np.float32)
         if current_round:
             current_trick = current_round.get_current_trick()
             if current_trick:
-                for i, picked_card in enumerate(current_trick.picked_cards[:7]):
+                for i, picked_card in enumerate(current_trick.picked_cards[:8]):
                     trick_encoding[i, int(picked_card.card_id) - 1] = 1.0
         obs.append(trick_encoding.flatten())
 
-        # Encode bids (7 players x 11 bids)
-        bid_encoding = np.zeros((7, 11), dtype=np.float32)
+        # Encode bids (8 players x 11 bids)
+        bid_encoding = np.zeros((8, 11), dtype=np.float32)
         if current_round:
-            for i, player in enumerate(self.game.players[:7]):
+            for i, player in enumerate(self.game.players[:8]):
                 if player.bid is not None:
                     bid_encoding[i, player.bid] = 1.0
         obs.append(bid_encoding.flatten())
 
         # Encode scores (normalized)
-        scores = np.zeros(7, dtype=np.float32)
-        for i, player in enumerate(self.game.players[:7]):
+        scores = np.zeros(8, dtype=np.float32)
+        for i, player in enumerate(self.game.players[:8]):
             scores[i] = player.score / 500.0  # Normalize
         obs.append(scores)
 
         # Encode tricks won this round
-        tricks_won = np.zeros(7, dtype=np.float32)
+        tricks_won = np.zeros(8, dtype=np.float32)
         if current_round:
-            for i, player in enumerate(self.game.players[:7]):
+            for i, player in enumerate(self.game.players[:8]):
                 tricks_won[i] = current_round.get_tricks_won(player.id) / 10.0
         obs.append(tricks_won)
 

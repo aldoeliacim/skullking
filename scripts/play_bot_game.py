@@ -29,11 +29,11 @@ class BotGameSimulator:
         Initialize simulator.
 
         Args:
-            num_players: Number of players (2-7)
+            num_players: Number of players (2-8)
             bot_types: List of bot types for each player ("random" or "rule_based")
         """
-        if not (2 <= num_players <= 7):
-            raise ValueError("Must have 2-7 players")
+        if not (2 <= num_players <= 8):
+            raise ValueError("Must have 2-8 players")
 
         self.num_players = num_players
         self.bot_types = bot_types or ["rule_based"] * num_players
@@ -257,8 +257,8 @@ def main():
 
     args = parser.parse_args()
 
-    if not (2 <= args.players <= 7):
-        print("Error: Must have 2-7 players")
+    if not (2 <= args.players <= 8):
+        print("Error: Must have 2-8 players")
         sys.exit(1)
 
     # Set up bot types

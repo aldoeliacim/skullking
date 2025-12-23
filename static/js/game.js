@@ -375,7 +375,7 @@ class SkullKingGame {
         // Update start button state
         const startBtn = document.getElementById('start-game-btn');
         const startHint = document.getElementById('start-hint');
-        const canStart = players.length >= 2 && players.length <= 4;
+        const canStart = players.length >= 2 && players.length <= 8;
 
         startBtn.disabled = !canStart || !this.isHost;
         startHint.style.display = canStart ? 'none' : 'block';
