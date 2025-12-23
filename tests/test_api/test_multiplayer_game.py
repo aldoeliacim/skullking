@@ -105,9 +105,11 @@ class TestFullGameFlow:
                     if player.hand:
                         card = player.hand[0]
                         current_round.tricks[-1].picking_player_id = f"player-{i}"
-                        await game_handler.handle_command(
-                            game, f"player-{i}", "PICK", {"card_id": card.value}
-                        )
+                        pick_content = {"card_id": card.value}
+                        # Tigress (card_id 72) requires a choice
+                        if card.value == 72:
+                            pick_content["tigress_choice"] = "escape"
+                        await game_handler.handle_command(game, f"player-{i}", "PICK", pick_content)
 
         # After round 3, should be in round 4
         assert game.current_round_number == 4
@@ -170,9 +172,11 @@ class TestFullGameFlow:
                     if player.hand:
                         card = player.hand[0]
                         current_round.tricks[-1].picking_player_id = f"player-{i}"
-                        await game_handler.handle_command(
-                            game, f"player-{i}", "PICK", {"card_id": card.value}
-                        )
+                        pick_content = {"card_id": card.value}
+                        # Tigress (card_id 72) requires a choice
+                        if card.value == 72:
+                            pick_content["tigress_choice"] = "escape"
+                        await game_handler.handle_command(game, f"player-{i}", "PICK", pick_content)
 
         # Game should be ended after round 10
         assert game.state == GameState.ENDED
