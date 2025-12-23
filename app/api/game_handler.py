@@ -50,6 +50,7 @@ class GameHandler:
         """Initialize handler with connection manager."""
         self.manager = manager
         self.bots: dict[str, dict[str, BaseBot]] = {}  # game_id -> player_id -> bot
+        self._bot_processing_locks: dict[str, asyncio.Lock] = {}  # game_id -> lock
 
     async def handle_command(
         self, game: Game, player_id: str, command: str, content: dict[str, Any]
@@ -215,7 +216,11 @@ class GameHandler:
 
         # Play the card
         player.hand.remove(card_id)
-        current_trick.add_card(player_id, card_id)
+        if not current_trick.add_card(player_id, card_id):
+            # Card was rejected (player already picked)
+            player.hand.append(card_id)
+            await self._send_error(game.id, player_id, "Already played in this trick")
+            return
 
         logger.info(
             "Player %s played card %s in game %s",
@@ -685,17 +690,30 @@ class GameHandler:
             game.id,
         )
 
+    def _get_bot_lock(self, game_id: str) -> asyncio.Lock:
+        """Get or create the bot processing lock for a game."""
+        if game_id not in self._bot_processing_locks:
+            self._bot_processing_locks[game_id] = asyncio.Lock()
+        return self._bot_processing_locks[game_id]
+
     async def _process_bot_actions(self, game: Game) -> None:
         """Process any pending bot actions (bids or card plays)."""
         if game.id not in self.bots:
             return
 
-        await asyncio.sleep(0.5)  # Small delay for natural feel
+        # Use lock to prevent concurrent bot processing
+        lock = self._get_bot_lock(game.id)
+        if lock.locked():
+            # Already processing bots for this game, skip
+            return
 
-        if game.state == GameState.BIDDING:
-            await self._process_bot_bids(game)
-        elif game.state == GameState.PICKING:
-            await self._process_bot_picks(game)
+        async with lock:
+            await asyncio.sleep(0.5)  # Small delay for natural feel
+
+            if game.state == GameState.BIDDING:
+                await self._process_bot_bids(game)
+            elif game.state == GameState.PICKING:
+                await self._process_bot_picks(game)
 
     async def _process_bot_bids(self, game: Game) -> None:
         """Process bids for all bots that haven't bid yet."""
@@ -741,6 +759,10 @@ class GameHandler:
         if game.id not in self.bots:
             return
 
+        # Guard: ensure we're still in picking state
+        if game.state != GameState.PICKING:
+            return
+
         current_round = game.get_current_round()
         if not current_round:
             return
@@ -749,9 +771,18 @@ class GameHandler:
         if not trick:
             return
 
+        # Guard: don't process if trick is already complete
+        if trick.is_complete(len(game.players)):
+            return
+
         picking_player_id = trick.picking_player_id
         if picking_player_id not in self.bots.get(game.id, {}):
             return  # Not a bot's turn
+
+        # Guard: check if this player already played in this trick
+        if any(pc.player_id == picking_player_id for pc in trick.picked_cards):
+            logger.warning("Bot %s already played in trick %d", picking_player_id, trick.number)
+            return
 
         bot = self.bots[game.id][picking_player_id]
         player = game.get_player(picking_player_id)
@@ -770,8 +801,21 @@ class GameHandler:
         if card_id in player.hand:
             player.hand.remove(card_id)
 
+        # Final guard: re-check trick isn't complete before adding
+        if trick.is_complete(len(game.players)):
+            logger.warning("Trick completed before bot %s could play", picking_player_id)
+            # Put card back in hand
+            player.hand.append(card_id)
+            return
+
         # Add to trick
-        trick.add_card(picking_player_id, card_id)
+        if not trick.add_card(picking_player_id, card_id):
+            # Card was rejected (player already picked) - shouldn't happen with guards above
+            logger.error(
+                "Bot %s card rejected - already picked in trick %d", picking_player_id, trick.number
+            )
+            player.hand.append(card_id)
+            return
 
         logger.info("Bot %s plays %s", picking_player_id, card)
 

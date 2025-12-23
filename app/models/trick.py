@@ -45,9 +45,18 @@ class Trick:
         """Get all card IDs picked in this trick."""
         return [pc.card_id for pc in self.picked_cards]
 
-    def add_card(self, player_id: str, card_id: CardId) -> None:
-        """Add a picked card to this trick."""
+    def add_card(self, player_id: str, card_id: CardId) -> bool:
+        """
+        Add a picked card to this trick.
+
+        Returns:
+            True if card was added, False if player already picked.
+        """
+        # Guard: don't allow duplicate picks from same player
+        if self.has_player_picked(player_id):
+            return False
         self.picked_cards.append(PickedCard(player_id, card_id))
+        return True
 
     def determine_winner(self) -> tuple[CardId | None, str | None]:
         """
