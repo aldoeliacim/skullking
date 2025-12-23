@@ -1,4 +1,4 @@
-"""Rule-based bot with heuristic strategy."""
+"""Rule-based bot with heuristic strategy for 74-card Skull King."""
 
 import random
 
@@ -11,14 +11,21 @@ class RuleBasedBot(BaseBot):
     """
     Bot that uses heuristics and game rules to make intelligent decisions.
 
+    Supports all 74 cards including expansion cards:
+    - Tigress (Scary Mary): Can be played as pirate OR escape
+    - Loot (Botín): Acts like escape but creates alliance
+    - Kraken: No one wins the trick
+    - Whale: Highest suit card wins
+
     Bidding Strategy:
     - Count strong cards (high numbers, special cards)
     - Estimate tricks based on card strength distribution
+    - Factor in Tigress flexibility (can win or lose)
 
     Playing Strategy:
     - If winning: Play high cards when likely to win
-    - If losing: Play low cards or escapes to avoid winning
-    - Handle special cards intelligently
+    - If losing: Play low cards, escapes, or Loot
+    - Handle special cards intelligently (Kraken to cancel, Whale situationally)
     """
 
     def __init__(self, player_id: str, difficulty: BotDifficulty = BotDifficulty.MEDIUM):
@@ -29,10 +36,14 @@ class RuleBasedBot(BaseBot):
         """
         Make a bid based on hand strength.
 
-        Strategy:
-        - Count cards likely to win tricks
-        - Skull King: almost always wins
-        - Pirates: often win
+        Strategy (74-card deck):
+        - Skull King: almost always wins (0.9)
+        - Pirates: often win (0.6)
+        - Tigress: flexible - can be pirate OR escape (0.35)
+        - Mermaids: can beat King (0.4)
+        - Kraken: disrupts trick (0.15 - reduces opponent's expected tricks)
+        - Whale: unpredictable (0.2)
+        - Loot: creates alliance, rarely wins (0.05)
         - High Jolly Rogers: likely to win
         - High standard suits: might win
         - Escapes/Low cards: unlikely to win
@@ -55,8 +66,20 @@ class RuleBasedBot(BaseBot):
                 expected_tricks += 0.9  # Very likely to win
             elif card.is_pirate():
                 expected_tricks += 0.6  # Often wins
-            elif card.is_whale() or card.is_kraken():
-                expected_tricks += 0.3  # Special outcomes
+            elif card.is_tigress():
+                # Tigress (Scary Mary): Can be played as pirate OR escape
+                # Flexible card - moderate value
+                expected_tricks += 0.35
+            elif card.is_whale():
+                # Whale: Highest suit card wins - unpredictable
+                expected_tricks += 0.2
+            elif card.is_kraken():
+                # Kraken: No one wins - disrupts trick counting
+                # Slightly helpful for avoiding overbid
+                expected_tricks += 0.15
+            elif card.is_loot():
+                # Loot (Botín): Acts like escape, creates alliance
+                expected_tricks += 0.05  # Almost never wins
             elif card.is_mermaid():
                 expected_tricks += 0.4  # Can beat King
             elif card.is_roger():
@@ -169,6 +192,8 @@ class RuleBasedBot(BaseBot):
         """
         Evaluate the strength of a card (0.0 to 1.0).
 
+        Handles all 74 cards including expansion cards.
+
         Args:
             card_id: Card to evaluate
             hand: Full hand for context
@@ -180,16 +205,29 @@ class RuleBasedBot(BaseBot):
 
         if card.is_escape():
             return 0.0
+        if card.is_loot():
+            # Loot acts like escape but has alliance bonus
+            return 0.05
         if card.is_king():
             return 1.0
         if card.is_pirate():
             return 0.85
+        if card.is_tigress():
+            # Tigress is flexible - can be pirate (0.85) or escape (0.0)
+            # Evaluate as medium-high since it offers choice
+            return 0.55
         if card.is_mermaid():
             return 0.75
         if card.is_whale():
-            return 0.5  # Special case
+            # Whale: highest suit wins - context-dependent
+            # Good if we have high suits, bad otherwise
+            high_suits = sum(
+                1 for cid in hand if get_card(cid).is_suit() and get_card(cid).number >= 12
+            )
+            return 0.6 if high_suits >= 2 else 0.35
         if card.is_kraken():
-            return 0.3  # Nobody wins
+            # Kraken: nobody wins - useful for dodging or disrupting
+            return 0.25
         if card.is_roger():
             # Trump suit
             return 0.4 + (card.number / 14) * 0.4

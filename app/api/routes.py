@@ -47,7 +47,7 @@ async def create_game(_request: CreateGameRequest) -> CreateGameResponse:
     return CreateGameResponse(game_id=game_id, slug=slug)
 
 
-@router.get("/games/join")
+@router.websocket("/games/join")
 async def join_game(
     websocket: WebSocket,
     game_id: str = Query(..., description="Game ID to join"),

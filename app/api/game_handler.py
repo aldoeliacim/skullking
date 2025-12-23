@@ -1,18 +1,41 @@
 """Game logic handler for WebSocket commands."""
 
+import asyncio
 import logging
+import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.api.responses import Command, ServerMessage
+from app.bots import RandomBot, RuleBasedBot
+from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import CardId, get_card
 from app.models.enums import GameState
 from app.models.game import Game
+from app.models.player import Player
 from app.models.trick import Trick
 
 if TYPE_CHECKING:
     from app.api.websocket import ConnectionManager
 
 logger = logging.getLogger(__name__)
+
+# Module-level cache for RL model (avoids global statement)
+_rl_cache: dict[str, Any] = {"model": None}
+_rl_model_path = Path(__file__).parent.parent.parent / "models/masked_ppo/masked_ppo_final.zip"
+
+
+def _load_rl_model():
+    """Load the trained RL model if available."""
+    if _rl_cache["model"] is None and _rl_model_path.exists():
+        try:
+            from sb3_contrib import MaskablePPO
+
+            _rl_cache["model"] = MaskablePPO.load(str(_rl_model_path))
+            logger.info("Loaded RL model from %s", _rl_model_path)
+        except Exception as e:
+            logger.warning("Could not load RL model: %s", e)
+    return _rl_cache["model"]
 
 
 class GameHandler:
@@ -26,6 +49,7 @@ class GameHandler:
     def __init__(self, manager: "ConnectionManager") -> None:
         """Initialize handler with connection manager."""
         self.manager = manager
+        self.bots: dict[str, dict[str, BaseBot]] = {}  # game_id -> player_id -> bot
 
     async def handle_command(
         self, game: Game, player_id: str, command: str, content: dict[str, Any]
@@ -44,6 +68,7 @@ class GameHandler:
             "PICK": self._handle_pick,
             "START_GAME": self._handle_start_game,
             "SYNC_STATE": self._handle_sync_state,
+            "ADD_BOT": self._handle_add_bot,
         }
 
         handler = handlers.get(command)
@@ -80,6 +105,9 @@ class GameHandler:
         # Start first round
         await self._start_new_round(game)
 
+        # Process bot actions (bids)
+        await self._process_bot_actions(game)
+
     async def _handle_bid(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """
         Handle BID command from a player.
@@ -102,7 +130,15 @@ class GameHandler:
             await self._send_error(game.id, player_id, "Already placed bid")
             return
 
-        bid_amount = content.get("bid", 0)
+        if "bid" not in content:
+            await self._send_error(game.id, player_id, "Missing bid value")
+            return
+
+        bid_amount = content.get("bid")
+        if not isinstance(bid_amount, int):
+            await self._send_error(game.id, player_id, "Bid must be a number")
+            return
+
         current_round = game.get_current_round()
 
         # Validate bid
@@ -131,6 +167,9 @@ class GameHandler:
         # Check if all players have bid
         if all(p.bid is not None for p in game.players):
             await self._end_bidding_phase(game)
+        else:
+            # Process bot bids if any bots haven't bid yet
+            await self._process_bot_actions(game)
 
     async def _handle_pick(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """
@@ -201,6 +240,8 @@ class GameHandler:
         else:
             # Move to next player
             await self._advance_to_next_player(game, current_round, current_trick)
+            # Process bot picks if next player is a bot
+            await self._process_bot_actions(game)
 
     async def _start_new_round(self, game: Game) -> None:
         """Start a new round in the game."""
@@ -256,6 +297,8 @@ class GameHandler:
 
         # Start first trick
         await self._start_new_trick(game, current_round)
+        # Process bot picks if first player is a bot
+        await self._process_bot_actions(game)
 
     async def _start_new_trick(self, game: Game, current_round: Any) -> None:
         """Start a new trick in the current round."""
@@ -361,6 +404,8 @@ class GameHandler:
         else:
             # Start next trick
             await self._start_new_trick(game, current_round)
+            # Process bot picks if first player is a bot
+            await self._process_bot_actions(game)
 
     async def _complete_round(self, game: Game, current_round: Any) -> None:
         """Complete a round and calculate scores."""
@@ -368,20 +413,15 @@ class GameHandler:
 
         logger.info("Round %d complete in game %s", current_round.number, game.id)
 
-        # Build score update for all players
+        # Build score update for all players using the round's calculated scores
         scores = []
         for player in game.players:
             tricks_won = current_round.get_tricks_won(player.id)
             bid = player.bid if player.bid is not None else 0
 
-            # Calculate score delta
-            if tricks_won == bid:
-                if bid == 0:
-                    delta = current_round.number * 10  # Bonus for zero bid success
-                else:
-                    delta = bid * 20  # Points per trick + bonus
-            else:
-                delta = -abs(tricks_won - bid) * 10  # Penalty for missing bid
+            # Use the round's calculated score which includes bonus points
+            delta = current_round.scores.get(player.id, 0)
+            bonus_points = current_round.get_bonus_points(player.id) if tricks_won == bid else 0
 
             player.score += delta
 
@@ -391,6 +431,7 @@ class GameHandler:
                     "bid": bid,
                     "tricks_won": tricks_won,
                     "score_delta": delta,
+                    "bonus_points": bonus_points,
                     "total_score": player.score,
                 }
             )
@@ -411,6 +452,8 @@ class GameHandler:
         else:
             # Start next round
             await self._start_new_round(game)
+            # Process bot bids for new round
+            await self._process_bot_actions(game)
 
     async def _end_game(self, game: Game) -> None:
         """End the game and announce winner."""
@@ -545,3 +588,208 @@ class GameHandler:
             "hand": hand,
             "picking_player_id": picking_player_id,
         }
+
+    async def _handle_add_bot(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
+        """Handle ADD_BOT command - adds an AI opponent to the game."""
+        if game.state != GameState.PENDING:
+            await self._send_error(game.id, player_id, "Cannot add bot after game started")
+            return
+
+        if len(game.players) >= 7:
+            await self._send_error(game.id, player_id, "Game is full")
+            return
+
+        # Get bot type from content (default to rl if model exists, else rule_based)
+        bot_type = content.get("bot_type", "rl" if _load_rl_model() else "rule_based")
+        difficulty = content.get("difficulty", "hard")
+
+        # Create bot player
+        bot_id = f"bot-{uuid.uuid4().hex[:8]}"
+        bot_names = [
+            "Captain Hook",
+            "Blackbeard",
+            "Anne Bonny",
+            "Davy Jones",
+            "Calico Jack",
+            "Red Beard",
+        ]
+        bot_name = bot_names[len(game.players) % len(bot_names)]
+
+        player = Player(
+            id=bot_id,
+            username=f"{bot_name} (AI)",
+            avatar_id=len(game.players),
+            game_id=game.id,
+            index=len(game.players),
+            is_bot=True,
+        )
+        game.add_player(player)
+
+        # Create bot instance
+        difficulty_enum = BotDifficulty[difficulty.upper()]
+        if bot_type == "rl" and _load_rl_model():
+            # Use RL bot with trained model
+            from app.bots.rl_bot import RLBot
+
+            bot = RLBot(bot_id, model=_load_rl_model(), difficulty=difficulty_enum)
+            logger.info("Added RL bot %s to game %s", bot_id, game.id)
+        elif bot_type == "random":
+            bot = RandomBot(bot_id, difficulty=difficulty_enum)
+            logger.info("Added random bot %s to game %s", bot_id, game.id)
+        else:
+            bot = RuleBasedBot(bot_id, difficulty=difficulty_enum)
+            logger.info("Added rule-based bot %s to game %s", bot_id, game.id)
+
+        # Store bot
+        if game.id not in self.bots:
+            self.bots[game.id] = {}
+        self.bots[game.id][bot_id] = bot
+
+        # Broadcast player joined
+        await self.manager.broadcast_to_game(
+            ServerMessage(
+                command=Command.JOINED,
+                game_id=game.id,
+                content={
+                    "player_id": bot_id,
+                    "username": player.username,
+                    "is_bot": True,
+                    "bot_type": bot_type,
+                },
+            ),
+            game.id,
+        )
+
+        # Broadcast updated game state so lobby refreshes
+        await self.manager.broadcast_to_game(
+            ServerMessage(
+                command=Command.GAME_STATE,
+                game_id=game.id,
+                content={
+                    "id": game.id,
+                    "slug": game.slug,
+                    "state": game.state.value,
+                    "players": [
+                        {
+                            "id": p.id,
+                            "username": p.username,
+                            "score": p.score,
+                            "index": p.index,
+                            "is_bot": p.is_bot,
+                            "is_connected": p.is_connected,
+                        }
+                        for p in game.players
+                    ],
+                },
+            ),
+            game.id,
+        )
+
+    async def _process_bot_actions(self, game: Game) -> None:
+        """Process any pending bot actions (bids or card plays)."""
+        if game.id not in self.bots:
+            return
+
+        await asyncio.sleep(0.5)  # Small delay for natural feel
+
+        if game.state == GameState.BIDDING:
+            await self._process_bot_bids(game)
+        elif game.state == GameState.PICKING:
+            await self._process_bot_picks(game)
+
+    async def _process_bot_bids(self, game: Game) -> None:
+        """Process bids for all bots that haven't bid yet."""
+        if game.id not in self.bots:
+            return
+
+        current_round = game.get_current_round()
+        if not current_round:
+            return
+
+        for bot_id, bot in self.bots.get(game.id, {}).items():
+            player = game.get_player(bot_id)
+            if player and player.bid is None:
+                # Bot makes bid
+                hand = list(player.hand)
+                bid = bot.make_bid(game, current_round.number, hand)
+                bid = max(0, min(current_round.number, bid))
+
+                # Record bid
+                player.bid = bid
+                current_round.bids[bot_id] = bid
+
+                logger.info("Bot %s bids %d", bot_id, bid)
+
+                # Broadcast bid
+                await self.manager.broadcast_to_game(
+                    ServerMessage(
+                        command=Command.BADE,
+                        game_id=game.id,
+                        content={"player_id": bot_id, "bid": bid},
+                    ),
+                    game.id,
+                )
+
+                await asyncio.sleep(0.3)  # Delay between bot bids
+
+        # Check if all players have bid
+        if current_round.all_bids_placed(len(game.players)):
+            await self._end_bidding_phase(game)
+
+    async def _process_bot_picks(self, game: Game) -> None:
+        """Process card pick for the current bot if it's their turn."""
+        if game.id not in self.bots:
+            return
+
+        current_round = game.get_current_round()
+        if not current_round:
+            return
+
+        trick = current_round.get_current_trick()
+        if not trick:
+            return
+
+        picking_player_id = trick.picking_player_id
+        if picking_player_id not in self.bots.get(game.id, {}):
+            return  # Not a bot's turn
+
+        bot = self.bots[game.id][picking_player_id]
+        player = game.get_player(picking_player_id)
+        if not player or not player.hand:
+            return
+
+        # Get valid cards
+        cards_in_trick = [pc.card_id for pc in trick.picked_cards]
+        valid_cards = trick.get_valid_cards(player.hand, cards_in_trick)
+
+        # Bot picks card
+        card_id = bot.pick_card(game, player.hand, cards_in_trick, valid_cards)
+        card = get_card(card_id)
+
+        # Remove from hand
+        if card_id in player.hand:
+            player.hand.remove(card_id)
+
+        # Add to trick
+        trick.add_card(picking_player_id, card_id)
+
+        logger.info("Bot %s plays %s", picking_player_id, card)
+
+        # Broadcast card played
+        await self.manager.broadcast_to_game(
+            ServerMessage(
+                command=Command.PICKED,
+                game_id=game.id,
+                content={"player_id": picking_player_id, "card_id": card_id.value},
+            ),
+            game.id,
+        )
+
+        # Check if trick is complete
+        if trick.is_complete(len(game.players)):
+            await self._complete_trick(game, current_round, trick)
+        else:
+            await self._advance_to_next_player(game, current_round, trick)
+            # Continue processing if next player is also a bot
+            await asyncio.sleep(0.5)
+            await self._process_bot_picks(game)

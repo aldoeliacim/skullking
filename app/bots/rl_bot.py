@@ -1,6 +1,7 @@
 """Reinforcement Learning bot interface."""
 
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 
@@ -25,7 +26,7 @@ class RLBot(BaseBot):
     def __init__(
         self,
         player_id: str,
-        model: any | None = None,
+        model: Any | None = None,
         difficulty: BotDifficulty = BotDifficulty.HARD,
     ):
         """
@@ -59,10 +60,20 @@ class RLBot(BaseBot):
         observation = self._build_bid_observation(game, hand, round_number)
 
         # Get model prediction
-        action = self.model.predict(observation)
+        # predict() returns (action, states) tuple in stable-baselines3
+        result = self.model.predict(observation, deterministic=True)
+        if isinstance(result, tuple):
+            action = result[0]
+        else:
+            action = result
 
         # Action should be bid amount (0 to round_number)
-        bid = int(action) if isinstance(action, int | np.integer) else int(action[0])
+        if isinstance(action, np.ndarray):
+            bid = int(action.item()) if action.ndim == 0 else int(action[0])
+        elif isinstance(action, int | np.integer):
+            bid = int(action)
+        else:
+            bid = int(action[0])
         bid = max(0, min(round_number, bid))
 
         return bid
@@ -101,10 +112,17 @@ class RLBot(BaseBot):
         observation = self._build_pick_observation(game, hand, cards_in_trick)
 
         # Get model prediction
-        action = self.model.predict(observation)
+        # predict() returns (action, states) tuple in stable-baselines3
+        result = self.model.predict(observation, deterministic=True)
+        if isinstance(result, tuple):
+            action = result[0]  # First element is the action
+        else:
+            action = result
 
         # Action should be index into valid cards
-        if isinstance(action, list | np.ndarray):
+        if isinstance(action, np.ndarray):
+            card_index = int(action.item()) if action.ndim == 0 else int(action[0])
+        elif isinstance(action, list):
             card_index = int(action[0])
         else:
             card_index = int(action)
@@ -250,31 +268,47 @@ class RLBot(BaseBot):
         return np.array(obs, dtype=np.float32)
 
     def _encode_card_compact(self, card: Card) -> list[float]:
-        """Encode card with 9 features."""
+        """Encode card with 9 features. Handles all 74 cards."""
         encoding = []
 
-        # Card type one-hot (5 dims)
+        # Card type one-hot (5 dims) - grouped for feature efficiency
+        # [0] = Standard suits (has number)
+        # [1] = Pirate-like (Pirate, Tigress as pirate)
+        # [2] = King (Skull King)
+        # [3] = Mermaid
+        # [4] = Escape-like (Escape, Loot, Tigress as escape)
+        # Note: Beasts (Whale, Kraken) handled via special flags
         card_type_vec = [0.0] * 5
-        if card.is_standard_suit():
+        if card.is_standard_suit() or card.is_roger():
             card_type_vec[0] = 1.0
         elif card.is_pirate():
             card_type_vec[1] = 1.0
+        elif card.is_tigress():
+            # Tigress can be pirate or escape - encode as both
+            card_type_vec[1] = 0.5  # Partial pirate
+            card_type_vec[4] = 0.5  # Partial escape
         elif card.is_king():
             card_type_vec[2] = 1.0
         elif card.is_mermaid():
             card_type_vec[3] = 1.0
-        elif card.is_escape():
+        elif card.is_escape() or card.is_loot():
             card_type_vec[4] = 1.0
+        elif card.is_whale() or card.is_kraken():
+            # Beasts get their own partial encoding
+            card_type_vec[2] = 0.5  # Beast power similar to king
         encoding.extend(card_type_vec)
 
         # Number (1 dim)
         encoding.append(card.number / 14.0 if card.number else 0.0)
 
-        # Special flags (3 dims)
+        # Special flags (3 dims) - expanded meaning:
+        # [0] = Is high-power card (Pirate, Tigress, Beast)
+        # [1] = Is King or Beast
+        # [2] = Is Mermaid or counter-card
         encoding.extend(
             [
-                1.0 if card.is_pirate() else 0.0,
-                1.0 if card.is_king() else 0.0,
+                1.0 if (card.is_pirate() or card.is_tigress() or card.is_beast()) else 0.0,
+                1.0 if (card.is_king() or card.is_beast()) else 0.0,
                 1.0 if card.is_mermaid() else 0.0,
             ]
         )
@@ -286,18 +320,33 @@ class RLBot(BaseBot):
         return sum(1 for card_id in hand if predicate(get_card(card_id)))
 
     def _evaluate_card_strength(self, card: Card) -> float:
-        """Evaluate card strength (0.0 to 1.0)."""
+        """Evaluate card strength (0.0 to 1.0). Handles all 74 cards."""
         if card.is_king():
-            return 0.9
+            return 0.95
         if card.is_pirate():
             return 0.8
+        if card.is_tigress():
+            # Flexible - can be pirate (0.8) or escape (0.1)
+            return 0.55
+        if card.is_whale():
+            # Unpredictable - highest suit wins
+            return 0.4
+        if card.is_kraken():
+            # Nobody wins - disruptive
+            return 0.25
         if card.is_mermaid():
-            return 0.3
+            return 0.35
+        if card.is_loot():
+            # Acts like escape but alliance bonus
+            return 0.08
         if card.is_escape():
-            return 0.1
+            return 0.05
+        if card.is_roger():
+            # Trump suit - higher value
+            return 0.5 + (card.number / 14.0) * 0.35 if card.number else 0.5
         if card.is_standard_suit():
-            return 0.3 + (card.number / 14.0) * 0.4 if card.number else 0.3
-        return 0.5
+            return 0.2 + (card.number / 14.0) * 0.35 if card.number else 0.2
+        return 0.3
 
     def _estimate_hand_strength(self, hand: list[CardId], round_number: int) -> float:
         """Enhanced hand strength estimation."""
