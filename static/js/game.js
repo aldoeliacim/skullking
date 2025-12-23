@@ -154,7 +154,7 @@ class SkullKingGame {
     }
 
     handleMessage(message) {
-        console.log('Received:', message);
+        console.log('[handleMessage] Received:', message.command, message);
 
         switch (message.command) {
             case 'INIT':
@@ -199,6 +199,7 @@ class SkullKingGame {
                 this.switchScreen('game');
                 break;
             case 'DEAL':
+                console.log('[DEAL] Received cards:', message.content.cards, 'for round:', message.content.round);
                 // Store dealt cards
                 this.gameState = this.gameState || {};
                 this.gameState.hand = message.content.cards;
@@ -212,6 +213,7 @@ class SkullKingGame {
                         p.tricks_won = 0;
                     });
                 }
+                console.log('[DEAL] Updated gameState.hand:', this.gameState.hand);
                 this.updateGameScreen();
                 this.addLog(window.i18n.t('log.cardsDealt', { round: message.content.round }));
                 break;
@@ -269,13 +271,16 @@ class SkullKingGame {
                 this.updateGameScreen();
                 break;
             case 'START_PICKING':
+                console.log('[START_PICKING] Picking player:', message.content.picking_player_id, 'Trick:', message.content.trick);
                 this.gameState = this.gameState || {};
                 this.gameState.state = 'PICKING';
                 this.gameState.picking_player_id = message.content.picking_player_id;
                 this.gameState.current_trick = message.content.trick;
+                console.log('[START_PICKING] Is my turn:', message.content.picking_player_id === this.playerId);
                 this.updateGameScreen();
                 break;
             case 'PICKED':
+                console.log('[PICKED] Player:', message.content.player_id, 'played card:', message.content.card_id);
                 // A card was played
                 this.gameState.trick_cards = this.gameState.trick_cards || [];
                 this.gameState.trick_cards.push({
@@ -284,7 +289,9 @@ class SkullKingGame {
                 });
                 // Remove from hand if it's our card
                 if (message.content.player_id === this.playerId && this.gameState.hand) {
+                    console.log('[PICKED] Removing card from my hand. Before:', this.gameState.hand);
                     this.gameState.hand = this.gameState.hand.filter(c => c !== message.content.card_id);
+                    console.log('[PICKED] After removal:', this.gameState.hand);
                 }
                 this.updateGameScreen();
                 break;
@@ -388,6 +395,8 @@ class SkullKingGame {
     updateGameScreen() {
         if (!this.gameState) return;
 
+        console.log('[updateGameScreen] State:', this.gameState.state, 'Round:', this.gameState.current_round, 'Hand:', this.gameState.hand?.length, 'cards');
+
         // Switch to game screen
         if (!document.getElementById('game-screen').classList.contains('active')) {
             this.switchScreen('game');
@@ -476,6 +485,8 @@ class SkullKingGame {
         const handContainer = document.getElementById('player-hand');
         handContainer.innerHTML = '';
 
+        console.log('[updateHand] Rendering hand with', hand.length, 'cards:', hand);
+
         document.getElementById('hand-count').textContent = hand.length;
 
         hand.forEach((cardId, index) => {
@@ -483,9 +494,13 @@ class SkullKingGame {
             const card = this.cardIdToCard(cardId);
             const cardElement = this.createCardElement(card);
             cardElement.dataset.cardId = cardId; // Store actual ID
-            cardElement.addEventListener('click', () => this.playCard(cardId));
+            cardElement.addEventListener('click', () => {
+                console.log('[card click] Card clicked:', cardId);
+                this.playCard(cardId);
+            });
             handContainer.appendChild(cardElement);
         });
+        console.log('[updateHand] Done rendering hand');
     }
 
     // Pirate names for card IDs 6-10
@@ -737,11 +752,20 @@ class SkullKingGame {
     }
 
     playCard(cardId) {
+        console.log('[playCard] Called with cardId:', cardId);
+        console.log('[playCard] Current game state:', this.gameState?.state);
+        console.log('[playCard] Picking player:', this.gameState?.picking_player_id);
+        console.log('[playCard] My player ID:', this.playerId);
+        console.log('[playCard] Is my turn:', this.gameState?.picking_player_id === this.playerId);
+        console.log('[playCard] My hand:', this.gameState?.hand);
+
         // Tigress (card_id 72) requires player to choose pirate or escape
         if (cardId === 72) {
+            console.log('[playCard] Tigress card - showing choice modal');
             this.showTigressChoice(cardId);
             return;
         }
+        console.log('[playCard] Sending PICK command');
         this.sendMessage('PICK', { card_id: cardId });
     }
 
@@ -824,6 +848,7 @@ class SkullKingGame {
     }
 
     handleScoresAnnounced(data) {
+        console.log('[handleScoresAnnounced] Round:', data.round, 'Scores:', data.scores);
         // Update player scores
         if (this.gameState?.players && data.scores) {
             data.scores.forEach(scoreInfo => {
@@ -835,6 +860,7 @@ class SkullKingGame {
                 }
             });
         }
+        console.log('[handleScoresAnnounced] Current hand after scores:', this.gameState?.hand);
         this.addLog(window.i18n.t('log.roundComplete', { round: data.round }));
         this.updateGameScreen();
     }
@@ -976,13 +1002,21 @@ class SkullKingGame {
     }
 
     sendMessage(command, content) {
+        console.log('[sendMessage] Command:', command, 'Content:', content);
+        console.log('[sendMessage] WebSocket exists:', !!this.ws);
+        console.log('[sendMessage] WebSocket readyState:', this.ws?.readyState, '(OPEN=1)');
+
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
+            const message = {
                 command,
                 game_id: this.gameId,
                 player_id: this.playerId,
                 content
-            }));
+            };
+            console.log('[sendMessage] Sending:', JSON.stringify(message));
+            this.ws.send(JSON.stringify(message));
+        } else {
+            console.error('[sendMessage] WebSocket not ready! Cannot send message.');
         }
     }
 
