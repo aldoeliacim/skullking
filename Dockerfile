@@ -25,7 +25,9 @@ RUN poetry config virtualenvs.create false \
 # Copy application code
 COPY app/ ./app/
 COPY scripts/ ./scripts/
-COPY README_PYTHON.md ./
+
+# Copy trained models if available
+COPY models/ ./models/
 
 # Expose port
 EXPOSE 8000

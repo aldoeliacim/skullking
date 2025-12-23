@@ -46,6 +46,7 @@ Skull King es un juego de **bazas con envite**:
 - Tras la última mano, el jugador con **más puntos totales** gana la partida.
 
 Jugadores:
+
 - Reglas generales: 3–8 jugadores.
 - Con 2 jugadores, se usa la **variante especial** (ver sección 8).
 
