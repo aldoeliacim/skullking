@@ -25,7 +25,8 @@ def client(test_app):
     # Clear any existing games before each test
     websocket_manager.games.clear()
     websocket_manager.active_connections.clear()
-    return TestClient(test_app, raise_server_exceptions=False)
+    with TestClient(test_app, raise_server_exceptions=False) as client:
+        yield client
 
 
 class TestCreateGame:
