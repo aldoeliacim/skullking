@@ -12,6 +12,8 @@ import os
 import sys
 from pathlib import Path
 
+import torch
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sb3_contrib import MaskablePPO
@@ -94,9 +96,22 @@ def train_masked_ppo(
         save_dir: Directory to save models
         load_path: Optional path to load existing model
     """
+    # Check GPU availability
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cuda":
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9
+    else:
+        gpu_name = "N/A"
+        gpu_mem = 0
+
     print("=" * 60)
     print("MASKABLE PPO TRAINING - Optimized Curriculum")
     print("=" * 60)
+    print(
+        f"Device: {device.upper()}"
+        + (f" ({gpu_name}, {gpu_mem:.1f} GB)" if device == "cuda" else "")
+    )
     print(f"Total timesteps: {total_timesteps:,}")
     print(f"Parallel envs: {n_envs}")
     print(f"Save directory: {save_dir}")
@@ -198,6 +213,7 @@ def train_masked_ppo(
             max_grad_norm=0.5,
             verbose=1,
             tensorboard_log=f"{save_dir}/tensorboard",
+            device=device,
         )
 
     print("\n🏋️ Starting training...\n")
@@ -226,7 +242,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train MaskablePPO on Skull King")
     parser.add_argument("command", choices=["train", "resume"], help="Train new or resume existing")
     parser.add_argument("--timesteps", type=int, default=1_500_000, help="Total training timesteps")
-    parser.add_argument("--envs", type=int, default=4, help="Number of parallel environments")
+    parser.add_argument("--envs", type=int, default=8, help="Number of parallel environments")
     parser.add_argument("--load", type=str, help="Path to load existing model")
 
     args = parser.parse_args()
