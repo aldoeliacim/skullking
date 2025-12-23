@@ -488,6 +488,9 @@ class SkullKingGame {
         });
     }
 
+    // Pirate names for card IDs 6-10
+    pirateNames = ['bendt', 'harry', 'juanita', 'rascal', 'rosie'];
+
     // Convert numeric card ID to card object for display
     cardIdToCard(cardId) {
         // Card ID mapping based on app/models/card.py
@@ -500,20 +503,23 @@ class SkullKingGame {
         // 67-71 = Escape 1-5
         // 72 = Tigress, 73-74 = Loot
 
-        if (cardId === 1) return { type: 'king', number: null };
-        if (cardId === 2) return { type: 'whale', number: null };
-        if (cardId === 3) return { type: 'kraken', number: null };
-        if (cardId >= 4 && cardId <= 5) return { type: 'mermaid', number: null };
-        if (cardId >= 6 && cardId <= 10) return { type: 'pirate', number: null };
-        if (cardId >= 11 && cardId <= 24) return { type: 'roger', number: cardId - 10 };
-        if (cardId >= 25 && cardId <= 38) return { type: 'parrot', number: cardId - 24 };
-        if (cardId >= 39 && cardId <= 52) return { type: 'map', number: cardId - 38 };
-        if (cardId >= 53 && cardId <= 66) return { type: 'chest', number: cardId - 52 };
-        if (cardId >= 67 && cardId <= 71) return { type: 'escape', number: null };
-        if (cardId === 72) return { type: 'tigress', number: null };
-        if (cardId >= 73 && cardId <= 74) return { type: 'loot', number: null };
+        if (cardId === 1) return { type: 'king', number: null, image: 'skullking.png' };
+        if (cardId === 2) return { type: 'whale', number: null, image: 'whale.png' };
+        if (cardId === 3) return { type: 'kraken', number: null, image: 'kraken.png' };
+        if (cardId >= 4 && cardId <= 5) return { type: 'mermaid', number: null, image: 'siren.png' };
+        if (cardId >= 6 && cardId <= 10) {
+            const pirateIndex = cardId - 6;
+            return { type: 'pirate', number: null, image: `${this.pirateNames[pirateIndex]}.png` };
+        }
+        if (cardId >= 11 && cardId <= 24) return { type: 'roger', number: cardId - 10, image: 'black.png' };
+        if (cardId >= 25 && cardId <= 38) return { type: 'parrot', number: cardId - 24, image: 'green.png' };
+        if (cardId >= 39 && cardId <= 52) return { type: 'map', number: cardId - 38, image: 'purple.png' };
+        if (cardId >= 53 && cardId <= 66) return { type: 'chest', number: cardId - 52, image: 'yellow.png' };
+        if (cardId >= 67 && cardId <= 71) return { type: 'escape', number: null, image: 'flee.png' };
+        if (cardId === 72) return { type: 'tigress', number: null, image: 'tigress.png' };
+        if (cardId >= 73 && cardId <= 74) return { type: 'loot', number: null, image: 'loot.png' };
 
-        return { type: 'unknown', number: cardId };
+        return { type: 'unknown', number: cardId, image: 'back.png' };
     }
 
     updateTrickArea() {
@@ -551,34 +557,64 @@ class SkullKingGame {
             div.classList.add(cardClass);
         }
 
-        // Add bonus badge for 14 cards
-        const bonusPoints = this.getCardBonus(card);
-        if (bonusPoints > 0) {
-            const bonus = document.createElement('div');
-            bonus.className = 'card-bonus';
-            bonus.textContent = `+${bonusPoints}`;
-            div.appendChild(bonus);
+        // Use image-based rendering if image is available
+        if (card.image) {
+            div.classList.add('card-image');
+
+            const img = document.createElement('img');
+            img.src = `/static/images/cards/${card.image}`;
+            img.alt = this.formatCardType(card.type);
+            img.className = 'card-img';
+            img.draggable = false;
+            div.appendChild(img);
+
+            // Add number overlay for suit cards
+            if (card.number) {
+                const numberOverlay = document.createElement('div');
+                numberOverlay.className = 'card-number-overlay';
+                numberOverlay.textContent = card.number;
+                div.appendChild(numberOverlay);
+            }
+
+            // Add bonus badge for 14 cards
+            const bonusPoints = this.getCardBonus(card);
+            if (bonusPoints > 0) {
+                const bonus = document.createElement('div');
+                bonus.className = 'card-bonus';
+                bonus.textContent = `+${bonusPoints}`;
+                div.appendChild(bonus);
+            }
+        } else {
+            // Fallback to emoji-based rendering
+            const number = document.createElement('div');
+            number.className = 'card-number';
+            number.textContent = this.getCardDisplay(card);
+
+            const type = document.createElement('div');
+            type.className = 'card-type';
+            type.textContent = this.formatCardType(card.type);
+
+            // Add suit icon for numbered cards
+            const suitIcon = this.getSuitIcon(card);
+            if (suitIcon) {
+                const icon = document.createElement('div');
+                icon.className = 'card-suit-icon';
+                icon.textContent = suitIcon;
+                div.appendChild(icon);
+            }
+
+            div.appendChild(number);
+            div.appendChild(type);
+
+            // Add bonus badge for 14 cards
+            const bonusPoints = this.getCardBonus(card);
+            if (bonusPoints > 0) {
+                const bonus = document.createElement('div');
+                bonus.className = 'card-bonus';
+                bonus.textContent = `+${bonusPoints}`;
+                div.appendChild(bonus);
+            }
         }
-
-        const number = document.createElement('div');
-        number.className = 'card-number';
-        number.textContent = this.getCardDisplay(card);
-
-        const type = document.createElement('div');
-        type.className = 'card-type';
-        type.textContent = this.formatCardType(card.type);
-
-        // Add suit icon for numbered cards
-        const suitIcon = this.getSuitIcon(card);
-        if (suitIcon) {
-            const icon = document.createElement('div');
-            icon.className = 'card-suit-icon';
-            icon.textContent = suitIcon;
-            div.appendChild(icon);
-        }
-
-        div.appendChild(number);
-        div.appendChild(type);
 
         return div;
     }
