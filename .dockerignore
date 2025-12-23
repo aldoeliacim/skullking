@@ -1,4 +1,4 @@
-# Python
+# Docker ignore file
 __pycache__/
 *.py[cod]
 *$py.class
@@ -48,11 +48,27 @@ htmlcov/
 *.log
 logs/
 
-# Trained models (too large for git)
-models/
+# Models (too large)
+models/checkpoints/
+models/best_model/
+*.zip
 
 # Poetry
 poetry.lock
 
-# OS
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+
+# CI/CD
+.github/
+
+# Temporary files
+tmp/
+temp/
 .DS_Store

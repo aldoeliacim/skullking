@@ -109,9 +109,9 @@ class Round:
 
     def is_complete(self) -> bool:
         """Check if the round is complete (all tricks played)."""
-        return len(self.tricks) == self.number and all(
-            trick.winner_player_id is not None for trick in self.tricks
-        )
+        # A round is complete when we have the right number of tricks,
+        # regardless of whether they have winners (Kraken can result in no winner)
+        return len(self.tricks) == self.number
 
     def get_current_trick(self) -> Optional[Trick]:
         """Get the current (incomplete) trick, if any."""

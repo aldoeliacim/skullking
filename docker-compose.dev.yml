@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: skullking-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-skullking_dev}
+    ports:
+      - "${MONGODB_FORWARD_PORT:-27018}:27017"
+    volumes:
+      - mongodb_dev_data:/data/db
+    networks:
+      - skullking-dev-network
+
+  # Redis Cache & Pub/Sub
+  redis:
+    image: redis:7-alpine
+    container_name: skullking-redis-dev
+    restart: unless-stopped
+    ports:
+      - "${BROKER_REDIS_PORT:-6380}:6379"
+    networks:
+      - skullking-dev-network
+
+  # FastAPI Application with Hot Reload
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: skullking-app-dev
+    restart: unless-stopped
+    ports:
+      - "${APP_FORWARD_PORT:-8000}:8000"
+      - "6006:6006"  # TensorBoard
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      ENVIRONMENT: development
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+
+      # MongoDB
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-skullking_dev}
+
+      # Redis
+      BROKER_REDIS_HOST: redis
+      BROKER_REDIS_PORT: 6379
+
+      # JWT
+      JWT_SECRET: dev-secret-key
+      JWT_ALGORITHM: HS256
+
+      # Bots
+      ENABLE_BOTS: true
+      DEFAULT_BOT_STRATEGY: rule_based
+
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - skullking-dev-network
+    volumes:
+      # Mount source code for hot reload
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+      - ./models:/app/models
+      - ./logs:/app/logs
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+networks:
+  skullking-dev-network:
+    driver: bridge
+
+volumes:
+  mongodb_dev_data:
+    driver: local

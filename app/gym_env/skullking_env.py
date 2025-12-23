@@ -16,6 +16,7 @@ from app.models.card import CardId, get_card
 from app.models.enums import GameState, MAX_PLAYERS, MAX_ROUNDS
 from app.models.game import Game
 from app.models.player import Player
+from app.models.trick import Trick
 
 
 class SkullKingEnv(gym.Env):
@@ -358,6 +359,7 @@ class SkullKingEnv(gym.Env):
                 self.game, player.hand, current_trick.get_all_card_ids()
             )
             self._play_card(bot_id, card_to_play)
+            return  # Exit after one bot plays to avoid recursion
 
     def _all_players_bid(self) -> bool:
         """Check if all players have made their bids."""
@@ -385,7 +387,7 @@ class SkullKingEnv(gym.Env):
                 if winner:
                     starter_index = winner.index
 
-        trick = current_round.Trick(
+        trick = Trick(
             number=trick_number,
             starter_player_index=starter_index,
         )

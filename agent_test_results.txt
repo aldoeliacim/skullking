@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/user/skullking/scripts/test_agent_detailed.py", line 2, in <module>
+    from app.gym_env.skullking_env_masked import SkullKingEnvMasked
+ModuleNotFoundError: No module named 'app'
