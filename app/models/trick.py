@@ -1,8 +1,16 @@
 """Trick model for a single trick within a round."""
 
 from dataclasses import dataclass, field
+from enum import Enum
 
 from app.models.card import CardId, determine_winner, get_card
+
+
+class TigressChoice(Enum):
+    """Choice for how Tigress (Scary Mary) is played."""
+
+    PIRATE = "pirate"
+    ESCAPE = "escape"
 
 
 @dataclass
@@ -11,6 +19,7 @@ class PickedCard:
 
     player_id: str
     card_id: CardId
+    tigress_choice: TigressChoice | None = None  # Only set when card is Tigress
 
 
 @dataclass
@@ -45,9 +54,16 @@ class Trick:
         """Get all card IDs picked in this trick."""
         return [pc.card_id for pc in self.picked_cards]
 
-    def add_card(self, player_id: str, card_id: CardId) -> bool:
+    def add_card(
+        self, player_id: str, card_id: CardId, tigress_choice: TigressChoice | None = None
+    ) -> bool:
         """
         Add a picked card to this trick.
+
+        Args:
+            player_id: ID of the player playing the card
+            card_id: The card being played
+            tigress_choice: If playing Tigress, whether it's pirate or escape
 
         Returns:
             True if card was added, False if player already picked.
@@ -55,7 +71,7 @@ class Trick:
         # Guard: don't allow duplicate picks from same player
         if self.has_player_picked(player_id):
             return False
-        self.picked_cards.append(PickedCard(player_id, card_id))
+        self.picked_cards.append(PickedCard(player_id, card_id, tigress_choice))
         return True
 
     def determine_winner(self) -> tuple[CardId | None, str | None]:
@@ -70,7 +86,14 @@ class Trick:
             return None, None
 
         card_ids = self.get_all_card_ids()
-        winner_card_id = determine_winner(card_ids)
+
+        # Build tigress choices dict for cards that have a choice set
+        tigress_choices: dict[CardId, str] = {}
+        for picked_card in self.picked_cards:
+            if picked_card.tigress_choice is not None:
+                tigress_choices[picked_card.card_id] = picked_card.tigress_choice.value
+
+        winner_card_id = determine_winner(card_ids, tigress_choices)
 
         if winner_card_id is None:
             # Kraken wins - no one gets the trick
