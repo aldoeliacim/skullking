@@ -256,10 +256,149 @@ def get_all_cards() -> dict[CardId, Card]:
     return _CARDS.copy()
 
 
-def determine_winner(  # noqa: C901, PLR0912
+@dataclass
+class _TrickState:
+    """Track state while evaluating a trick."""
+
+    lead: "Card | None" = None
+    suit_lead: "Card | None" = None
+    mermaid_lead: "Card | None" = None
+    has_pirate: bool = False
+    has_king: bool = False
+    last_beast: "Card | None" = None
+
+
+def _is_acting_as_escape(card: "Card", card_id: CardId, tigress_choices: dict[CardId, str]) -> bool:
+    """Check if card acts as escape (escape, loot, or tigress-as-escape)."""
+    if card.is_escape() or card.is_loot():
+        return True
+    if card.is_tigress():
+        return tigress_choices.get(card_id) == "escape"
+    return False
+
+
+def _is_acting_as_pirate(card: "Card", card_id: CardId, tigress_choices: dict[CardId, str]) -> bool:
+    """Check if card acts as pirate (pirate or tigress-as-pirate)."""
+    if card.is_pirate():
+        return True
+    if card.is_tigress():
+        return tigress_choices.get(card_id) == "pirate"
+    return False
+
+
+def _card_beats_lead(
+    card: "Card",
+    card_id: CardId,
+    lead: "Card",
+    tigress_choices: dict[CardId, str],
+) -> bool:
+    """Check if card beats the current lead using game hierarchy rules."""
+    is_lead_escape = _is_acting_as_escape(lead, lead.id, tigress_choices)
+    is_lead_pirate = _is_acting_as_pirate(lead, lead.id, tigress_choices)
+    is_tigress_pirate = _is_acting_as_pirate(card, card_id, tigress_choices)
+    lead_is_beatable = lead.is_suit() or lead.is_mermaid() or is_lead_escape
+
+    # Check winning conditions (order matters for some)
+    return (
+        # Beasts beat everything
+        card.is_whale()
+        or card.is_kraken()
+        # Standard suit beats escape
+        or (card.is_standard_suit() and is_lead_escape)
+        # Jolly Roger beats standard suits and escapes
+        or (card.is_roger() and (lead.is_standard_suit() or is_lead_escape))
+        # Characters beat suits and escapes
+        or (card.is_character() and (lead.is_suit() or is_lead_escape))
+        # Pirate beats Mermaid
+        or (card.is_pirate() and lead.is_mermaid())
+        # Tigress-as-pirate beats suits and mermaids (not other pirates)
+        or (is_tigress_pirate and not lead.is_pirate() and lead_is_beatable)
+        # Skull King beats Pirates
+        or (card.is_king() and (lead.is_pirate() or is_lead_pirate))
+        # Mermaid beats Skull King
+        or (card.is_mermaid() and lead.is_king())
+    )
+
+
+def _update_trick_state(
+    state: _TrickState,
+    card: "Card",
+    card_id: CardId,
+    tigress_choices: dict[CardId, str],
+) -> None:
+    """Update trick state tracking for a played card."""
+    # Track pirate presence (including Tigress as pirate)
+    if _is_acting_as_pirate(card, card_id, tigress_choices):
+        state.has_pirate = True
+
+    # Track Skull King presence
+    if card.is_king():
+        state.has_king = True
+
+    # Track last beast (for Kraken+Whale interaction)
+    if card.is_beast():
+        state.last_beast = card
+
+    # Track highest suit card
+    is_new_suit_leader = state.suit_lead is None or state.suit_lead.number < card.number
+    if card.is_suit() and is_new_suit_leader:
+        state.suit_lead = card
+
+    # Track first mermaid
+    if card.is_mermaid() and state.mermaid_lead is None:
+        state.mermaid_lead = card
+
+
+def _resolve_beast_effect(state: _TrickState) -> CardId | None | bool:
+    """Apply beast effects. Return CardId/None for result, or False to continue."""
+    if state.last_beast is None:
+        return False  # No beast, continue normal resolution
+
+    if state.last_beast.is_whale():
+        # White Whale: Highest suit card wins
+        return state.suit_lead.id if state.suit_lead else None
+
+    if state.last_beast.is_kraken():
+        # Kraken: No one wins
+        return None
+
+    return False
+
+
+def _process_card_for_lead(
+    state: _TrickState,
+    card: "Card",
+    card_id: CardId,
+    tigress_choices: dict[CardId, str],
+) -> None:
+    """Process a card and update lead if it wins."""
+    # Cards that act as escape only become lead if nothing else played
+    if _is_acting_as_escape(card, card_id, tigress_choices):
+        if state.lead is None:
+            state.lead = card
+        return
+
+    # First non-escape card becomes lead
+    lead_is_escape = state.lead is not None and _is_acting_as_escape(
+        state.lead, state.lead.id, tigress_choices
+    )
+    if state.lead is None or lead_is_escape:
+        state.lead = card
+        return
+
+    # Same type: higher number wins
+    if state.lead.card_type == card.card_type:
+        if state.lead.number < card.number:
+            state.lead = card
+    # Different types: apply hierarchy rules
+    elif _card_beats_lead(card, card_id, state.lead, tigress_choices):
+        state.lead = card
+
+
+def determine_winner(
     card_ids: list[CardId], tigress_choices: dict[CardId, str] | None = None
 ) -> CardId | None:
-    """Determine the winner of a trick given the cards played.
+    """Determine the winner of a trick.
 
     Args:
         card_ids: List of card IDs played in order
@@ -268,119 +407,25 @@ def determine_winner(  # noqa: C901, PLR0912
     Returns:
         CardId of winning card, or None if Kraken wins (no one gets the trick)
 
-    Rules:
-        1. Highest card of same type wins among same types
-        2. Beasts (Kraken/Whale) beat suits
-        3. Jolly Roger beats standard suits and escapes
-        4. Characters beat suits and escapes
-        5. Pirates beat Mermaids
-        6. Skull King beats Pirates
-        7. Mermaid beats Skull King (when Pirate + King + Mermaid present)
-        8. White Whale: Highest suit card wins (specials discarded)
-        9. Kraken: No one wins the trick
-        10. Loot: Always loses (like Escape)
-        11. Kraken + Whale: Last beast played takes effect
-        12. Tigress: Acts as pirate or escape based on player choice
-
     """
     if not card_ids:
         return None
 
     tigress_choices = tigress_choices or {}
-
-    lead: Card | None = None
-    suit_lead: Card | None = None
-    mermaid_lead: Card | None = None
-    has_pirate = False
-    has_king = False
-    last_beast: Card | None = None  # Track last beast for Kraken+Whale interaction
-
-    def is_acting_as_escape(card: Card, card_id: CardId) -> bool:
-        """Check if card acts as escape (escape, loot, or tigress-as-escape)."""
-        if card.is_escape() or card.is_loot():
-            return True
-        if card.is_tigress():
-            return tigress_choices.get(card_id) == "escape"
-        return False
-
-    def is_acting_as_pirate(card: Card, card_id: CardId) -> bool:
-        """Check if card acts as pirate (pirate or tigress-as-pirate)."""
-        if card.is_pirate():
-            return True
-        if card.is_tigress():
-            return tigress_choices.get(card_id) == "pirate"
-        return False
+    state = _TrickState()
 
     for card_id in card_ids:
         card = get_card(card_id)
+        _update_trick_state(state, card, card_id, tigress_choices)
+        _process_card_for_lead(state, card, card_id, tigress_choices)
 
-        # Track special card presence (including Tigress as pirate)
-        if is_acting_as_pirate(card, card_id):
-            has_pirate = True
-        if card.is_king():
-            has_king = True
+    # Apply beast effects (Kraken/Whale override normal winner)
+    beast_result = _resolve_beast_effect(state)
+    if beast_result is not False:
+        return beast_result
 
-        # Track last beast (Kraken or Whale) - last one's effect takes precedence
-        if card.is_beast():
-            last_beast = card
+    # Three-way rule: Mermaid + Pirate + King = Mermaid wins
+    if state.mermaid_lead and state.has_pirate and state.has_king:
+        return state.mermaid_lead.id
 
-        # Track suit leader (highest suit card)
-        if card.is_suit() and (suit_lead is None or suit_lead.number < card.number):
-            suit_lead = card
-
-        # Track first mermaid
-        if card.is_mermaid() and mermaid_lead is None:
-            mermaid_lead = card
-
-        # Skip cards that act as escape - they always lose
-        if is_acting_as_escape(card, card_id):
-            if lead is None:
-                lead = card  # Only set as lead if nothing else played yet
-            continue
-
-        # Determine overall leader
-        if lead is None or is_acting_as_escape(get_card(lead.id), lead.id):
-            # First non-losing card becomes lead (or replace escape-like lead)
-            lead = card
-            continue
-
-        # Same type: higher number wins
-        if lead.card_type == card.card_type:
-            if lead.number < card.number:
-                lead = card
-        # Different types: apply special rules
-
-        # Tigress as pirate - treat like pirate for hierarchy
-        elif is_acting_as_pirate(card, card_id) and not lead.is_pirate():
-            # Tigress-as-pirate beats suits and mermaids like a pirate
-            if lead.is_suit() or lead.is_mermaid() or is_acting_as_escape(lead, lead.id):
-                lead = card
-        # Beasts beat everything except themselves
-        elif (
-            card.is_whale()
-            or card.is_kraken()
-            or (card.is_standard_suit() and is_acting_as_escape(lead, lead.id))
-            or (card.is_roger() and (lead.is_standard_suit() or is_acting_as_escape(lead, lead.id)))
-            or (card.is_character() and (lead.is_suit() or is_acting_as_escape(lead, lead.id)))
-            or (card.is_pirate() and lead.is_mermaid())
-            or (card.is_king() and (lead.is_pirate() or is_acting_as_pirate(lead, lead.id)))
-            or (card.is_mermaid() and lead.is_king())
-        ):
-            lead = card
-
-    # Special end-game rules
-
-    # Beast interaction: use last beast's effect (Kraken+Whale rule)
-    if last_beast:
-        if last_beast.is_whale():
-            # White Whale: Highest suit card wins
-            return suit_lead.id if suit_lead else None
-        if last_beast.is_kraken():
-            # Kraken: No one wins
-            return None
-
-    # Mermaid + Pirate + King: Mermaid wins
-    if mermaid_lead and has_pirate and has_king:
-        return mermaid_lead.id
-
-    return lead.id if lead else None
+    return state.lead.id if state.lead else None

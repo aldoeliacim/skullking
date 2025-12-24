@@ -120,7 +120,7 @@ class Round:
                 self.scores[player_id] = -10 * diff
 
             # Apply Roatán's extra bet bonus/penalty
-            roatan_bonus = self.ability_state.get_roatan_bonus(player_id, bid_correct)
+            roatan_bonus = self.ability_state.get_roatan_bonus(player_id, bid_correct=bid_correct)
             self.scores[player_id] += roatan_bonus
 
     def is_complete(self) -> bool:
