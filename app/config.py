@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     bot_think_time_min: float = Field(default=0.5, description="Min bot think time")
     bot_think_time_max: float = Field(default=2.0, description="Max bot think time")
     default_bot_strategy: str = Field(default="rule_based", description="Default bot strategy")
+    rl_model_path: str = Field(
+        default="models/masked_ppo/masked_ppo_final.zip",
+        description="Path to trained RL model (relative to project root)",
+    )
 
     @property
     def mongodb_uri(self) -> str:

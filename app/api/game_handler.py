@@ -10,6 +10,7 @@ from app.api.responses import Command, ServerMessage
 from app.bots import RandomBot, RuleBasedBot
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.bots.rl_bot import RLBot
+from app.config import settings
 from app.constants import HARRY_THE_GIANT_DISCARD_COUNT, MAX_PLAYERS
 from app.models.card import CardId, get_card
 from app.models.enums import GameState
@@ -36,19 +37,29 @@ logger = logging.getLogger(__name__)
 
 # Module-level cache for RL model (avoids global statement)
 _rl_cache: dict[str, Any] = {"model": None}
-_rl_model_path = Path(__file__).parent.parent.parent / "models/masked_ppo/masked_ppo_final.zip"
+
+
+def _get_rl_model_path() -> Path:
+    """Get the RL model path from config."""
+    model_path = Path(settings.rl_model_path)
+    if not model_path.is_absolute():
+        # Relative paths are from project root
+        model_path = Path(__file__).parent.parent.parent / model_path
+    return model_path
 
 
 def _load_rl_model() -> "MaskablePPO | None":
     """Load the trained RL model if available."""
     if not _MASKABLE_PPO_AVAILABLE:
         return None
-    if _rl_cache["model"] is None and _rl_model_path.exists():
-        try:
-            _rl_cache["model"] = MaskablePPO.load(str(_rl_model_path))
-            logger.info("Loaded RL model from %s", _rl_model_path)
-        except (OSError, ValueError, RuntimeError) as e:
-            logger.warning("Could not load RL model: %s", e)
+    if _rl_cache["model"] is None:
+        model_path = _get_rl_model_path()
+        if model_path.exists():
+            try:
+                _rl_cache["model"] = MaskablePPO.load(str(model_path))
+                logger.info("Loaded RL model from %s", model_path)
+            except (OSError, ValueError, RuntimeError) as e:
+                logger.warning("Could not load RL model: %s", e)
     return _rl_cache["model"]
 
 

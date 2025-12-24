@@ -160,6 +160,7 @@ BROKER_REDIS_PORT=6379
 JWT_SECRET=your-secret-key
 ENABLE_BOTS=true
 FRONTEND_URL=http://localhost:5173
+RL_MODEL_PATH=models/masked_ppo/masked_ppo_final.zip
 ```
 
 ## Resources
