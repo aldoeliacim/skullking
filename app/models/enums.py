@@ -59,6 +59,10 @@ class Command(str, Enum):
     CONTINUE_PROMPT = "CONTINUE_PROMPT"  # Server prompts for continue
     ALL_READY = "ALL_READY"  # All players ready to continue
 
+    # Spectator commands
+    SPECTATOR_JOINED = "SPECTATOR_JOINED"  # Spectator connected
+    SPECTATOR_LEFT = "SPECTATOR_LEFT"  # Spectator disconnected
+
 
 class CardType(str, Enum):
     """Card types in Skull King."""

@@ -7,6 +7,7 @@ class SkullKingGame {
         this.username = null;
         this.gameState = null;
         this.isHost = false;
+        this.isSpectator = false;
         this.selectedCardId = null; // For tap-to-confirm on mobile
         this.isTouchDevice = this.detectTouchDevice();
 
@@ -120,6 +121,7 @@ class SkullKingGame {
         // Login screen
         document.getElementById('create-game-btn').addEventListener('click', () => this.createGame());
         document.getElementById('join-game-btn').addEventListener('click', () => this.joinGame());
+        document.getElementById('spectate-game-btn').addEventListener('click', () => this.spectateGame());
         document.getElementById('username-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.createGame();
         });
@@ -259,20 +261,45 @@ class SkullKingGame {
         this.gameId = gameId;
         this.playerId = this.generatePlayerId();
         this.isHost = false;
+        this.isSpectator = false;
+
+        this.connectWebSocket();
+    }
+
+    spectateGame() {
+        const gameId = document.getElementById('game-id-input').value.trim();
+
+        if (!gameId) {
+            this.showError('login', window.i18n.t('login.errorEnterGameId'));
+            return;
+        }
+
+        this.username = 'Spectator';
+        this.gameId = gameId;
+        this.playerId = this.generatePlayerId();
+        this.isHost = false;
+        this.isSpectator = true;
 
         this.connectWebSocket();
     }
 
     connectWebSocket() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.host}/games/join?game_id=${this.gameId}&player_id=${this.playerId}&username=${encodeURIComponent(this.username)}`;
+        const endpoint = this.isSpectator ? 'spectate' : 'join';
+        const idParam = this.isSpectator ? 'spectator_id' : 'player_id';
+        const wsUrl = `${wsProtocol}//${window.location.host}/games/${endpoint}?game_id=${this.gameId}&${idParam}=${this.playerId}&username=${encodeURIComponent(this.username)}`;
 
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
             console.log('WebSocket connected');
-            this.switchScreen('lobby');
-            this.updateLobby();
+            if (this.isSpectator) {
+                this.switchScreen('game');
+                document.body.classList.add('spectator-mode');
+            } else {
+                this.switchScreen('lobby');
+                this.updateLobby();
+            }
         };
 
         this.ws.onmessage = (event) => {
@@ -300,10 +327,22 @@ class SkullKingGame {
         switch (message.command) {
             case 'INIT':
                 this.gameState = message.content.game;
-                this.updateLobby();
+                if (message.content.is_spectator) {
+                    this.isSpectator = true;
+                    document.body.classList.add('spectator-mode');
+                    this.updateGameScreen();
+                } else {
+                    this.updateLobby();
+                }
                 break;
             case 'JOINED':
                 this.addLog(window.i18n.t('log.playerJoined', { username: message.content.username }), 'info', '&#128100;');
+                break;
+            case 'SPECTATOR_JOINED':
+                this.addLog(`${message.content.username} is now watching (${message.content.spectator_count} spectators)`, 'info', '&#128065;');
+                break;
+            case 'SPECTATOR_LEFT':
+                this.addLog(`A spectator left (${message.content.spectator_count} spectators)`, 'info', '&#128065;');
                 break;
             case 'LEFT':
             case 'PLAYER_LEFT':

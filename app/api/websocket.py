@@ -24,6 +24,7 @@ class ConnectionManager:
 
     Handles:
     - Player connections per game
+    - Spectator connections per game
     - Message broadcasting
     - Connection lifecycle
     """
@@ -32,6 +33,8 @@ class ConnectionManager:
         """Initialize the connection manager."""
         # game_id -> player_id -> WebSocket
         self.active_connections: dict[str, dict[str, WebSocket]] = {}
+        # game_id -> spectator_id -> WebSocket
+        self.spectator_connections: dict[str, dict[str, WebSocket]] = {}
         # Message queue for broadcasting
         self.message_queue: asyncio.Queue[ServerMessage] = asyncio.Queue()
         self.games: dict[str, Game] = {}
@@ -48,7 +51,7 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket, game_id: str, player_id: str) -> None:
         """
-        Accept a new WebSocket connection.
+        Accept a new WebSocket connection for a player.
 
         Args:
             websocket: WebSocket connection
@@ -67,9 +70,28 @@ class ConnectionManager:
         if game_id in self.games:
             await self.game_handler.send_game_state(self.games[game_id], player_id)
 
+    async def connect_spectator(
+        self, websocket: WebSocket, game_id: str, spectator_id: str
+    ) -> None:
+        """
+        Accept a new WebSocket connection for a spectator.
+
+        Args:
+            websocket: WebSocket connection
+            game_id: Game identifier
+            spectator_id: Spectator identifier
+        """
+        await websocket.accept()
+
+        if game_id not in self.spectator_connections:
+            self.spectator_connections[game_id] = {}
+
+        self.spectator_connections[game_id][spectator_id] = websocket
+        logger.info("Spectator %s connected to game %s", spectator_id, game_id)
+
     def disconnect(self, game_id: str, player_id: str) -> None:
         """
-        Remove a WebSocket connection.
+        Remove a player WebSocket connection.
 
         Args:
             game_id: Game identifier
@@ -79,11 +101,41 @@ class ConnectionManager:
             del self.active_connections[game_id][player_id]
             logger.info("Player %s disconnected from game %s", player_id, game_id)
 
-            # Clean up empty game
+            # Clean up empty game (only if no players AND no spectators)
             if not self.active_connections[game_id]:
                 del self.active_connections[game_id]
-                if game_id in self.games:
+                # Only delete game if no spectators either
+                no_spectators = (
+                    game_id not in self.spectator_connections
+                    or not self.spectator_connections[game_id]
+                )
+                if no_spectators and game_id in self.games:
                     del self.games[game_id]
+
+    def disconnect_spectator(self, game_id: str, spectator_id: str) -> None:
+        """
+        Remove a spectator WebSocket connection.
+
+        Args:
+            game_id: Game identifier
+            spectator_id: Spectator identifier
+        """
+        if (
+            game_id in self.spectator_connections
+            and spectator_id in self.spectator_connections[game_id]
+        ):
+            del self.spectator_connections[game_id][spectator_id]
+            logger.info("Spectator %s disconnected from game %s", spectator_id, game_id)
+
+            # Clean up empty spectator dict
+            if not self.spectator_connections[game_id]:
+                del self.spectator_connections[game_id]
+
+    def get_spectator_count(self, game_id: str) -> int:
+        """Get the number of spectators for a game."""
+        if game_id not in self.spectator_connections:
+            return 0
+        return len(self.spectator_connections[game_id])
 
     async def send_personal_message(
         self, message: ServerMessage, game_id: str, player_id: str
@@ -111,31 +163,42 @@ class ConnectionManager:
         excluded_player_id: str | None = None,
     ) -> None:
         """
-        Broadcast message to all players in a game.
+        Broadcast message to all players and spectators in a game.
 
         Args:
             message: Message to broadcast
             game_id: Game identifier
             excluded_player_id: Player to exclude from broadcast
         """
-        if game_id not in self.active_connections:
-            return
+        disconnected_players = []
+        disconnected_spectators = []
 
-        disconnected = []
+        # Send to players
+        if game_id in self.active_connections:
+            for player_id, websocket in self.active_connections[game_id].items():
+                if excluded_player_id and player_id == excluded_player_id:
+                    continue
 
-        for player_id, websocket in self.active_connections[game_id].items():
-            if excluded_player_id and player_id == excluded_player_id:
-                continue
+                try:
+                    await websocket.send_json(message.to_dict())
+                except Exception:
+                    logger.exception("Error broadcasting to player %s", player_id)
+                    disconnected_players.append(player_id)
 
-            try:
-                await websocket.send_json(message.to_dict())
-            except Exception:
-                logger.exception("Error broadcasting to %s", player_id)
-                disconnected.append(player_id)
+        # Send to spectators (spectators receive all public broadcasts)
+        if game_id in self.spectator_connections:
+            for spectator_id, websocket in self.spectator_connections[game_id].items():
+                try:
+                    await websocket.send_json(message.to_dict())
+                except Exception:
+                    logger.exception("Error broadcasting to spectator %s", spectator_id)
+                    disconnected_spectators.append(spectator_id)
 
-        # Clean up disconnected players
-        for player_id in disconnected:
+        # Clean up disconnected
+        for player_id in disconnected_players:
             self.disconnect(game_id, player_id)
+        for spectator_id in disconnected_spectators:
+            self.disconnect_spectator(game_id, spectator_id)
 
     async def dispatch_message(self, message: ServerMessage) -> None:
         """
@@ -214,6 +277,39 @@ class ConnectionManager:
         except Exception:
             logger.exception("Error handling message from %s", player_id)
             self.disconnect(game_id, player_id)
+
+    async def handle_spectator_message(
+        self, websocket: WebSocket, game_id: str, spectator_id: str
+    ) -> None:
+        """
+        Handle incoming messages from a spectator.
+        Spectators can only observe, not send game commands.
+
+        Args:
+            websocket: WebSocket connection
+            game_id: Game identifier
+            spectator_id: Spectator identifier
+        """
+        try:
+            while True:
+                # Receive message (spectators can't send game commands, but need to handle pings)
+                data = await websocket.receive_text()
+                message = json.loads(data)
+
+                command = message.get("command", "")
+                logger.debug("Spectator %s sent %s (ignored)", spectator_id, command)
+
+                # Spectators can only send PING or similar non-game commands
+                if command == "PING":
+                    await websocket.send_json({"command": "PONG"})
+
+        except WebSocketDisconnect:
+            logger.info("Spectator %s disconnected from game %s", spectator_id, game_id)
+            self.disconnect_spectator(game_id, spectator_id)
+
+        except Exception:
+            logger.exception("Error handling spectator message from %s", spectator_id)
+            self.disconnect_spectator(game_id, spectator_id)
 
     def get_game(self, game_id: str) -> Game | None:
         """Get game by ID."""

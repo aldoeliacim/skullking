@@ -131,6 +131,95 @@ async def join_game(
     await websocket_manager.handle_player_message(websocket, game_id, player_id)
 
 
+@router.websocket("/games/spectate")
+async def spectate_game(
+    websocket: WebSocket,
+    game_id: str = Query(..., description="Game ID to spectate"),
+    spectator_id: str = Query(..., description="Spectator ID"),
+    username: str = Query(default="Spectator", description="Spectator username"),
+) -> None:
+    """
+    WebSocket endpoint to spectate a game.
+
+    Spectators can watch the game but cannot interact with it.
+    They receive all public game events.
+
+    Args:
+        websocket: WebSocket connection
+        game_id: Game to spectate
+        spectator_id: Spectator identifier
+        username: Spectator display name
+    """
+    # Get game
+    game = websocket_manager.get_game(game_id)
+
+    if not game:
+        await websocket.close(code=4004, reason="Game not found")
+        return
+
+    # Connect as spectator
+    await websocket_manager.connect_spectator(websocket, game_id, spectator_id)
+
+    # Build current game state for spectator (without private info like hands)
+    current_round = game.get_current_round()
+    trick = current_round.get_current_trick() if current_round else None
+
+    spectator_state = {
+        "id": game.id,
+        "slug": game.slug,
+        "state": game.state.value,
+        "current_round": current_round.number if current_round else 0,
+        "players": [
+            {
+                "id": p.id,
+                "username": p.username,
+                "score": p.score,
+                "index": p.index,
+                "is_bot": p.is_bot,
+                "is_connected": p.is_connected,
+                "bid": p.bid,
+                "tricks_won": current_round.get_tricks_won(p.id) if current_round else 0,
+            }
+            for p in game.players
+        ],
+        "spectator_count": websocket_manager.get_spectator_count(game_id),
+    }
+
+    # Add trick info if in progress
+    if trick:
+        spectator_state["current_trick"] = {
+            "number": trick.number,
+            "cards": [
+                {"player_id": pc.player_id, "card_id": pc.card_id.value}
+                for pc in trick.picked_cards
+            ],
+            "picking_player_id": trick.picking_player_id,
+        }
+
+    # Send initial state
+    init_message = ServerMessage(
+        command=Command.INIT,
+        game_id=game_id,
+        content={"game": spectator_state, "is_spectator": True},
+    )
+    await websocket.send_json(init_message.to_dict())
+
+    # Notify players that a spectator joined
+    spectator_joined_message = ServerMessage(
+        command=Command.SPECTATOR_JOINED,
+        game_id=game_id,
+        content={
+            "spectator_id": spectator_id,
+            "username": username,
+            "spectator_count": websocket_manager.get_spectator_count(game_id),
+        },
+    )
+    await websocket_manager.broadcast_to_game(spectator_joined_message, game_id)
+
+    # Handle spectator connection (mostly just keeping it alive)
+    await websocket_manager.handle_spectator_message(websocket, game_id, spectator_id)
+
+
 @router.get("/games/cards", response_model=CardListResponse)
 async def get_cards() -> CardListResponse:
     """
