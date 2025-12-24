@@ -4423,6 +4423,136 @@ input[type="text"]:focus,
     font-size: 1rem;
 }
 
+/* Browse games button */
+.btn-browse {
+    margin-top: var(--spacing-xs);
+    font-size: 0.85rem;
+}
+
+/* Spectator count indicator in topbar */
+.spectator-count {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: rgba(6, 182, 212, 0.15);
+    border-radius: var(--radius-full);
+    font-size: 0.85rem;
+    color: var(--accent-cyan);
+}
+
+.spectator-count .spectator-icon {
+    font-size: 1rem;
+}
+
+/* ============================================
+   BROWSE GAMES MODAL
+   ============================================ */
+
+.browse-games-content {
+    max-width: 500px;
+    max-height: 80vh;
+}
+
+.active-games-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+}
+
+.active-games-list .loading,
+.active-games-list .empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--spacing-xl);
+}
+
+.active-game-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--surface-darker);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.active-game-item:hover {
+    border-color: var(--accent-cyan);
+    background: rgba(6, 182, 212, 0.05);
+}
+
+.game-item-info {
+    flex: 1;
+}
+
+.game-item-players {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: var(--spacing-xs);
+}
+
+.game-item-players .player-count {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.game-item-players .player-names {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.game-item-status {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.game-item-status .game-state {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+}
+
+.game-state.pending {
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--accent-purple);
+}
+
+.game-state.bidding {
+    background: rgba(251, 191, 36, 0.2);
+    color: var(--accent-gold);
+}
+
+.game-state.picking {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--accent-green);
+}
+
+.game-item-status .round-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.game-item-status .spectator-info {
+    font-size: 0.8rem;
+    color: var(--accent-cyan);
+}
+
+.browse-footer {
+    display: flex;
+    justify-content: center;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: var(--spacing-sm);
+}
+
 /* ============================================
    ROUND SUMMARY OVERLAY
    ============================================ */

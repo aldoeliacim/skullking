@@ -177,6 +177,14 @@ class SkullKingGame {
             if (e.target.id === 'history-modal') this.hideHistory();
         });
 
+        // Browse games modal
+        document.getElementById('browse-games-btn')?.addEventListener('click', () => this.showBrowseGames());
+        document.getElementById('close-browse-btn')?.addEventListener('click', () => this.hideBrowseGames());
+        document.getElementById('refresh-games-btn')?.addEventListener('click', () => this.refreshActiveGames());
+        document.getElementById('browse-games-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'browse-games-modal') this.hideBrowseGames();
+        });
+
         // Game log toggle
         document.getElementById('log-toggle')?.addEventListener('click', () => {
             document.getElementById('game-log')?.classList.toggle('collapsed');
@@ -414,10 +422,17 @@ class SkullKingGame {
                 this.addLog(window.i18n.t('log.playerJoined', { username: message.content.username }), 'info', '&#128100;');
                 break;
             case 'SPECTATOR_JOINED':
-                this.addLog(`${message.content.username} is now watching (${message.content.spectator_count} spectators)`, 'info', '&#128065;');
+                this.updateSpectatorCount(message.content.spectator_count);
+                this.addLog(window.i18n.t('log.spectatorJoined', {
+                    username: message.content.username,
+                    count: message.content.spectator_count
+                }) || `${message.content.username} is now watching (${message.content.spectator_count} spectators)`, 'info', '&#128065;');
                 break;
             case 'SPECTATOR_LEFT':
-                this.addLog(`A spectator left (${message.content.spectator_count} spectators)`, 'info', '&#128065;');
+                this.updateSpectatorCount(message.content.spectator_count);
+                this.addLog(window.i18n.t('log.spectatorLeft', {
+                    count: message.content.spectator_count
+                }) || `A spectator left (${message.content.spectator_count} spectators)`, 'info', '&#128065;');
                 break;
             case 'LEFT':
             case 'PLAYER_LEFT':
@@ -2144,6 +2159,108 @@ class SkullKingGame {
 
     hideHistory() {
         document.getElementById('history-modal')?.classList.add('hidden');
+    }
+
+    // ============================================
+    //  Browse Active Games
+    // ============================================
+
+    async showBrowseGames() {
+        const modal = document.getElementById('browse-games-modal');
+        modal?.classList.remove('hidden');
+        await this.refreshActiveGames();
+    }
+
+    hideBrowseGames() {
+        document.getElementById('browse-games-modal')?.classList.add('hidden');
+    }
+
+    async refreshActiveGames() {
+        const list = document.getElementById('active-games-list');
+        if (!list) return;
+
+        list.innerHTML = '<p class="loading">' + (window.i18n?.t('browse.loading') || 'Loading...') + '</p>';
+
+        try {
+            const response = await fetch('/games/active');
+            const data = await response.json();
+
+            if (data.games && data.games.length > 0) {
+                list.innerHTML = data.games.map(game => this.renderActiveGameItem(game)).join('');
+
+                // Add click handlers to spectate buttons
+                list.querySelectorAll('.spectate-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const gameId = btn.dataset.gameId;
+                        this.hideBrowseGames();
+                        this.spectateGameById(gameId);
+                    });
+                });
+            } else {
+                list.innerHTML = '<p class="empty">' + (window.i18n?.t('browse.noGames') || 'No active games right now') + '</p>';
+            }
+        } catch (error) {
+            console.error('Failed to load active games:', error);
+            list.innerHTML = '<p class="empty">' + (window.i18n?.t('browse.error') || 'Failed to load games') + '</p>';
+        }
+    }
+
+    renderActiveGameItem(game) {
+        const stateLabel = this.getGameStateLabel(game.state);
+        const playerInfo = game.player_names.join(', ') + (game.bot_count > 0 ? ` + ${game.bot_count} bots` : '');
+        const spectatorInfo = game.spectator_count > 0 ? `&#128065; ${game.spectator_count}` : '';
+
+        return `
+            <div class="active-game-item">
+                <div class="game-item-info">
+                    <div class="game-item-players">
+                        <span class="player-count">${game.player_count} players</span>
+                        <span class="player-names">${playerInfo}</span>
+                    </div>
+                    <div class="game-item-status">
+                        <span class="game-state ${game.state.toLowerCase()}">${stateLabel}</span>
+                        ${game.current_round > 0 ? `<span class="round-info">Round ${game.current_round}/10</span>` : ''}
+                        ${spectatorInfo ? `<span class="spectator-info">${spectatorInfo}</span>` : ''}
+                    </div>
+                </div>
+                <button class="btn btn-ghost spectate-btn" data-game-id="${game.game_id}">
+                    <span>&#128065;</span> Watch
+                </button>
+            </div>
+        `;
+    }
+
+    getGameStateLabel(state) {
+        const labels = {
+            'PENDING': window.i18n?.t('browse.statePending') || 'In Lobby',
+            'BIDDING': window.i18n?.t('browse.stateBidding') || 'Bidding',
+            'PICKING': window.i18n?.t('browse.statePlaying') || 'Playing'
+        };
+        return labels[state] || state;
+    }
+
+    spectateGameById(gameId) {
+        this.username = 'Spectator';
+        this.gameId = gameId;
+        this.playerId = this.generatePlayerId();
+        this.isHost = false;
+        this.isSpectator = true;
+
+        this.connectWebSocket();
+    }
+
+    updateSpectatorCount(count) {
+        const countElement = document.getElementById('spectator-count');
+        const valueElement = document.getElementById('spectator-count-value');
+
+        if (countElement && valueElement) {
+            valueElement.textContent = count;
+            if (count > 0) {
+                countElement.classList.remove('hidden');
+            } else {
+                countElement.classList.add('hidden');
+            }
+        }
     }
 
     generatePlayerId() {

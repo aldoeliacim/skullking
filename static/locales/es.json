@@ -12,7 +12,8 @@
     "gameCode": "Codigo de Partida",
     "enterGameId": "Ingresa el codigo...",
     "joinGame": "Unirse",
-    "spectateGame": "Observar",
+    "spectateGame": "Ver Partida",
+    "browseGames": "Buscar Partidas Activas",
     "viewHistory": "Historial",
     "errorEnterName": "Por favor ingresa tu nombre",
     "errorEnterGameId": "Por favor ingresa un codigo",
@@ -21,7 +22,20 @@
   },
   "history": {
     "title": "Historial de Partidas",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "noGames": "No hay partidas completadas aun",
+    "error": "Error al cargar historial"
+  },
+  "browse": {
+    "title": "Partidas Activas",
+    "loading": "Cargando...",
+    "noGames": "No hay partidas activas ahora",
+    "error": "Error al cargar partidas",
+    "refresh": "Actualizar",
+    "watch": "Ver",
+    "statePending": "En Sala",
+    "stateBidding": "Apostando",
+    "statePlaying": "Jugando"
   },
   "lobby": {
     "title": "Sala de Espera",
@@ -101,6 +115,8 @@
   "log": {
     "playerJoined": "{username} se unio a la partida",
     "playerLeft": "{username} abandono la partida",
+    "spectatorJoined": "{username} esta observando ({count} espectadores)",
+    "spectatorLeft": "Un espectador se fue ({count} espectadores)",
     "gameStarted": "Partida iniciada con {count} jugadores",
     "cardsDealt": "Ronda {round} - Cartas repartidas",
     "playerBid": "{player} aposto {bid}",

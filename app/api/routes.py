@@ -242,6 +242,38 @@ async def get_cards() -> CardListResponse:
     return CardListResponse(cards=cards_list)
 
 
+@router.get("/games/active")
+async def get_active_games() -> dict[str, Any]:
+    """Get list of active games that can be spectated.
+
+    Returns:
+        List of active games with player counts and states
+
+    """
+    active_games = []
+
+    for game_id, game in websocket_manager.games.items():
+        # Only include games that are in progress or have players
+        if game.state != GameState.ENDED and len(game.players) > 0:
+            active_games.append(
+                {
+                    "game_id": game_id,
+                    "slug": game.slug,
+                    "state": game.state.value,
+                    "player_count": len(game.players),
+                    "player_names": [p.username for p in game.players if not p.is_bot][:3],
+                    "bot_count": sum(1 for p in game.players if p.is_bot),
+                    "current_round": game.current_round_number,
+                    "spectator_count": websocket_manager.get_spectator_count(game_id),
+                }
+            )
+
+    # Sort by player count descending, then by state (BIDDING/PICKING first)
+    active_games.sort(key=lambda g: (g["player_count"], g["state"] != "PENDING"), reverse=True)
+
+    return {"games": active_games, "count": len(active_games)}
+
+
 @router.get("/games/{game_id}")
 async def get_game(game_id: str) -> dict[str, Any]:
     """Get game state.

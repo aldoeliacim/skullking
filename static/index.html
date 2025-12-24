@@ -59,6 +59,10 @@
                         <span class="btn-icon">&#128065;</span>
                         <span data-i18n="login.spectateGame">Watch Game</span>
                     </button>
+                    <button id="browse-games-btn" class="btn btn-ghost btn-browse">
+                        <span class="btn-icon">&#127760;</span>
+                        <span data-i18n="login.browseGames">Browse Active Games</span>
+                    </button>
                 </div>
                 <div id="login-error" class="error-message"></div>
                 <button id="history-btn" class="btn btn-ghost history-btn">
@@ -77,6 +81,24 @@
                 </div>
                 <div id="history-list" class="history-list">
                     <p class="loading" data-i18n="history.loading">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Browse Active Games Modal -->
+        <div id="browse-games-modal" class="modal hidden">
+            <div class="modal-content browse-games-content">
+                <div class="modal-header">
+                    <h3 data-i18n="browse.title">Active Games</h3>
+                    <button id="close-browse-btn" class="btn-close">&times;</button>
+                </div>
+                <div id="active-games-list" class="active-games-list">
+                    <p class="loading" data-i18n="browse.loading">Loading...</p>
+                </div>
+                <div class="browse-footer">
+                    <button id="refresh-games-btn" class="btn btn-ghost">
+                        <span>&#128260;</span> <span data-i18n="browse.refresh">Refresh</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -171,6 +193,10 @@
                             <strong><span id="current-round">1</span>/10</strong>
                         </div>
                         <div class="game-phase" id="game-status-text" data-i18n="game.waiting">Waiting...</div>
+                        <div id="spectator-count" class="spectator-count hidden">
+                            <span class="spectator-icon">&#128065;</span>
+                            <span id="spectator-count-value">0</span>
+                        </div>
                     </div>
                     <div class="topbar-right">
                         <button id="sound-toggle-game" class="topbar-btn" title="Toggle sound">
