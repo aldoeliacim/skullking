@@ -161,6 +161,13 @@ class SkullKingGame {
         // Initialize sounds on first user interaction
         document.addEventListener('click', () => this.initializeSounds(), { once: true });
 
+        // Game history modal
+        document.getElementById('history-btn')?.addEventListener('click', () => this.showHistory());
+        document.getElementById('close-history-btn')?.addEventListener('click', () => this.hideHistory());
+        document.getElementById('history-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'history-modal') this.hideHistory();
+        });
+
         // Game log toggle
         document.getElementById('log-toggle')?.addEventListener('click', () => {
             document.getElementById('game-log')?.classList.toggle('collapsed');
@@ -1968,6 +1975,64 @@ class SkullKingGame {
         this.gameState = null;
         this.isHost = false;
         this.switchScreen('login');
+    }
+
+    // ============================================
+    //  Game History
+    // ============================================
+
+    async showHistory() {
+        const modal = document.getElementById('history-modal');
+        const list = document.getElementById('history-list');
+
+        modal.classList.remove('hidden');
+        list.innerHTML = '<p class="loading">' + (window.i18n?.t('history.loading') || 'Loading...') + '</p>';
+
+        try {
+            const response = await fetch('/api/games/history?limit=10');
+            const data = await response.json();
+
+            if (data.games && data.games.length > 0) {
+                list.innerHTML = data.games.map(game => this.renderHistoryItem(game)).join('');
+            } else {
+                list.innerHTML = '<p class="empty">' + (window.i18n?.t('history.noGames') || 'No completed games yet') + '</p>';
+            }
+        } catch (error) {
+            console.error('Failed to load game history:', error);
+            list.innerHTML = '<p class="empty">' + (window.i18n?.t('history.error') || 'Failed to load history') + '</p>';
+        }
+    }
+
+    renderHistoryItem(game) {
+        const date = new Date(game.created_at);
+        const duration = this.formatDuration(game.duration_seconds);
+        const playerCount = game.players?.length || 0;
+
+        return `
+            <div class="history-item" data-game-id="${game.game_id}">
+                <div class="history-item-icon">&#127942;</div>
+                <div class="history-item-info">
+                    <div class="history-item-title">${game.winner_username} won!</div>
+                    <div class="history-item-meta">${playerCount} players - ${game.total_rounds} rounds - ${duration}</div>
+                </div>
+                <div class="history-item-score">
+                    <div class="history-item-winner">${game.players?.[0]?.score || 0} pts</div>
+                    <div class="history-item-date">${date.toLocaleDateString()}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    formatDuration(seconds) {
+        if (!seconds) return '0m';
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        if (mins === 0) return `${secs}s`;
+        return `${mins}m ${secs}s`;
+    }
+
+    hideHistory() {
+        document.getElementById('history-modal')?.classList.add('hidden');
     }
 
     generatePlayerId() {

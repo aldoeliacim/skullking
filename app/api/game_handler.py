@@ -15,6 +15,7 @@ from app.models.game import Game
 from app.models.pirate_ability import AbilityType, PendingAbility, get_card_ability, get_pirate_type
 from app.models.player import Player
 from app.models.trick import TigressChoice, Trick
+from app.services.event_recorder import event_recorder
 
 if TYPE_CHECKING:
     from app.api.websocket import ConnectionManager
@@ -100,6 +101,9 @@ class GameHandler:
         # Start the game
         game.state = GameState.DEALING
 
+        # Record game start event
+        event_recorder.start_game(game)
+
         # Broadcast game started
         await self.manager.broadcast_to_game(
             ServerMessage(
@@ -159,6 +163,9 @@ class GameHandler:
         player.bid = bid_amount
         if current_round:
             current_round.bids[player_id] = bid_amount
+
+        # Record event for replay
+        event_recorder.record_bid(game, player_id, bid_amount)
 
         logger.info("Player %s bid %d in game %s", player_id, bid_amount, game.id)
 
@@ -249,6 +256,11 @@ class GameHandler:
             game.id,
         )
 
+        # Record event for replay
+        event_recorder.record_card_played(
+            game, player_id, card_id.value, tigress_choice.value if tigress_choice else None
+        )
+
         # Broadcast pick to all players
         pick_content: dict[str, Any] = {"player_id": player_id, "card_id": card_id.value}
         if tigress_choice:
@@ -276,6 +288,9 @@ class GameHandler:
         """Start a new round in the game."""
         current_round = game.start_new_round()
         game.deal_cards()
+
+        # Record round start with dealt cards for replay
+        event_recorder.record_round_start(game)
 
         logger.info("Starting round %d in game %s", current_round.number, game.id)
 
@@ -414,6 +429,12 @@ class GameHandler:
             winner_player_id,
             bonus_points,
         )
+
+        # Record trick won event for replay
+        if winner_player_id and winner_card_id:
+            event_recorder.record_trick_won(
+                game, winner_player_id, winner_card_id.value, bonus_points
+            )
 
         # Update player's tricks won
         if winner_player_id:
@@ -688,6 +709,9 @@ class GameHandler:
                 }
             )
 
+        # Record scores for replay
+        event_recorder.record_scores(game, scores)
+
         # Broadcast scores
         await self.manager.broadcast_to_game(
             ServerMessage(
@@ -711,6 +735,9 @@ class GameHandler:
         """End the game and announce winner."""
         game.state = GameState.ENDED
         leaderboard = game.get_leaderboard()
+
+        # Record game end and create history
+        event_recorder.end_game(game)
 
         logger.info("Game %s ended. Winner: %s", game.id, leaderboard[0]["player_id"])
 

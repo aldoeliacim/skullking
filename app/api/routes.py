@@ -17,6 +17,7 @@ from app.models.card import get_all_cards
 from app.models.enums import GameState
 from app.models.game import Game
 from app.models.player import Player
+from app.services.event_recorder import event_recorder
 
 router = APIRouter()
 
@@ -186,3 +187,45 @@ async def get_game(game_id: str) -> dict[str, Any]:
             for p in game.players
         ],
     }
+
+
+# ============================================
+#  Game History & Replay Endpoints
+# ============================================
+
+
+@router.get("/games/history")
+async def get_game_history_list(limit: int = Query(default=10, le=50)) -> dict[str, Any]:
+    """
+    Get list of recently completed games.
+
+    Args:
+        limit: Maximum number of games to return (max 50)
+
+    Returns:
+        List of game summaries
+    """
+    histories = event_recorder.get_recent_histories(limit)
+    return {"games": histories, "count": len(histories)}
+
+
+@router.get("/games/{game_id}/replay")
+async def get_game_replay(game_id: str) -> dict[str, Any]:
+    """
+    Get full replay data for a completed game.
+
+    Args:
+        game_id: ID of the completed game
+
+    Returns:
+        Complete game history with all events for replay
+    """
+    history = event_recorder.get_history(game_id)
+
+    if not history:
+        raise HTTPException(
+            status_code=404,
+            detail="Game history not found. Game may still be in progress or was not recorded.",
+        )
+
+    return history.to_dict()

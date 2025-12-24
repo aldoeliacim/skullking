@@ -57,6 +57,23 @@
                     </button>
                 </div>
                 <div id="login-error" class="error-message"></div>
+                <button id="history-btn" class="btn btn-ghost history-btn">
+                    <span class="btn-icon">&#128214;</span>
+                    <span data-i18n="login.viewHistory">Game History</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Game History Modal -->
+        <div id="history-modal" class="modal hidden">
+            <div class="modal-content history-content">
+                <div class="modal-header">
+                    <h3 data-i18n="history.title">Recent Games</h3>
+                    <button id="close-history-btn" class="btn-close">&times;</button>
+                </div>
+                <div id="history-list" class="history-list">
+                    <p class="loading" data-i18n="history.loading">Loading...</p>
+                </div>
             </div>
         </div>
 
