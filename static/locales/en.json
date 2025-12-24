@@ -172,5 +172,8 @@
   },
   "rules": {
     "advancedTitle": "Advanced Rules"
+  },
+  "modal": {
+    "tapToDismiss": "Tap outside to close"
   }
 }

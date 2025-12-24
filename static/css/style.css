@@ -1832,6 +1832,31 @@ input[type="text"]::placeholder {
     text-align: center;
 }
 
+/* Modal dismiss hint */
+.modal-dismiss-hint {
+    position: fixed;
+    bottom: var(--spacing-lg);
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    opacity: 0.7;
+    pointer-events: none;
+    animation: hintPulse 2s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
+
+@media (max-width: 480px) {
+    .modal-dismiss-hint {
+        bottom: var(--spacing-md);
+        font-size: 0.75rem;
+    }
+}
+
 .bidding-content h3 {
     font-family: 'Pirata One', cursive;
     font-size: 1.75rem;

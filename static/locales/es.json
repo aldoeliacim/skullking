@@ -172,5 +172,8 @@
   },
   "rules": {
     "advancedTitle": "Reglas Avanzadas"
+  },
+  "modal": {
+    "tapToDismiss": "Toca fuera para cerrar"
   }
 }
