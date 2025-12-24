@@ -13,7 +13,7 @@ from app.models.round import Round
 class Game:
     """Represents a complete Skull King game.
 
-    A game consists of up to 10 rounds, with 2-7 players.
+    A game consists of up to 10 rounds, with 2-8 players.
     In round N, each player receives N cards.
 
     Attributes:

@@ -153,5 +153,8 @@
     "message": "Ready to continue?",
     "button": "Continue",
     "waiting": "Waiting for other players..."
+  },
+  "rules": {
+    "advancedTitle": "Advanced Rules"
   }
 }

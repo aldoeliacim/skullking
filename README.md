@@ -62,7 +62,7 @@ uv run pytest tests/ -v
 
 1. **Skull King** beats Pirates (+30 bonus each)
 2. **Pirates** beat Mermaids (+20 bonus)
-3. **Mermaids** beat Skull King (+50 bonus)
+3. **Mermaids** beat Skull King (+40 bonus)
 4. **Special**: Mermaid wins if Skull King + Pirate + Mermaid all present
 5. **Jolly Roger** (black trump) beats standard suits
 6. **Kraken**: No one wins the trick
@@ -152,11 +152,14 @@ uv run mypy app/
 ## Environment Variables
 
 ```bash
-MONGODB_URL=mongodb://localhost:27017
-REDIS_URL=redis://localhost:6379
+MONGODB_HOST=localhost
+MONGODB_PORT=27017
+MONGODB_DATABASE=skullking
+BROKER_REDIS_HOST=localhost
+BROKER_REDIS_PORT=6379
 JWT_SECRET=your-secret-key
 ENABLE_BOTS=true
-FRONTEND_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:5173
 ```
 
 ## Resources

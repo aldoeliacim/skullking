@@ -30,6 +30,7 @@ logging.basicConfig(
 )
 # Set app loggers to INFO level
 logging.getLogger("app").setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -47,12 +48,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize services
     app.state.log_service = LogService()
     app.state.publisher_service = PublisherService()
+    await app.state.publisher_service.connect()
 
     # Initialize repository (optional - will use in-memory storage if connection fails)
     app.state.game_repository = GameRepository()
     try:
         await app.state.game_repository.connect()
-    except (ConnectionError, TimeoutError):
+    except (ConnectionError, TimeoutError, OSError):
+        logger.warning("MongoDB not available, running without persistence")
         app.state.game_repository = None
 
     # Start WebSocket manager background task

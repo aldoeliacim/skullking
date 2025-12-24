@@ -145,6 +145,21 @@ class I18n {
         if (titleKey) {
             document.title = this.t(titleKey);
         }
+
+        // Switch localized images
+        this.applyLocalizedImages();
+    }
+
+    /**
+     * Switch images based on current locale (data-img-en, data-img-es)
+     */
+    applyLocalizedImages() {
+        document.querySelectorAll('[data-img-en][data-img-es]').forEach(img => {
+            const src = img.getAttribute(`data-img-${this.currentLocale}`);
+            if (src && img.src !== src) {
+                img.src = src;
+            }
+        });
     }
 
     /**

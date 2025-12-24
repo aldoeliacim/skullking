@@ -21,19 +21,22 @@ class PublisherService:
     def __init__(self) -> None:
         """Initialize publisher service."""
         self.redis_client: redis.Redis | None = None
-        self._connect()
 
-    def _connect(self) -> None:
-        """Connect to Redis."""
+    async def connect(self) -> None:
+        """Connect to Redis and verify connection."""
         try:
             self.redis_client = redis.from_url(
                 settings.redis_url,
                 encoding="utf-8",
                 decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
             )
+            # Actually verify the connection works
+            await self.redis_client.ping()
             logger.info("Connected to Redis")
-        except RedisError:
-            logger.exception("Failed to connect to Redis")
+        except (RedisError, TimeoutError, OSError):
+            logger.warning("Redis not available, running without pub/sub")
             self.redis_client = None
 
     async def publish(self, channel: str, message: dict[str, Any]) -> bool:

@@ -25,7 +25,10 @@ class GameRepository:
     async def connect(self) -> None:
         """Connect to MongoDB."""
         try:
-            self.client = AsyncIOMotorClient(settings.mongodb_uri)
+            self.client = AsyncIOMotorClient(
+                settings.mongodb_uri,
+                serverSelectionTimeoutMS=2000,  # 2 second timeout
+            )
             self.db = self.client[settings.mongodb_database]
 
             # Verify connection
@@ -33,7 +36,7 @@ class GameRepository:
             logger.info("Connected to MongoDB: %s", settings.mongodb_database)
 
         except PyMongoError:
-            logger.exception("Failed to connect to MongoDB")
+            logger.warning("MongoDB not available")
             raise
 
     async def disconnect(self) -> None:

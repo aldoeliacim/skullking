@@ -191,6 +191,26 @@ class SkullKingGame {
             }
         });
 
+        // Advanced rules image zoom toggle
+        const advancedRulesImg = document.getElementById('advanced-rules-img');
+        if (advancedRulesImg) {
+            advancedRulesImg.addEventListener('click', () => {
+                if (advancedRulesImg.classList.contains('zoomed')) {
+                    advancedRulesImg.classList.remove('zoomed');
+                    document.querySelector('.advanced-rules-overlay')?.remove();
+                } else {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'advanced-rules-overlay';
+                    overlay.addEventListener('click', () => {
+                        advancedRulesImg.classList.remove('zoomed');
+                        overlay.remove();
+                    });
+                    document.body.appendChild(overlay);
+                    advancedRulesImg.classList.add('zoomed');
+                }
+            });
+        }
+
         // Scoreboard toggle (legacy panel)
         document.getElementById('scoreboard-toggle')?.addEventListener('click', () => {
             document.getElementById('scoreboard-panel')?.classList.toggle('hidden');

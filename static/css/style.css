@@ -2706,6 +2706,48 @@ input[type="text"]::placeholder {
     color: var(--accent-green);
 }
 
+/* Advanced Rules Image */
+.advanced-rules-container {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--spacing-sm);
+}
+
+.advanced-rules-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    cursor: zoom-in;
+    transition: transform 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.advanced-rules-img:hover {
+    transform: scale(1.02);
+}
+
+.advanced-rules-img.zoomed {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 95vw;
+    max-height: 95vh;
+    z-index: 1001;
+    cursor: zoom-out;
+    border-radius: var(--radius-lg);
+}
+
+.advanced-rules-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+}
+
 /* ============================================
    ENHANCED GAME LOG
    ============================================ */

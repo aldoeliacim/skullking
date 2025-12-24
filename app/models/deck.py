@@ -8,7 +8,7 @@ from app.models.card import CardId, get_all_cards
 class Deck:
     """Represents a deck of Skull King cards.
 
-    The deck contains 63 cards total:
+    The deck contains 74 cards total:
     - 1 Skull King
     - 1 White Whale, 1 Kraken
     - 2 Mermaids
@@ -16,6 +16,8 @@ class Deck:
     - 14 Jolly Rogers (trump suit)
     - 14 Parrots, 14 Maps, 14 Chests (standard suits)
     - 5 Escapes
+    - 1 Tigress (Scary Mary)
+    - 2 Loot cards
     """
 
     def __init__(self) -> None:
@@ -23,7 +25,7 @@ class Deck:
         self.cards: list[CardId] = []
 
     def fill(self) -> None:
-        """Fill the deck with all 63 cards."""
+        """Fill the deck with all 74 cards."""
         all_cards = get_all_cards()
         self.cards = list(all_cards.keys())
 
