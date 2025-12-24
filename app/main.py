@@ -103,7 +103,7 @@ if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
-@app.get("/")
+@app.get("/", response_model=None)
 async def root() -> FileResponse | dict[str, str]:
     """Serve the main game UI or API info."""
     static_path = static_dir / "index.html"
