@@ -99,7 +99,7 @@ def quick_train_and_evaluate(
     avg_reward = total_reward / eval_games
     win_rate = wins / eval_games
 
-    print(f"  Result: Avg reward={avg_reward:.2f}, Win rate={100*win_rate:.0f}%")
+    print(f"  Result: Avg reward={avg_reward:.2f}, Win rate={100 * win_rate:.0f}%")
 
     return avg_reward
 

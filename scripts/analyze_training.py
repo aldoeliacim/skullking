@@ -36,9 +36,9 @@ def evaluate_model_comprehensive(
     - Average scores and rankings
     - Strategic play metrics
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"COMPREHENSIVE EVALUATION: {model_path}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     model = PPO.load(model_path)
     results = {}
@@ -107,7 +107,7 @@ def evaluate_model_comprehensive(
 
                 if game_num < 5:  # Print first 5 games
                     print(
-                        f"  Game {game_num+1:3d}: Score={agent_score:4d} | "
+                        f"  Game {game_num + 1:3d}: Score={agent_score:4d} | "
                         f"Opp={opponent_scores} | Rank={ranking}/4"
                     )
 
@@ -146,8 +146,8 @@ def evaluate_model_comprehensive(
 
         # Print summary
         print(f"\n  Summary ({n_games} games):")
-        print(f"    Win rate: {100*wins/n_games:.1f}%")
-        print(f"    Top-2 rate: {100*top2/n_games:.1f}%")
+        print(f"    Win rate: {100 * wins / n_games:.1f}%")
+        print(f"    Top-2 rate: {100 * top2 / n_games:.1f}%")
         print(f"    Avg score: {np.mean(scores):.1f} ± {np.std(scores):.1f}")
         print(f"    Avg ranking: {np.mean(rankings):.2f}")
         print(f"    Avg reward: {np.mean(rewards):.2f}")
@@ -196,8 +196,8 @@ def compare_models(model_paths: list[str], n_games: int = 50):
 
             print(
                 f"{model_name:<30} "
-                f"{100*stats['win_rate']:<10.1f} "
-                f"{100*stats['top2_rate']:<10.1f} "
+                f"{100 * stats['win_rate']:<10.1f} "
+                f"{100 * stats['top2_rate']:<10.1f} "
                 f"{stats['avg_ranking']:<12.2f} "
                 f"{perfect_pct:<10.1f}"
             )
@@ -218,9 +218,9 @@ def analyze_checkpoints(checkpoint_dir: str):
 
     Plots win rate and bidding accuracy as training progresses.
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"CHECKPOINT ANALYSIS: {checkpoint_dir}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     # Find all checkpoint files
     checkpoint_files = sorted(Path(checkpoint_dir).glob("*.zip"))
@@ -294,7 +294,7 @@ def analyze_checkpoints(checkpoint_dir: str):
             }
         )
 
-        print(f"  Win rate: {100*win_rate:.0f}%, Avg bid error: {avg_bid_error:.2f}")
+        print(f"  Win rate: {100 * win_rate:.0f}%, Avg bid error: {avg_bid_error:.2f}")
 
     # Print progression summary
     print("\n" + "=" * 70)
@@ -309,15 +309,15 @@ def analyze_checkpoints(checkpoint_dir: str):
             prev_win = progression[i - 1]["win_rate"]
             delta = data["win_rate"] - prev_win
             if delta > 0:
-                improvement = f"+{100*delta:.1f}%"
+                improvement = f"+{100 * delta:.1f}%"
             elif delta < 0:
-                improvement = f"{100*delta:.1f}%"
+                improvement = f"{100 * delta:.1f}%"
             else:
                 improvement = "="
 
         print(
             f"{data['steps']:<15,} "
-            f"{100*data['win_rate']:<15.1f} "
+            f"{100 * data['win_rate']:<15.1f} "
             f"{data['avg_bid_error']:<15.2f} "
             f"{improvement:<15}"
         )

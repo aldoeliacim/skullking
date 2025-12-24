@@ -190,7 +190,7 @@ def evaluate_agent(
 
         if (episode + 1) % 10 == 0:
             print(
-                f"Episode {episode + 1}/{n_episodes}: Avg Reward = {total_reward/(episode+1):.2f}, Win Rate = {wins/(episode+1)*100:.1f}%"
+                f"Episode {episode + 1}/{n_episodes}: Avg Reward = {total_reward / (episode + 1):.2f}, Win Rate = {wins / (episode + 1) * 100:.1f}%"
             )
 
     env.close()
@@ -201,8 +201,8 @@ def evaluate_agent(
     print("\n" + "=" * 60)
     print("Evaluation Results")
     print("=" * 60)
-    print(f"Average reward: {total_reward/n_episodes:.2f}")
-    print(f"Win rate: {wins/n_episodes*100:.1f}%")
+    print(f"Average reward: {total_reward / n_episodes:.2f}")
+    print(f"Win rate: {wins / n_episodes * 100:.1f}%")
     print(f"Average score: {np.mean(scores):.2f} ± {np.std(scores):.2f}")
     print(f"Best score: {max(scores)}")
     print(f"Worst score: {min(scores)}")

@@ -94,11 +94,11 @@ class CurriculumCallback(BaseCallback):
             next_step, next_type, next_diff = self.curriculum_schedule[self.current_phase + 1]
 
             if self.num_timesteps >= next_step:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"📈 CURRICULUM ADVANCEMENT at {self.num_timesteps:,} steps")
                 print(f"Phase {self.current_phase + 2}/{len(self.curriculum_schedule)}")
                 print(f"Opponent: {next_type} ({next_diff})")
-                print(f"{'='*60}\n")
+                print(f"{'=' * 60}\n")
 
                 for env_idx in range(self.vec_env.num_envs):
                     self.vec_env.env_method("set_opponent", next_type, next_diff, indices=[env_idx])

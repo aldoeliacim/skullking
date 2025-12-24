@@ -44,9 +44,9 @@ class BotGameSimulator:
         """Set up the game with bot players."""
         self.game = Game(id="bot_game_001", slug="bot-game-001")
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Setting up Skull King game with {self.num_players} bots")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Create bot players
         for i in range(self.num_players):
@@ -55,7 +55,7 @@ class BotGameSimulator:
 
             player = Player(
                 id=player_id,
-                username=f"Bot{i+1}",
+                username=f"Bot{i + 1}",
                 game_id=self.game.id,
                 index=i,
                 is_bot=True,
@@ -69,15 +69,15 @@ class BotGameSimulator:
                 bot = RuleBasedBot(player_id)
 
             self.bots.append((player_id, bot))
-            print(f"  Player {i+1}: {player.username} ({bot})")
+            print(f"  Player {i + 1}: {player.username} ({bot})")
 
         print()
 
     def play_round(self, round_number: int) -> None:
         """Play a single round."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"ROUND {round_number}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Start round
         self.game.start_new_round()
@@ -213,9 +213,9 @@ class BotGameSimulator:
 
         elapsed_time = time.time() - start_time
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("GAME OVER")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Final standings
         leaderboard = self.game.get_leaderboard()
@@ -234,7 +234,7 @@ class BotGameSimulator:
             print(f"\n🎉 Winner: {winner.username} with {winner.score} points! 🎉")
 
         print(f"\nGame duration: {elapsed_time:.1f} seconds")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
 
 def main():

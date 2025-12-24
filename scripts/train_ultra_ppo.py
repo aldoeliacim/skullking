@@ -58,11 +58,11 @@ class CurriculumCallback(BaseCallback):
             next_step, next_type, next_diff = self.curriculum_schedule[self.current_phase + 1]
 
             if self.num_timesteps >= next_step:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"📈 CURRICULUM ADVANCEMENT at {self.num_timesteps:,} steps")
                 print(f"Phase {self.current_phase + 2}/{len(self.curriculum_schedule)}")
                 print(f"Opponent: {next_type} ({next_diff})")
-                print(f"{'='*60}\n")
+                print(f"{'=' * 60}\n")
 
                 # Update all sub-environments
                 for env_idx in range(self.vec_env.num_envs):
@@ -220,9 +220,9 @@ def evaluate_model(model_path: str, n_games: int = 50):
     """Evaluate trained model."""
     import numpy as np
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Evaluating model: {model_path}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     model = PPO.load(model_path)
 
@@ -266,14 +266,14 @@ def evaluate_model(model_path: str, n_games: int = 50):
         env.close()
 
         print(f"  Games played: {n_games}")
-        print(f"  Win rate: {100*wins/n_games:.1f}%")
+        print(f"  Win rate: {100 * wins / n_games:.1f}%")
         print(f"  Avg reward: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
         print(f"  Avg ranking: {np.mean(rankings):.2f}")
         print(
-            f"  Rank distribution: 1st={sum(r==1 for r in rankings)}, "
-            f"2nd={sum(r==2 for r in rankings)}, "
-            f"3rd={sum(r==3 for r in rankings)}, "
-            f"4th={sum(r==4 for r in rankings)}"
+            f"  Rank distribution: 1st={sum(r == 1 for r in rankings)}, "
+            f"2nd={sum(r == 2 for r in rankings)}, "
+            f"3rd={sum(r == 3 for r in rankings)}, "
+            f"4th={sum(r == 4 for r in rankings)}"
         )
 
 

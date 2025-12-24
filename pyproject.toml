@@ -1,3 +1,10 @@
+[project]
+name = "skullking"
+version = "2.0.0"
+description = "Modern Python implementation of Skull King card game with bot AI and Gymnasium environment"
+readme = "README.md"
+requires-python = ">=3.11"
+
 [tool.poetry]
 name = "skullking"
 version = "2.0.0"
@@ -98,11 +105,13 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["ARG", "PLR2004", "S101", "SIM102", "E501", "SLF001"]
-"scripts/**/*.py" = ["T20", "PTH103", "PTH118", "PTH110", "PTH120", "PTH123", "SIM102", "E501", "B007", "F841", "RUF015", "RUF005", "ICN001", "N806", "ARG001", "RUF013", "PLR1722"]
+"tests/**/*.py" = ["ARG", "PLR2004", "S101", "SIM102", "E501", "SLF001", "PLC0415"]  # Late imports in tests
+"scripts/**/*.py" = ["T20", "PTH103", "PTH118", "PTH110", "PTH120", "PTH123", "SIM102", "E501", "B007", "F841", "RUF015", "RUF005", "ICN001", "N806", "ARG001", "RUF013", "PLR1722", "PLC0415"]  # Late imports
 "app/bots/*.py" = ["ARG002", "PLC0415"]  # Interface methods, late imports for circular deps
 "app/gym_env/*.py" = ["ARG002", "PLC0415"]  # Interface methods, late imports
 "app/api/websocket.py" = ["TC001", "PLC0415"]  # Runtime imports, late import for circular deps
+"app/api/game_handler.py" = ["PLC0415"]  # Late imports to avoid circular deps
+"app/models/trick.py" = ["PLC0415"]  # Late import to avoid circular deps
 "run_game.py" = ["PTH118", "PTH120"]  # Simple runner script
 
 [tool.ruff.format]

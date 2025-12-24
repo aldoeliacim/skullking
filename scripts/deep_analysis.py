@@ -148,7 +148,7 @@ def main():
     timesteps, metrics = parse_training_log("training_v2.log")
 
     print(
-        f"\nTraining Progress: {timesteps[-1]:,} / 1,500,000 steps ({100*timesteps[-1]/1500000:.1f}%)"
+        f"\nTraining Progress: {timesteps[-1]:,} / 1,500,000 steps ({100 * timesteps[-1] / 1500000:.1f}%)"
     )
     print(f"Data points: {len(timesteps)}")
 
@@ -165,7 +165,7 @@ def main():
             print(f"  Start: {trend['start']:.3f}")
             print(f"  End: {trend['end']:.3f}")
             print(
-                f"  Change: {trend['end'] - trend['start']:+.3f} ({((trend['end']/trend['start']-1)*100) if trend['start'] != 0 else 0:+.1f}%)"
+                f"  Change: {trend['end'] - trend['start']:+.3f} ({((trend['end'] / trend['start'] - 1) * 100) if trend['start'] != 0 else 0:+.1f}%)"
             )
             print(
                 f"  Slope: {trend['slope']:.6f} per step ({'↗ improving' if trend['slope'] > 0 else '↘ declining'})"

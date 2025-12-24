@@ -107,7 +107,7 @@ def multiple_episodes_example():
     print("\nStatistics over 5 episodes:")
     print(f"  Average reward: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
     print(f"  Average score: {np.mean(scores):.2f} ± {np.std(scores):.2f}")
-    print(f"  Win rate: {wins}/5 ({wins/5*100:.0f}%)")
+    print(f"  Win rate: {wins}/5 ({wins / 5 * 100:.0f}%)")
 
 
 def main():

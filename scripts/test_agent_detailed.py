@@ -41,9 +41,9 @@ print("=" * 70)
 overall_stats = defaultdict(list)
 
 for opp_type, opp_diff, label in opponent_configs:
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Testing vs {label}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     env = SkullKingEnvMasked(
         num_opponents=3, opponent_bot_type=opp_type, opponent_difficulty=opp_diff
@@ -100,16 +100,16 @@ for opp_type, opp_diff, label in opponent_configs:
     print(f"  Average reward: {avg_reward:.1f} ± {std_reward:.1f}")
     print(f"  Average rank: {avg_rank:.2f} / 4")
     print(f"  Win rate: {win_rate:.1f}%")
-    print(f"  Perfect bid rate: {avg_bid_acc*100:.1f}%")
+    print(f"  Perfect bid rate: {avg_bid_acc * 100:.1f}%")
 
     overall_stats["rewards"].append(avg_reward)
     overall_stats["ranks"].append(avg_rank)
     overall_stats["win_rates"].append(win_rate)
     overall_stats["labels"].append(label)
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("OVERALL SUMMARY")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 for i, label in enumerate(overall_stats["labels"]):
     print(f"\n{label}:")
@@ -117,9 +117,9 @@ for i, label in enumerate(overall_stats["labels"]):
     print(f"  Avg Rank: {overall_stats['ranks'][i]:.2f}")
     print(f"  Win Rate: {overall_stats['win_rates'][i]:.1f}%")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("PERFORMANCE ANALYSIS")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 # Analyze performance
 all_win_rates = overall_stats["win_rates"]
@@ -129,7 +129,7 @@ baseline_random = 25.0  # Expected for random 1/4 players
 print(f"\nAverage win rate: {avg_win_rate:.1f}%")
 print(f"Baseline (random): {baseline_random:.1f}%")
 print(
-    f"Improvement: {avg_win_rate - baseline_random:+.1f}% ({(avg_win_rate/baseline_random - 1)*100:+.1f}%)"
+    f"Improvement: {avg_win_rate - baseline_random:+.1f}% ({(avg_win_rate / baseline_random - 1) * 100:+.1f}%)"
 )
 
 if avg_win_rate > 35:
@@ -139,4 +139,4 @@ elif avg_win_rate > 28:
 else:
     print("\n⚠ MODERATE PERFORMANCE - Room for improvement")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")

@@ -59,11 +59,11 @@ for episode in range(10):
     rewards.append(total_reward)
     lengths.append(steps)
 
-    print(f"Episode {episode+1:2d}: {status}  Reward: {total_reward:6.1f}  Steps: {steps:2d}")
+    print(f"Episode {episode + 1:2d}: {status}  Reward: {total_reward:6.1f}  Steps: {steps:2d}")
 
 print("\n" + "=" * 50)
 print(f"Average reward: {np.mean(rewards):.1f} ± {np.std(rewards):.1f}")
 print(f"Average length: {np.mean(lengths):.1f}")
-print(f"Win rate: {wins}/10 ({100*wins/10:.0f}%)")
+print(f"Win rate: {wins}/10 ({100 * wins / 10:.0f}%)")
 print("Expected vs random: ~25% (1/4 players)")
 print("=" * 50)
