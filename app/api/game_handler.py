@@ -52,7 +52,6 @@ class GameHandler:
         """Initialize handler with connection manager."""
         self.manager = manager
         self.bots: dict[str, dict[str, BaseBot]] = {}  # game_id -> player_id -> bot
-        self._bot_processing_locks: dict[str, asyncio.Lock] = {}  # game_id -> lock
 
     async def handle_command(
         self, game: Game, player_id: str, command: str, content: dict[str, Any]
@@ -964,34 +963,27 @@ class GameHandler:
             game.id,
         )
 
-    def _get_bot_lock(self, game_id: str) -> asyncio.Lock:
-        """Get or create the bot processing lock for a game."""
-        if game_id not in self._bot_processing_locks:
-            self._bot_processing_locks[game_id] = asyncio.Lock()
-        return self._bot_processing_locks[game_id]
-
     async def _process_bot_actions(self, game: Game) -> None:
-        """Process any pending bot actions (bids or card plays)."""
+        """
+        Process bot actions sequentially. This is called after any game state change
+        to check if a bot should take an action. No locks needed because this is
+        a sequential turn-based game - only one action happens at a time.
+        """
         if game.id not in self.bots:
             return
 
-        # Use lock to prevent concurrent bot processing
-        lock = self._get_bot_lock(game.id)
+        await asyncio.sleep(0.5)  # Small delay for natural feel
 
-        async with lock:
-            await asyncio.sleep(0.5)  # Small delay for natural feel
+        if game.state == GameState.BIDDING:
+            await self._process_single_bot_bid(game)
+        elif game.state == GameState.PICKING:
+            await self._process_single_bot_pick(game)
 
-            if game.state == GameState.BIDDING:
-                await self._process_bot_bids(game)
-            elif game.state == GameState.PICKING:
-                await self._process_bot_picks(game)
-
-    async def _process_bot_bids(self, game: Game) -> None:
-        """Process bids for all bots that haven't bid yet."""
+    async def _process_single_bot_bid(self, game: Game) -> None:
+        """Process ONE bot bid, then recursively check for more."""
         if game.id not in self.bots:
             return
 
-        # Guard: ensure we're still in bidding state
         if game.state != GameState.BIDDING:
             return
 
@@ -999,10 +991,10 @@ class GameHandler:
         if not current_round:
             return
 
-        # Guard: check if all bids already placed
         if current_round.all_bids_placed(len(game.players)):
             return
 
+        # Find first bot that hasn't bid
         for bot_id, bot in self.bots.get(game.id, {}).items():
             player = game.get_player(bot_id)
             if player and player.bid is None:
@@ -1011,13 +1003,12 @@ class GameHandler:
                 bid = bot.make_bid(game, current_round.number, hand)
                 bid = max(0, min(current_round.number, bid))
 
-                # Record bid
                 player.bid = bid
                 current_round.bids[bot_id] = bid
 
+                event_recorder.record_bid(game, bot_id, bid)
                 logger.info("Bot %s bids %d", bot_id, bid)
 
-                # Broadcast bid
                 await self.manager.broadcast_to_game(
                     ServerMessage(
                         command=Command.BADE,
@@ -1027,18 +1018,24 @@ class GameHandler:
                     game.id,
                 )
 
-                await asyncio.sleep(0.3)  # Delay between bot bids
+                # Check if all bids placed after this one
+                if current_round.all_bids_placed(len(game.players)):
+                    await self._end_bidding_phase(game)
+                    return
 
-        # Check if all players have bid
-        if current_round.all_bids_placed(len(game.players)):
-            await self._end_bidding_phase(game)
+                # Process next bot bid after a delay
+                await asyncio.sleep(0.3)
+                await self._process_single_bot_bid(game)
+                return  # Exit after processing chain
 
-    async def _process_bot_picks(self, game: Game) -> None:
-        """Process card pick for the current bot if it's their turn."""
+    async def _process_single_bot_pick(self, game: Game) -> None:
+        """
+        Process ONE bot card pick. Does NOT recursively continue - the game flow
+        handles continuation through _prompt_continue or _advance_to_next_player.
+        """
         if game.id not in self.bots:
             return
 
-        # Guard: ensure we're still in picking state
         if game.state != GameState.PICKING:
             return
 
@@ -1050,7 +1047,6 @@ class GameHandler:
         if not trick:
             return
 
-        # Guard: don't process if trick is already complete
         if trick.is_complete(len(game.players)):
             return
 
@@ -1058,7 +1054,6 @@ class GameHandler:
         if picking_player_id not in self.bots.get(game.id, {}):
             return  # Not a bot's turn
 
-        # Guard: check if this player already played in this trick
         if any(pc.player_id == picking_player_id for pc in trick.picked_cards):
             logger.warning("Bot %s already played in trick %d", picking_player_id, trick.number)
             return
@@ -1068,37 +1063,28 @@ class GameHandler:
         if not player or not player.hand:
             return
 
-        # Get valid cards
         cards_in_trick = [pc.card_id for pc in trick.picked_cards]
         valid_cards = trick.get_valid_cards(player.hand, cards_in_trick)
 
-        # Bot picks card
         card_id = bot.pick_card(game, player.hand, cards_in_trick, valid_cards)
         card = get_card(card_id)
 
-        # Handle Tigress choice for bots
         tigress_choice: TigressChoice | None = None
         if card.is_tigress():
-            # Bot decides: play as pirate if need to win tricks, escape otherwise
             tricks_won = current_round.get_tricks_won(picking_player_id)
             bid = player.bid if player.bid is not None else 0
             need_more_wins = tricks_won < bid
             tigress_choice = TigressChoice.PIRATE if need_more_wins else TigressChoice.ESCAPE
 
-        # Remove from hand
         if card_id in player.hand:
             player.hand.remove(card_id)
 
-        # Final guard: re-check trick isn't complete before adding
         if trick.is_complete(len(game.players)):
             logger.warning("Trick completed before bot %s could play", picking_player_id)
-            # Put card back in hand
             player.hand.append(card_id)
             return
 
-        # Add to trick
         if not trick.add_card(picking_player_id, card_id, tigress_choice):
-            # Card was rejected (player already picked) - shouldn't happen with guards above
             logger.error(
                 "Bot %s card rejected - already picked in trick %d", picking_player_id, trick.number
             )
@@ -1112,7 +1098,10 @@ class GameHandler:
             f" as {tigress_choice.value}" if tigress_choice else "",
         )
 
-        # Broadcast card played
+        event_recorder.record_card_played(
+            game, picking_player_id, card_id.value, tigress_choice.value if tigress_choice else None
+        )
+
         pick_content: dict[str, Any] = {"player_id": picking_player_id, "card_id": card_id.value}
         if tigress_choice:
             pick_content["tigress_choice"] = tigress_choice.value
@@ -1126,14 +1115,18 @@ class GameHandler:
             game.id,
         )
 
-        # Check if trick is complete
+        # Handle what comes next - NO recursive calls here
         if trick.is_complete(len(game.players)):
+            # Trick complete - _complete_trick will handle continuation
             await self._complete_trick(game, current_round, trick)
         else:
+            # Advance to next player
             await self._advance_to_next_player(game, current_round, trick)
-            # Continue processing if next player is also a bot
-            await asyncio.sleep(0.5)
-            await self._process_bot_picks(game)
+            # If next player is also a bot, process their turn
+            next_player_id = trick.picking_player_id
+            if next_player_id in self.bots.get(game.id, {}):
+                await asyncio.sleep(0.5)
+                await self._process_single_bot_pick(game)
 
     # Pirate ability resolution handlers
 
