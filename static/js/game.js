@@ -2115,7 +2115,7 @@ class SkullKingGame {
         list.innerHTML = '<p class="loading">' + (window.i18n?.t('history.loading') || 'Loading...') + '</p>';
 
         try {
-            const response = await fetch('/api/games/history?limit=10');
+            const response = await fetch('/games/history?limit=10');
             const data = await response.json();
 
             if (data.games && data.games.length > 0) {
