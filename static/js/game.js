@@ -11,6 +11,13 @@ class SkullKingGame {
         this.selectedCardId = null; // For tap-to-confirm on mobile
         this.isTouchDevice = this.detectTouchDevice();
 
+        // WebSocket reconnection state
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000; // Start with 1 second
+        this.reconnectTimer = null;
+        this.intentionalClose = false;
+
         this.initializeEventListeners();
         this.initializeI18n();
     }
@@ -309,10 +316,21 @@ class SkullKingGame {
         const idParam = this.isSpectator ? 'spectator_id' : 'player_id';
         const wsUrl = `${wsProtocol}//${window.location.host}/games/${endpoint}?game_id=${this.gameId}&${idParam}=${this.playerId}&username=${encodeURIComponent(this.username)}`;
 
+        // Clear any existing reconnect timer
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
             console.log('WebSocket connected');
+            // Reset reconnection state on successful connect
+            this.reconnectAttempts = 0;
+            this.reconnectDelay = 1000;
+            this.hideReconnecting();
+
             if (this.isSpectator) {
                 this.switchScreen('game');
                 document.body.classList.add('spectator-mode');
@@ -329,16 +347,53 @@ class SkullKingGame {
 
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
-            this.showError('login', window.i18n.t('login.errorConnection'));
         };
 
         this.ws.onclose = (event) => {
             console.log('WebSocket closed:', event.code, event.reason);
-            // Don't show error if game ended normally or we're on results screen
-            if (this.gameState && this.gameState.state !== 'ENDED' && !this.gameEnded) {
+
+            // Don't reconnect if intentionally closed or game ended
+            if (this.intentionalClose || this.gameEnded ||
+                (this.gameState && this.gameState.state === 'ENDED')) {
+                return;
+            }
+
+            // Attempt to reconnect
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
+                console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+                this.showReconnecting(this.reconnectAttempts, this.maxReconnectAttempts);
+
+                this.reconnectTimer = setTimeout(() => {
+                    this.connectWebSocket();
+                }, delay);
+            } else {
+                console.log('Max reconnection attempts reached');
+                this.hideReconnecting();
                 this.showError('lobby', window.i18n.t('lobby.errorConnectionLost'));
             }
         };
+    }
+
+    showReconnecting(attempt, max) {
+        let indicator = document.getElementById('reconnect-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'reconnect-indicator';
+            indicator.className = 'reconnect-indicator';
+            document.body.appendChild(indicator);
+        }
+        indicator.innerHTML = `&#128268; Reconnecting... (${attempt}/${max})`;
+        indicator.classList.add('visible');
+    }
+
+    hideReconnecting() {
+        const indicator = document.getElementById('reconnect-indicator');
+        if (indicator) {
+            indicator.classList.remove('visible');
+        }
     }
 
     handleMessage(message) {
@@ -1825,6 +1880,7 @@ class SkullKingGame {
     }
 
     leaveLobby() {
+        this.intentionalClose = true;
         if (this.ws) {
             this.ws.close();
         }
@@ -2013,6 +2069,11 @@ class SkullKingGame {
     }
 
     returnToLogin() {
+        this.intentionalClose = true;
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
         if (this.ws) {
             this.ws.close();
         }
@@ -2021,6 +2082,9 @@ class SkullKingGame {
         this.playerId = null;
         this.gameState = null;
         this.isHost = false;
+        this.reconnectAttempts = 0;
+        this.intentionalClose = false; // Reset for next game
+        this.hideReconnecting();
         this.switchScreen('login');
     }
 
