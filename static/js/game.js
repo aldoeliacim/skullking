@@ -95,6 +95,17 @@ class SkullKingGame {
         }
     }
 
+    playDealSounds(cardCount) {
+        if (!window.soundManager) return;
+
+        // Play staggered card deal sounds
+        for (let i = 0; i < Math.min(cardCount, 10); i++) {
+            setTimeout(() => {
+                window.soundManager.cardDeal();
+            }, i * 60);
+        }
+    }
+
     updateLangFlag() {
         const locale = window.i18n.getLocale().toUpperCase();
         // Update both login screen and game screen language flags
@@ -485,6 +496,7 @@ class SkullKingGame {
                 }
                 console.log('[DEAL] Updated gameState.hand:', this.gameState.hand);
                 this.updateGameScreen();
+                this.playDealSounds(message.content.cards.length);
                 this.addLog(window.i18n.t('log.cardsDealt', { round: message.content.round }), 'round', '&#127183;');
                 break;
             case 'START_BIDDING':
@@ -1412,8 +1424,11 @@ class SkullKingGame {
             winner.tricks_won = (winner.tricks_won || 0) + 1;
         }
 
-        // Play sound - different for player winning vs losing
-        if (data.winner_player_id === this.playerId) {
+        // Play special sounds for notable wins
+        // Mermaid captures Skull King (40 point bonus with mermaid card 4-5)
+        if (data.bonus_points >= 40 && data.winner_card_id >= 4 && data.winner_card_id <= 5) {
+            window.soundManager?.mermaidCapture();
+        } else if (data.winner_player_id === this.playerId) {
             this.playSound('trickWon');
         } else {
             this.playSound('trickLost');
