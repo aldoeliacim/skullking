@@ -2,6 +2,8 @@
 
 import asyncio
 import contextlib
+import logging
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,6 +20,16 @@ from app.config import settings
 from app.repositories.game_repository import GameRepository
 from app.services.log_service import LogService
 from app.services.publisher_service import PublisherService
+
+# Configure logging for the app (must be after imports but before app usage)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+    stream=sys.stdout,
+)
+# Set app loggers to INFO level
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 @asynccontextmanager
