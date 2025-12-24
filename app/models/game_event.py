@@ -4,8 +4,13 @@ Captures all significant game events for later replay.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time (timezone-aware)."""
+    return datetime.now(UTC)
 
 
 class GameEventType(str, Enum):
@@ -41,7 +46,7 @@ class GameEvent:
 
     game_id: str
     event_type: GameEventType
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=_utc_now)
     round_number: int = 0
     trick_number: int | None = None
     player_id: str | None = None

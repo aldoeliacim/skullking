@@ -198,7 +198,18 @@ class TestMultiplayerInteractions:
 
     async def test_turn_order_enforcement(self, game_handler, mock_manager):
         """Test that players must pick in correct order."""
-        game = create_game_with_players(3)
+        # Create game with human players (not bots) for controlled test
+        game = Game(id="turn-order-test", slug="turn-order-test")
+        for i in range(3):
+            player = Player(
+                id=f"player-{i}",
+                username=f"Player {i}",
+                avatar_id=i,
+                index=i,
+                game_id=game.id,
+                is_bot=False,  # Human players - no auto-processing
+            )
+            game.add_player(player)
 
         await game_handler.handle_command(game, "player-0", "START_GAME", {})
 
@@ -206,15 +217,28 @@ class TestMultiplayerInteractions:
         for i in range(3):
             await game_handler.handle_command(game, f"player-{i}", "BID", {"bid": 0})
 
-        # Try to pick out of order (player 1 tries to pick when it's player 0's turn)
-        player1 = game.get_player("player-1")
-        card = player1.hand[0]
+        # Verify we're in picking phase
+        assert game.state == GameState.PICKING
+        current_round = game.get_current_round()
+        trick = current_round.get_current_trick()
+        assert trick is not None
+
+        # Get whose turn it actually is (starter is randomized in round 1)
+        current_player_id = trick.picking_player_id
+        current_player_index = int(current_player_id.split("-")[1])
+
+        # Find a player who is NOT the current player
+        wrong_player_index = (current_player_index + 1) % 3
+        wrong_player_id = f"player-{wrong_player_index}"
+        wrong_player = game.get_player(wrong_player_id)
+        card = wrong_player.hand[0]
 
         mock_manager.send_personal_message.reset_mock()
-        await game_handler.handle_command(game, "player-1", "PICK", {"card_id": card.value})
+        await game_handler.handle_command(game, wrong_player_id, "PICK", {"card_id": card.value})
 
         # Should receive error
         error_call = mock_manager.send_personal_message.call_args
+        assert error_call is not None, "Expected error message to be sent"
         assert error_call[0][0].command == Command.REPORT_ERROR
         assert "Not your turn" in error_call[0][0].content["error"]
 

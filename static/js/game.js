@@ -961,8 +961,9 @@ class SkullKingGame {
         return playable;
     }
 
-    // Pirate names for card IDs 6-10
-    pirateNames = ['bendt', 'harry', 'juanita', 'rascal', 'rosie'];
+    // Pirate names for card IDs 6-10 (matching backend PIRATE_IDENTITY order)
+    // PIRATE1=Rosie, PIRATE2=Bendt, PIRATE3=Roatan(rascal), PIRATE4=Jade(juanita), PIRATE5=Harry
+    pirateNames = ['rosie', 'bendt', 'rascal', 'juanita', 'harry'];
 
     // Convert numeric card ID to card object for display
     cardIdToCard(cardId) {

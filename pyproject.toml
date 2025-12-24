@@ -98,7 +98,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["ARG", "PLR2004", "S101", "SIM102", "E501"]
+"tests/**/*.py" = ["ARG", "PLR2004", "S101", "SIM102", "E501", "SLF001"]
 "scripts/**/*.py" = ["T20", "PTH103", "PTH118", "PTH110", "PTH120", "PTH123", "SIM102", "E501", "B007", "F841", "RUF015", "RUF005", "ICN001", "N806", "ARG001", "RUF013", "PLR1722"]
 "app/bots/*.py" = ["ARG002", "PLC0415"]  # Interface methods, late imports for circular deps
 "app/gym_env/*.py" = ["ARG002", "PLC0415"]  # Interface methods, late imports
@@ -125,3 +125,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=app --cov-report=html --cov-report=term"
+filterwarnings = [
+    "ignore::DeprecationWarning:httpx._client",
+    "ignore:Unknown config option:pytest.PytestConfigWarning",
+]
