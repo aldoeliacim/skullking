@@ -1339,45 +1339,16 @@ class SkullKingGame {
         });
 
         const winnerLabel = document.getElementById('trick-winner');
-        // Use winner_name from server if available, otherwise fall back to lookup
         const winnerName = data.winner_name || winner?.username || 'Unknown';
 
         winnerLabel.textContent = `${winnerName} ${window.i18n.t('game.wonTrick')}`;
         winnerLabel.classList.remove('hidden');
 
         this.addLog(window.i18n.t('log.trickWon', { winner: winnerName }));
-
-        // Update UI immediately to show new trick count
         this.updateGameScreen();
 
-        // Track which trick this animation is for
-        const trickNumberAtWin = this.gameState.current_trick;
-
-        // After a delay, animate collection then clear (only if still on same trick)
-        setTimeout(() => {
-            // Check if we're still on the same trick (START_PICKING may have already cleared)
-            if (this.gameState.current_trick !== trickNumberAtWin) {
-                console.log('[handleTrickWinner] Trick changed, skipping animation clear');
-                return;
-            }
-
-            // Add collection animation
-            const trickCardsContainer = document.getElementById('trick-cards');
-            const collectDirection = this.getCollectDirection(data.winner_player_id);
-            trickCardsContainer.classList.add('collecting', collectDirection);
-
-            // After animation completes, clear the cards (if still same trick)
-            setTimeout(() => {
-                if (this.gameState.current_trick !== trickNumberAtWin) {
-                    console.log('[handleTrickWinner] Trick changed during animation, skipping clear');
-                    return;
-                }
-                winnerLabel.classList.add('hidden');
-                trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
-                this.gameState.trick_cards = [];
-                this.updateGameScreen();
-            }, 600);
-        }, 2500); // Increased from 1400ms to give more time to see results
+        // NOTE: Trick cards are cleared by START_PICKING when next trick begins
+        // No setTimeout here - all state changes are server-driven
     }
 
     // Determine which direction cards should fly to based on winner position
@@ -1411,62 +1382,18 @@ class SkullKingGame {
     }
 
     handleTrickComplete(data) {
-        // Update tricks won for the winner
-        const winner = this.gameState?.players?.find(p => p.id === data.winner_player_id);
-        if (winner) {
-            winner.tricks_won = (winner.tricks_won || 0) + 1;
-        }
-
-        const winnerLabel = document.getElementById('trick-winner');
-        const winnerName = winner?.username || data.winner_name || 'Unknown';
-        winnerLabel.textContent = `${winnerName} ${window.i18n.t('game.wonTrick')}`;
-        winnerLabel.classList.remove('hidden');
-
-        this.addLog(window.i18n.t('log.trickWon', { winner: winnerName }));
-
-        // Update UI immediately
-        this.updateGameScreen();
-
-        // Track which trick this animation is for
-        const trickNumberAtWin = this.gameState.current_trick;
-
-        // After a delay, animate collection then clear (only if still on same trick)
-        setTimeout(() => {
-            // Check if we're still on the same trick (START_PICKING may have already cleared)
-            if (this.gameState.current_trick !== trickNumberAtWin) {
-                console.log('[handleTrickComplete] Trick changed, skipping animation clear');
-                return;
-            }
-
-            const trickCardsContainer = document.getElementById('trick-cards');
-            const collectDirection = this.getCollectDirection(data.winner_player_id);
-            trickCardsContainer.classList.add('collecting', collectDirection);
-
-            setTimeout(() => {
-                if (this.gameState.current_trick !== trickNumberAtWin) {
-                    console.log('[handleTrickComplete] Trick changed during animation, skipping clear');
-                    return;
-                }
-                winnerLabel.classList.add('hidden');
-                trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
-                this.gameState.trick_cards = [];
-                this.updateGameScreen();
-            }, 600);
-        }, 2500); // Increased from 1400ms to give more time to see results
+        // Delegate to handleTrickWinner - same logic
+        this.handleTrickWinner(data);
     }
 
     handleScoresAnnounced(data) {
         console.log('[handleScoresAnnounced] Round:', data.round, 'Scores:', data.scores);
-
-        // Track score changes for animation
-        const scoreChanges = {};
 
         // Update player scores
         if (this.gameState?.players && data.scores) {
             data.scores.forEach(scoreInfo => {
                 const player = this.gameState.players.find(p => p.id === scoreInfo.player_id);
                 if (player) {
-                    scoreChanges[player.id] = scoreInfo.score_delta;
                     player.score = scoreInfo.total_score;
                     player.tricks_won = 0; // Reset for next round
                     player.bid = null; // Reset bid
@@ -1474,33 +1401,11 @@ class SkullKingGame {
             });
         }
 
-        // Store score changes for animation
-        this.lastScoreChanges = scoreChanges;
-
-        console.log('[handleScoresAnnounced] Current hand after scores:', this.gameState?.hand);
         this.addLog(window.i18n.t('log.roundComplete', { round: data.round }));
         this.updateGameScreen();
 
-        // Show round summary overlay
+        // Show round summary overlay (dismissible by click)
         this.showRoundSummary(data.round, data.scores);
-
-        // Auto-expand scoreboard dropdown
-        const scoreboardBar = document.getElementById('scoreboard-bar');
-        const scoreboardDropdown = document.getElementById('scoreboard-dropdown');
-        if (scoreboardBar && scoreboardDropdown) {
-            scoreboardBar.classList.add('expanded');
-            scoreboardDropdown.classList.remove('hidden');
-        }
-
-        // Clear score changes and collapse scoreboard after delay
-        setTimeout(() => {
-            this.lastScoreChanges = null;
-            // Collapse scoreboard after viewing
-            setTimeout(() => {
-                if (scoreboardBar) scoreboardBar.classList.remove('expanded');
-                if (scoreboardDropdown) scoreboardDropdown.classList.add('hidden');
-            }, 2000);
-        }, 1000);
     }
 
     showRoundSummary(roundNumber, scores) {
@@ -1542,11 +1447,11 @@ class SkullKingGame {
 
         document.body.appendChild(overlay);
 
-        // Auto-remove after delay
-        setTimeout(() => {
+        // Click to dismiss (no auto-timeout - sequential state flow)
+        overlay.addEventListener('click', () => {
             overlay.classList.add('fade-out');
-            setTimeout(() => overlay.remove(), 500);
-        }, 3500);
+            setTimeout(() => overlay.remove(), 300);
+        });
     }
 
     handleRoundComplete(data) {
@@ -1881,8 +1786,9 @@ class SkullKingGame {
         const currentPlayers = this.gameState?.players?.length || 1;
         const botsToAdd = 4 - currentPlayers;
 
+        // Send all bot additions immediately (server handles sequentially)
         for (let i = 0; i < botsToAdd; i++) {
-            setTimeout(() => this.addBot(), i * 100);
+            this.addBot();
         }
     }
 
