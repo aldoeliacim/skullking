@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pymongo.errors import PyMongoError
 
 from app.api.routes import router
 from app.api.websocket import websocket_manager
@@ -54,7 +55,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.game_repository = GameRepository()
     try:
         await app.state.game_repository.connect()
-    except (ConnectionError, TimeoutError, OSError):
+    except (ConnectionError, TimeoutError, OSError, PyMongoError):
+        # Catch MongoDB connection errors (ServerSelectionTimeoutError, etc.)
         logger.warning("MongoDB not available, running without persistence")
         app.state.game_repository = None
 
