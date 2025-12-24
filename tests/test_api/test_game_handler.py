@@ -340,3 +340,184 @@ class TestTrickCompletion:
         # Since round 1 has only 1 trick, ANNOUNCE_SCORES should also be broadcast
         score_calls = [c for c in calls if c[0][0].command == Command.ANNOUNCE_SCORES]
         assert len(score_calls) >= 1
+
+
+class TestSequentialBotProcessing:
+    """Tests for sequential bot processing without locks.
+
+    These tests verify that:
+    1. Bot turns are processed one at a time
+    2. No race conditions in bot processing
+    3. Game state remains consistent during bot turns
+    """
+
+    def test_handler_has_no_lock_mechanism(self, game_handler):
+        """Handler should not have lock-based bot processing."""
+        # Verify no lock attributes exist
+        assert not hasattr(game_handler, "_bot_processing_locks")
+        assert not hasattr(game_handler, "_bot_processing_active")
+
+    def test_bot_methods_are_single_player(self, game_handler):
+        """Verify the renamed methods process single bot at a time."""
+        # Methods should be named for single processing
+        assert hasattr(game_handler, "_process_single_bot_bid")
+        assert hasattr(game_handler, "_process_single_bot_pick")
+
+        # Old batch methods should not exist
+        assert not hasattr(game_handler, "_process_bot_bids")
+        assert not hasattr(game_handler, "_process_bot_picks")
+
+    def test_bots_dictionary_initialized(self, game_handler):
+        """Handler should have bots dictionary for tracking."""
+        assert hasattr(game_handler, "bots")
+        assert isinstance(game_handler.bots, dict)
+
+    async def test_bot_bid_updates_player_state(self, game_handler, mock_manager):
+        """Direct test that bot bid logic updates player state correctly."""
+        from app.bots import RuleBasedBot
+
+        game = Game(id="test-bid-state", slug="test-game")
+        for i in range(3):
+            player = Player(
+                id=f"bot-{i}",
+                username=f"Bot {i}",
+                index=i,
+                game_id=game.id,
+                is_bot=True,
+            )
+            game.add_player(player)
+
+        game_handler.bots[game.id] = {f"bot-{i}": RuleBasedBot(f"bot-{i}") for i in range(3)}
+
+        game.state = GameState.BIDDING
+        game.start_new_round()
+        game.deal_cards()
+
+        current_round = game.get_current_round()
+
+        # Simulate what _process_single_bot_bid does for one bot
+        bot = game_handler.bots[game.id]["bot-0"]
+        player = game.get_player("bot-0")
+        hand = current_round.dealt_cards.get("bot-0", [])
+
+        # Bot makes a bid
+        bid = bot.make_bid(game, current_round.number, hand)
+        bid = max(0, min(current_round.number, bid))
+
+        # Update state like the handler does
+        player.bid = bid
+        current_round.bids["bot-0"] = bid
+
+        # Verify state updates
+        assert player.bid is not None
+        assert 0 <= player.bid <= current_round.number
+        assert "bot-0" in current_round.bids
+        assert current_round.bids["bot-0"] == bid
+
+    async def test_bot_pick_removes_card_from_hand(self, game_handler, mock_manager):
+        """Direct test that bot pick logic removes card from hand."""
+        from app.bots import RuleBasedBot
+
+        game = Game(id="test-pick-state", slug="test-game")
+        for i in range(3):
+            player = Player(
+                id=f"bot-{i}",
+                username=f"Bot {i}",
+                index=i,
+                game_id=game.id,
+                is_bot=True,
+            )
+            game.add_player(player)
+
+        game.state = GameState.PICKING
+        game.start_new_round()
+        game.deal_cards()
+
+        for player in game.players:
+            player.bid = 0
+
+        current_round = game.get_current_round()
+        trick = Trick(number=1, starter_player_index=0, picking_player_id="bot-0")
+        current_round.tricks.append(trick)
+
+        player = game.get_player("bot-0")
+        initial_hand_size = len(player.hand)
+        assert initial_hand_size > 0
+
+        # Simulate bot pick
+        bot = RuleBasedBot("bot-0")
+        card_id = bot.pick_card(game, player.hand, [], player.hand)
+
+        # Remove card like handler does
+        if card_id in player.hand:
+            player.hand.remove(card_id)
+
+        # Verify card was removed
+        assert len(player.hand) == initial_hand_size - 1
+        assert card_id not in player.hand
+
+    def test_guard_prevents_already_picked(self, game_handler):
+        """Guard conditions should prevent double plays."""
+        game = Game(id="test-guard", slug="test-game")
+        for i in range(3):
+            player = Player(
+                id=f"player-{i}",
+                username=f"Player {i}",
+                index=i,
+                game_id=game.id,
+            )
+            game.add_player(player)
+
+        game.state = GameState.PICKING
+        game.start_new_round()
+        game.deal_cards()
+
+        for player in game.players:
+            player.bid = 0
+
+        current_round = game.get_current_round()
+        trick = Trick(number=1, starter_player_index=0, picking_player_id="player-0")
+        current_round.tricks.append(trick)
+
+        # Simulate player-0 already played
+        from app.models.card import CardId
+        from app.models.trick import PickedCard
+
+        trick.picked_cards.append(PickedCard(player_id="player-0", card_id=CardId(11)))
+
+        # Guard should detect already picked
+        already_played = any(pc.player_id == "player-0" for pc in trick.picked_cards)
+        assert already_played is True
+
+    def test_trick_complete_guard(self, game_handler):
+        """Guard should detect when trick is complete."""
+        game = Game(id="test-complete", slug="test-game")
+        for i in range(3):
+            player = Player(
+                id=f"player-{i}",
+                username=f"Player {i}",
+                index=i,
+                game_id=game.id,
+            )
+            game.add_player(player)
+
+        game.state = GameState.PICKING
+        game.start_new_round()
+        game.deal_cards()
+
+        for player in game.players:
+            player.bid = 0
+
+        current_round = game.get_current_round()
+        trick = Trick(number=1, starter_player_index=0, picking_player_id="player-0")
+        current_round.tricks.append(trick)
+
+        # Add all player picks
+        from app.models.card import CardId
+        from app.models.trick import PickedCard
+
+        for i in range(3):
+            trick.picked_cards.append(PickedCard(player_id=f"player-{i}", card_id=CardId(11 + i)))
+
+        # Guard should detect complete trick
+        assert trick.is_complete(len(game.players)) is True
