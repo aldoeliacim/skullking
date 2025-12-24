@@ -457,7 +457,24 @@ class SkullKingGame {
                 this.gameState = this.gameState || {};
                 this.gameState.state = 'PICKING';
                 this.gameState.picking_player_id = message.content.picking_player_id;
-                this.gameState.current_trick = message.content.trick;
+
+                // Clear trick cards when starting a NEW trick (prevents race condition with animation timer)
+                const newTrickNumber = message.content.trick;
+                const oldTrickNumber = this.gameState.current_trick || 0;
+                if (newTrickNumber > oldTrickNumber) {
+                    console.log('[START_PICKING] New trick', newTrickNumber, '- clearing old trick cards');
+                    this.gameState.trick_cards = [];
+                    // Hide winner label if still visible
+                    const winnerLabel = document.getElementById('trick-winner');
+                    if (winnerLabel) winnerLabel.classList.add('hidden');
+                    // Remove any collection animations
+                    const trickCardsContainer = document.getElementById('trick-cards');
+                    if (trickCardsContainer) {
+                        trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
+                    }
+                }
+                this.gameState.current_trick = newTrickNumber;
+
                 console.log('[START_PICKING] Is my turn:', message.content.picking_player_id === this.playerId);
                 // Play your turn sound if it's our turn
                 if (message.content.picking_player_id === this.playerId) {
@@ -1333,15 +1350,28 @@ class SkullKingGame {
         // Update UI immediately to show new trick count
         this.updateGameScreen();
 
-        // After a delay, animate collection then clear
+        // Track which trick this animation is for
+        const trickNumberAtWin = this.gameState.current_trick;
+
+        // After a delay, animate collection then clear (only if still on same trick)
         setTimeout(() => {
+            // Check if we're still on the same trick (START_PICKING may have already cleared)
+            if (this.gameState.current_trick !== trickNumberAtWin) {
+                console.log('[handleTrickWinner] Trick changed, skipping animation clear');
+                return;
+            }
+
             // Add collection animation
             const trickCardsContainer = document.getElementById('trick-cards');
             const collectDirection = this.getCollectDirection(data.winner_player_id);
             trickCardsContainer.classList.add('collecting', collectDirection);
 
-            // After animation completes, clear the cards
+            // After animation completes, clear the cards (if still same trick)
             setTimeout(() => {
+                if (this.gameState.current_trick !== trickNumberAtWin) {
+                    console.log('[handleTrickWinner] Trick changed during animation, skipping clear');
+                    return;
+                }
                 winnerLabel.classList.add('hidden');
                 trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
                 this.gameState.trick_cards = [];
@@ -1397,13 +1427,26 @@ class SkullKingGame {
         // Update UI immediately
         this.updateGameScreen();
 
-        // After a delay, animate collection then clear
+        // Track which trick this animation is for
+        const trickNumberAtWin = this.gameState.current_trick;
+
+        // After a delay, animate collection then clear (only if still on same trick)
         setTimeout(() => {
+            // Check if we're still on the same trick (START_PICKING may have already cleared)
+            if (this.gameState.current_trick !== trickNumberAtWin) {
+                console.log('[handleTrickComplete] Trick changed, skipping animation clear');
+                return;
+            }
+
             const trickCardsContainer = document.getElementById('trick-cards');
             const collectDirection = this.getCollectDirection(data.winner_player_id);
             trickCardsContainer.classList.add('collecting', collectDirection);
 
             setTimeout(() => {
+                if (this.gameState.current_trick !== trickNumberAtWin) {
+                    console.log('[handleTrickComplete] Trick changed during animation, skipping clear');
+                    return;
+                }
                 winnerLabel.classList.add('hidden');
                 trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
                 this.gameState.trick_cards = [];
