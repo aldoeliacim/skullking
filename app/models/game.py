@@ -4,15 +4,14 @@ import random
 from dataclasses import dataclass, field
 
 from app.models.deck import Deck
-from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, GameState
+from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, MIN_PLAYERS, GameState
 from app.models.player import Player
 from app.models.round import Round
 
 
 @dataclass
 class Game:
-    """
-    Represents a complete Skull King game.
+    """Represents a complete Skull King game.
 
     A game consists of up to 10 rounds, with 2-7 players.
     In round N, each player receives N cards.
@@ -26,6 +25,7 @@ class Game:
         current_round_number: Current round (1-10)
         deck: The deck of cards
         created_at: Timestamp when game was created
+
     """
 
     id: str
@@ -79,7 +79,7 @@ class Game:
 
     def can_start(self) -> bool:
         """Check if game has enough players to start."""
-        return len(self.players) >= 2
+        return len(self.players) >= MIN_PLAYERS
 
     def get_current_round(self) -> Round | None:
         """Get the current round."""
@@ -93,7 +93,7 @@ class Game:
 
         # First round: random starter. Subsequent rounds: rotate from round 1 starter
         if self.current_round_number == 1:
-            starter_index = random.randint(0, len(self.players) - 1)
+            starter_index = random.randint(0, len(self.players) - 1)  # noqa: S311
         else:
             # Get round 1 starter and rotate from there
             round1_starter = self.rounds[0].starter_player_index if self.rounds else 0
@@ -148,7 +148,7 @@ class Game:
         return max(self.players, key=lambda p: p.score)
 
     def __str__(self) -> str:
-        """String representation."""
+        """Return string representation."""
         return (
             f"Game {self.slug}: {len(self.players)} players, "
             f"Round {self.current_round_number}, State: {self.state.value}"

@@ -1,5 +1,6 @@
 """Detailed agent testing with gameplay analysis."""
 
+import sys
 from collections import defaultdict
 
 import numpy as np
@@ -24,7 +25,7 @@ except Exception as e:
 
 if not model:
     print("No model to test. Exiting.")
-    exit(1)
+    sys.exit(1)
 
 # Test against different opponents
 opponent_configs = [
@@ -55,7 +56,7 @@ for opp_type, opp_diff, label in opponent_configs:
     bid_accuracies = []
     episodes = 20
 
-    for episode in range(episodes):
+    for _episode in range(episodes):
         obs, info = env.reset()
         total_reward = 0
         done = False

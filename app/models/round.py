@@ -9,8 +9,7 @@ from app.models.trick import Trick
 
 @dataclass
 class Round:
-    """
-    Represents a single round of Skull King.
+    """Represents a single round of Skull King.
 
     In round N, each player is dealt N cards and must bid how many tricks they'll win.
     The round consists of N tricks.
@@ -22,6 +21,7 @@ class Round:
         tricks: List of tricks in this round
         starter_player_index: Index of player who starts bidding/picking
         scores: Score changes for each player this round
+
     """
 
     number: int
@@ -76,8 +76,7 @@ class Round:
         return bonus
 
     def calculate_scores(self) -> None:
-        """
-        Calculate scores for all players in this round.
+        """Calculate scores for all players in this round.
 
         Scoring rules:
         - Bid correct (non-zero): 20 * bid + bonus points
@@ -149,6 +148,7 @@ class Round:
 
         Returns:
             Player ID who should start the next trick
+
         """
         if self.ability_state.rosie_next_starter:
             starter = self.ability_state.rosie_next_starter
@@ -157,5 +157,5 @@ class Round:
         return default_player_id
 
     def __str__(self) -> str:
-        """String representation."""
+        """Return string representation."""
         return f"Round {self.number}: {len(self.bids)} bids, {len(self.tricks)} tricks"

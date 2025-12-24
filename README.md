@@ -1,231 +1,167 @@
 # Skull King
 
-A modern Python implementation of the [Skull King](https://www.grandpabecksgames.com/pages/skull-king) card game with bot AI players and Gymnasium environment for reinforcement learning.
+A modern Python implementation of the [Skull King](https://www.grandpabecksgames.com/pages/skull-king) card game with multiplayer WebSocket support, AI bots, and a Gymnasium environment for reinforcement learning.
 
 ![Screenshot of Skull King online board game.](./screenshot.png)
 
-Skull King is a trick-taking game where you bid the exact number of tricks you predict you'll win each round. Battle your rivals while keeping your bid afloat and seizing opportunities to sink your opponents! The pirate with the highest score earns the title of Captain of the Seven Seas!
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Backend** | Python 3.11+, FastAPI, WebSockets |
+| **Frontend** | Vanilla JS, CSS3, i18n |
+| **Database** | MongoDB (optional), Redis |
+| **AI/ML** | Gymnasium, Stable-Baselines3, sb3-contrib |
+| **DevOps** | Docker, Docker Compose, uv |
+| **Quality** | Ruff, Pre-commit, Pytest |
 
 ## Features
 
-### Core Game Engine
-- Complete Skull King rules implementation
-- Support for 2-7 players
-- 10 rounds with escalating complexity
-- All special cards (Skull King, Mermaids, Pirates, Kraken, White Whale)
-- Comprehensive scoring system with bonus points
-
-### AI Bot Players
-- **RandomBot**: Baseline bot making random valid moves
-- **RuleBasedBot**: Intelligent heuristic-based strategy with difficulty levels
-- **RLBot**: Interface for reinforcement learning agents
-
-### Reinforcement Learning
-- **Gymnasium Environment**: OpenAI Gym-compatible environment
-- Observation/action space encoding for RL algorithms
-- Ready for PPO, DQN, A2C, etc.
-
-### Modern Python Stack
-- Python 3.11+ with type hints
-- FastAPI WebSocket server for multiplayer
-- Poetry for dependency management
-- Pre-commit hooks with ruff linting
-- Comprehensive test suite (46 tests)
-
-## Installation
-
-```bash
-# Install Poetry if needed
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Install dependencies
-poetry install
-
-# Activate virtual environment
-poetry shell
-```
+- **Complete Rules**: All Skull King cards including pirates with abilities, Kraken, White Whale
+- **Multiplayer**: Real-time WebSocket gameplay for 2-8 players
+- **AI Bots**: RandomBot, RuleBasedBot, and trained RL agents
+- **Reinforcement Learning**: Gymnasium environment for training agents
+- **Internationalization**: English and Spanish support
 
 ## Quick Start
 
-### Watch Bots Play
+### Local Development
 
 ```bash
-# 4 rule-based bots (default)
-python scripts/play_bot_game.py
+# Install uv (if needed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 6 players with custom mix
-python scripts/play_bot_game.py --players 6 --random 2
+# Install dependencies and run
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+
+# Open http://localhost:8000
 ```
 
-### Train RL Agents
+### Docker
 
-```python
-from stable_baselines3 import PPO
-from app.gym_env import SkullKingEnv
+```bash
+# Development (hot reload)
+docker compose -f docker-compose.dev.yml up -d
 
-env = SkullKingEnv(num_opponents=3, opponent_bot_type="rule_based")
-model = PPO("MlpPolicy", env, verbose=1)
-model.learn(total_timesteps=100000)
-model.save("skullking_ppo")
+# Production
+docker compose up -d --build
+
+# Access at http://localhost:8000
 ```
 
 ### Run Tests
 
 ```bash
-pytest tests/
+uv run pytest tests/ -v
 ```
 
-## Cards
-
-### Suit Cards (14 each)
-- Parrot (yellow)
-- Pirate Map (green)
-- Treasure Chest (purple)
-- Jolly Roger (black - trump)
-
-### Special Cards
-- Skull King (1)
-- Mermaid (2)
-- Pirate (5)
-- Escape (5)
-- Kraken (1)
-- White Whale (1)
-
-> **Loot** and **Tigress** cards are not implemented due to complexity.
-
-## Rules
+## Game Rules
 
 ### Card Hierarchy
-1. **Skull King** beats Pirates
-2. **Pirates** beat Mermaids
-3. **Mermaids** beat Skull King
-4. **Special**: Mermaid wins if Skull King + Pirate + Mermaid all present
-5. **Jolly Roger** (trump) beats standard suits
-6. **Kraken**: No one wins the trick
-7. **White Whale**: Highest suit card wins
-8. **Escape**: Always loses
 
-### Following Suit
-- If a suit card leads, you must follow that suit if able
-- Special cards (Mermaid, Pirate, Skull King, etc.) have no suit to follow
-- Escape defers suit-setting to next player
+1. **Skull King** beats Pirates (+30 bonus each)
+2. **Pirates** beat Mermaids (+20 bonus)
+3. **Mermaids** beat Skull King (+50 bonus)
+4. **Special**: Mermaid wins if Skull King + Pirate + Mermaid all present
+5. **Jolly Roger** (black trump) beats standard suits
+6. **Kraken**: No one wins the trick
+7. **White Whale**: Highest standard suit card wins
+8. **Escape**: Always loses
 
 ### Scoring
 
-**Bidding One or More:**
-- Correct bid: 20 points per trick won + bonus points
-- Wrong bid: -10 points per trick off
-
-**Bidding Zero:**
-- Correct: +10 points × round number
-- Wrong: -10 points × round number
-
-### Bonus Points
-- Standard 14s captured: +10 each
-- Jolly Roger 14 captured: +20
-- Pirate captures Mermaid: +20
-- Skull King captures Pirate: +30
-- Mermaid captures Skull King: +40
+| Bid | Result | Points |
+|-----|--------|--------|
+| 1+ tricks | Correct | +20 per trick + bonuses |
+| 1+ tricks | Wrong | -10 per trick off |
+| Zero | Correct | +10 x round number |
+| Zero | Wrong | -10 x round number |
 
 ## Project Structure
 
 ```
 skullking/
 ├── app/
-│   ├── api/                 # FastAPI routes & WebSocket
-│   │   ├── routes.py
-│   │   ├── websocket.py
-│   │   └── game_handler.py  # Game logic handler
-│   ├── models/              # Game domain models
-│   ├── bots/                # AI bot players
-│   ├── gym_env/             # Gymnasium environment
-│   ├── repositories/        # Data access
-│   └── services/            # Business logic
-├── tests/                   # Test suite
-├── scripts/                 # Utility scripts
-└── pyproject.toml
+│   ├── api/          # FastAPI routes, WebSocket, game handler
+│   ├── models/       # Game domain models
+│   ├── bots/         # AI bot implementations
+│   ├── gym_env/      # Gymnasium RL environment
+│   └── services/     # Business logic
+├── static/           # Frontend (JS, CSS, i18n)
+├── tests/            # Test suite
+└── scripts/          # Training and utility scripts
+```
+
+## Training RL Agents
+
+```python
+from sb3_contrib import MaskablePPO
+from app.gym_env import SkullKingEnvMasked
+
+env = SkullKingEnvMasked(num_opponents=3)
+model = MaskablePPO("MlpPolicy", env, verbose=1)
+model.learn(total_timesteps=1_000_000)
+model.save("models/skull_king_ppo")
+```
+
+Or use the training script:
+
+```bash
+uv run python scripts/train_masked_ppo.py
+```
+
+## Docker Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| app | 8000 | FastAPI application |
+| mongodb | 27017 | Game persistence |
+| redis | 6379 | Pub/Sub messaging |
+
+### Useful Commands
+
+```bash
+# View logs
+docker compose logs -f app
+
+# Run bot game in container
+docker compose exec app python scripts/play_bot_game.py
+
+# Access MongoDB
+docker compose exec mongodb mongosh skullking
+
+# Stop everything
+docker compose down -v
 ```
 
 ## Development
 
-### Code Quality
-
 ```bash
-# Run pre-commit hooks
+# Lint and format
+uv run ruff check . --fix
+uv run ruff format .
+
+# Run pre-commit
 pre-commit run --all-files
 
-# Run tests
-pytest tests/ -v
-
-# Type checking
-mypy app/
+# Type check
+uv run mypy app/
 ```
 
-### Environment Variables
-
-Copy `.env.example` to `.env`:
+## Environment Variables
 
 ```bash
+MONGODB_URL=mongodb://localhost:27017
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-secret-key
 ENABLE_BOTS=true
-BOT_THINK_TIME_MIN=0.5
-BOT_THINK_TIME_MAX=2.0
-DEFAULT_BOT_STRATEGY=rule_based
-MAX_PLAYERS=7
-ROUNDS_COUNT=10
-```
-
-## Production Deployment
-
-### Docker
-
-```bash
-docker compose -f docker-compose-production.yml up -d --build
-```
-
-### Nginx Configuration
-
-```nginx
-server {
-  listen 80;
-  server_name api.skullking.ir;
-  return 301 https://$host$request_uri;
-}
-
-server {
-  listen 443 ssl;
-  ssl_certificate /etc/letsencrypt/live/skullking.ir/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/skullking.ir/privkey.pem;
-  server_name api.skullking.ir;
-
-  location / {
-    proxy_pass http://127.0.0.1:3002/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Host $http_host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-  }
-
-  location /games/join {
-    proxy_pass http://127.0.0.1:3002$request_uri;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300;
-    proxy_connect_timeout 300;
-    proxy_send_timeout 300;
-  }
-}
+FRONTEND_URL=http://localhost:8000
 ```
 
 ## Resources
 
-- [Skull King Official Rules](https://www.grandpabecksgames.com/products/skull-king)
+- [Official Skull King Rules](https://www.grandpabecksgames.com/products/skull-king)
 - [Gymnasium Documentation](https://gymnasium.farama.org/)
 - [Stable-Baselines3](https://stable-baselines3.readthedocs.io/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-
-## License
-
-See LICENSE file for details.
+- [FastAPI](https://fastapi.tiangolo.com/)

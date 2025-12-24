@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Ultra-optimized PPO training with 4-phase curriculum and enhanced rewards.
+"""Ultra-optimized PPO training with 4-phase curriculum and enhanced rewards.
 
 Training phases:
 1. Random opponents (200k) - Learn basic game rules
@@ -39,13 +38,13 @@ class CurriculumCallback(BaseCallback):
         vec_env,
         verbose: int = 1,
     ):
-        """
-        Initialize curriculum callback.
+        """Initialize curriculum callback.
 
         Args:
             curriculum_schedule: List of (timestep, opponent_type, difficulty)
             vec_env: Vectorized environment to update
             verbose: Verbosity level
+
         """
         super().__init__(verbose)
         self.curriculum_schedule = sorted(curriculum_schedule, key=lambda x: x[0])
@@ -88,14 +87,14 @@ def train_ultra_ppo(
     save_dir: str = "./models/ultra_ppo",
     load_path: str | None = None,
 ):
-    """
-    Train PPO agent with 4-phase curriculum.
+    """Train PPO agent with 4-phase curriculum.
 
     Args:
         total_timesteps: Total training timesteps (default 2M)
         n_envs: Number of parallel environments
         save_dir: Directory to save models
         load_path: Optional path to load existing model
+
     """
     print("=" * 60)
     print("ULTRA PPO TRAINING - 4-Phase Curriculum")
@@ -240,14 +239,14 @@ def evaluate_model(model_path: str, n_games: int = 50):
         wins = 0
         rankings = []
 
-        for game_num in range(n_games):
+        for _game_num in range(n_games):
             obs, _ = env.reset()
             done = False
             total_reward = 0
 
             while not done:
                 action, _ = model.predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, info = env.step(action)
+                obs, reward, terminated, truncated, _info = env.step(action)
                 total_reward += reward
                 done = terminated or truncated
 

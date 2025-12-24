@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 from app.api.responses import Command, ServerMessage
 from app.bots import RandomBot, RuleBasedBot
 from app.bots.base_bot import BaseBot, BotDifficulty
+from app.bots.rl_bot import RLBot
+from app.constants import HARRY_THE_GIANT_DISCARD_COUNT, MAX_PLAYERS
 from app.models.card import CardId, get_card
 from app.models.enums import GameState
 from app.models.game import Game
@@ -19,6 +21,16 @@ from app.services.event_recorder import event_recorder
 
 if TYPE_CHECKING:
     from app.api.websocket import ConnectionManager
+    from app.models.round import Round
+
+# Optional RL imports - may not be available
+try:
+    from sb3_contrib import MaskablePPO
+
+    _MASKABLE_PPO_AVAILABLE = True
+except ImportError:
+    MaskablePPO = None  # type: ignore[misc, assignment]
+    _MASKABLE_PPO_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -27,22 +39,21 @@ _rl_cache: dict[str, Any] = {"model": None}
 _rl_model_path = Path(__file__).parent.parent.parent / "models/masked_ppo/masked_ppo_final.zip"
 
 
-def _load_rl_model():
+def _load_rl_model() -> "MaskablePPO | None":
     """Load the trained RL model if available."""
+    if not _MASKABLE_PPO_AVAILABLE:
+        return None
     if _rl_cache["model"] is None and _rl_model_path.exists():
         try:
-            from sb3_contrib import MaskablePPO
-
             _rl_cache["model"] = MaskablePPO.load(str(_rl_model_path))
             logger.info("Loaded RL model from %s", _rl_model_path)
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.warning("Could not load RL model: %s", e)
     return _rl_cache["model"]
 
 
 class GameHandler:
-    """
-    Handles game logic for WebSocket commands.
+    """Handles game logic for WebSocket commands.
 
     Processes client commands (BID, PICK) and generates
     appropriate server responses.
@@ -56,14 +67,14 @@ class GameHandler:
     async def handle_command(
         self, game: Game, player_id: str, command: str, content: dict[str, Any]
     ) -> None:
-        """
-        Route incoming command to appropriate handler.
+        """Route incoming command to appropriate handler.
 
         Args:
             game: Game instance
             player_id: ID of player who sent command
             command: Command type
             content: Command payload
+
         """
         handlers = {
             "BID": self._handle_bid,
@@ -120,13 +131,13 @@ class GameHandler:
         await self._process_bot_actions(game)
 
     async def _handle_bid(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
-        """
-        Handle BID command from a player.
+        """Handle BID command from a player.
 
         Args:
             game: Game instance
             player_id: ID of bidding player
             content: Must contain 'bid' key with bid amount
+
         """
         if game.state != GameState.BIDDING:
             await self._send_error(game.id, player_id, "Not in bidding phase")
@@ -185,83 +196,87 @@ class GameHandler:
             # Process bot bids if any bots haven't bid yet
             await self._process_bot_actions(game)
 
-    async def _handle_pick(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
-        """
-        Handle PICK command from a player.
+    def _validate_pick_request(
+        self, game: Game, player_id: str, current_round: "Round | None", current_trick: Trick | None
+    ) -> Player | None:
+        """Validate basic pick request conditions.
 
-        Args:
-            game: Game instance
-            player_id: ID of picking player
-            content: Must contain 'card_id' key with card ID, optional 'tigress_choice'
+        Returns:
+            Player object if all validations pass, None otherwise (error already sent).
+
         """
         if game.state != GameState.PICKING:
-            await self._send_error(game.id, player_id, "Not in picking phase")
-            return
+            return None
 
-        current_round = game.get_current_round()
-        if not current_round or not current_round.tricks:
-            await self._send_error(game.id, player_id, "No active trick")
-            return
+        if not current_round or not current_trick:
+            return None
 
-        current_trick = current_round.tricks[-1]
-
-        # Verify it's this player's turn
         if current_trick.picking_player_id != player_id:
-            await self._send_error(game.id, player_id, "Not your turn")
-            return
+            return None
 
-        player = game.get_player(player_id)
-        if not player:
-            await self._send_error(game.id, player_id, "Player not found")
-            return
+        return game.get_player(player_id)
 
+    def _parse_and_validate_card(
+        self, player: Player, content: dict[str, Any]
+    ) -> tuple[CardId, TigressChoice | None] | None:
+        """Parse card ID and Tigress choice from content.
+
+        Returns:
+            Tuple of (card_id, tigress_choice) if valid, None otherwise.
+
+        """
         card_id_raw = content.get("card_id")
         try:
             card_id = CardId(card_id_raw)
         except (ValueError, TypeError):
-            await self._send_error(game.id, player_id, "Invalid card ID")
-            return
+            return None
 
-        # Verify player has this card
         if card_id not in player.hand:
-            await self._send_error(game.id, player_id, "Card not in hand")
-            return
+            return None
 
-        # Handle Tigress choice
         tigress_choice: TigressChoice | None = None
         card = get_card(card_id)
         if card.is_tigress():
             choice_raw = content.get("tigress_choice")
             if choice_raw not in ("pirate", "escape"):
-                await self._send_error(
-                    game.id, player_id, "Tigress requires choice: pirate or escape"
-                )
-                return
+                return None
             tigress_choice = TigressChoice(choice_raw)
 
-        # Play the card
-        player.hand.remove(card_id)
-        if not current_trick.add_card(player_id, card_id, tigress_choice):
-            # Card was rejected (player already picked)
-            player.hand.append(card_id)
-            await self._send_error(game.id, player_id, "Already played in this trick")
-            return
+        return (card_id, tigress_choice)
 
+    async def _execute_pick(
+        self,
+        game: Game,
+        player: Player,
+        current_trick: Trick,
+        card_id: CardId,
+        tigress_choice: TigressChoice | None,
+    ) -> bool:
+        """Execute the card pick and broadcast to players.
+
+        Returns:
+            True if successful, False if card was rejected.
+
+        """
+        player.hand.remove(card_id)
+        if not current_trick.add_card(player.id, card_id, tigress_choice):
+            player.hand.append(card_id)
+            return False
+
+        card = get_card(card_id)
         logger.info(
             "Player %s played card %s%s in game %s",
-            player_id,
+            player.id,
             card,
             f" as {tigress_choice.value}" if tigress_choice else "",
             game.id,
         )
 
-        # Record event for replay
         event_recorder.record_card_played(
-            game, player_id, card_id.value, tigress_choice.value if tigress_choice else None
+            game, player.id, card_id.value, tigress_choice.value if tigress_choice else None
         )
 
-        # Broadcast pick to all players
-        pick_content: dict[str, Any] = {"player_id": player_id, "card_id": card_id.value}
+        pick_content: dict[str, Any] = {"player_id": player.id, "card_id": card_id.value}
         if tigress_choice:
             pick_content["tigress_choice"] = tigress_choice.value
 
@@ -273,14 +288,59 @@ class GameHandler:
             ),
             game.id,
         )
+        return True
+
+    async def _handle_pick(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
+        """Handle PICK command from a player.
+
+        Args:
+            game: Game instance
+            player_id: ID of picking player
+            content: Must contain 'card_id' key with card ID, optional 'tigress_choice'
+
+        """
+        current_round = game.get_current_round()
+        current_trick = current_round.tricks[-1] if current_round and current_round.tricks else None
+
+        player = self._validate_pick_request(game, player_id, current_round, current_trick)
+        if not player:
+            if game.state != GameState.PICKING:
+                await self._send_error(game.id, player_id, "Not in picking phase")
+            elif not current_round or not current_trick:
+                await self._send_error(game.id, player_id, "No active trick")
+            elif current_trick.picking_player_id != player_id:
+                await self._send_error(game.id, player_id, "Not your turn")
+            else:
+                await self._send_error(game.id, player_id, "Player not found")
+            return
+
+        card_data = self._parse_and_validate_card(player, content)
+        if not card_data:
+            card_id_raw = content.get("card_id")
+            try:
+                card_id = CardId(card_id_raw)
+                if card_id not in player.hand:
+                    await self._send_error(game.id, player_id, "Card not in hand")
+                else:
+                    await self._send_error(
+                        game.id, player_id, "Tigress requires choice: pirate or escape"
+                    )
+            except (ValueError, TypeError):
+                await self._send_error(game.id, player_id, "Invalid card ID")
+            return
+
+        card_id, tigress_choice = card_data
+
+        # current_round and current_trick are guaranteed to be non-None here due to validation
+        if not await self._execute_pick(game, player, current_trick, card_id, tigress_choice):
+            await self._send_error(game.id, player_id, "Already played in this trick")
+            return
 
         # Check if trick is complete
         if current_trick.is_complete(len(game.players)):
             await self._complete_trick(game, current_round, current_trick)
         else:
-            # Move to next player
             await self._advance_to_next_player(game, current_round, current_trick)
-            # Process bot picks if next player is a bot
             await self._process_bot_actions(game)
 
     async def _start_new_round(self, game: Game) -> None:
@@ -343,7 +403,7 @@ class GameHandler:
         # Process bot picks if first player is a bot
         await self._process_bot_actions(game)
 
-    async def _start_new_trick(self, game: Game, current_round: Any) -> None:
+    async def _start_new_trick(self, game: Game, current_round: "Round") -> None:
         """Start a new trick in the current round."""
         trick_number = len(current_round.tricks) + 1
         starter_index = current_round.starter_player_index
@@ -442,7 +502,9 @@ class GameHandler:
             game.id,
         )
 
-    async def _advance_to_next_player(self, game: Game, _current_round: Any, trick: Trick) -> None:
+    async def _advance_to_next_player(
+        self, game: Game, _current_round: "Round", trick: Trick
+    ) -> None:
         """Advance to the next player in the trick."""
         # Find current player index
         current_player = game.get_player(trick.picking_player_id)
@@ -466,7 +528,7 @@ class GameHandler:
                 game.id,
             )
 
-    async def _complete_trick(self, game: Game, current_round: Any, trick: Trick) -> None:
+    async def _complete_trick(self, game: Game, current_round: "Round", trick: Trick) -> None:
         """Complete a trick and determine winner."""
         winner_card_id, winner_player_id = trick.determine_winner()
         bonus_points = trick.calculate_bonus_points()
@@ -547,100 +609,102 @@ class GameHandler:
         # Prompt for continue confirmation before proceeding
         await self._prompt_continue(game)
 
+    def _is_bot_player(self, game: Game, player_id: str) -> bool:
+        """Check if a player is a bot."""
+        player = game.get_player(player_id)
+        return player_id in self.bots.get(game.id, {}) or (player is not None and player.is_bot)
+
+    async def _handle_rosie_ability(
+        self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
+    ) -> None:
+        """Handle Rosie's choose starter ability."""
+        if self._is_bot_player(game, ability.player_id):
+            current_round.ability_state.resolve_rosie(ability.player_id, ability.player_id)
+            await self._ability_resolved(game, current_round, ability, trick)
+        else:
+            await self._send_ability_prompt(
+                game,
+                ability,
+                {"options": [{"player_id": p.id, "username": p.username} for p in game.players]},
+            )
+
+    async def _handle_bendt_ability(
+        self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
+    ) -> None:
+        """Handle Bendt's draw and discard ability."""
+        drawn_cards = self._draw_cards_from_deck(game, 2)
+        ability.drawn_cards = drawn_cards
+
+        if self._is_bot_player(game, ability.player_id):
+            player_obj = game.get_player(ability.player_id)
+            if player_obj:
+                player_obj.hand.extend(drawn_cards)
+                discard = (
+                    player_obj.hand[:HARRY_THE_GIANT_DISCARD_COUNT]
+                    if len(player_obj.hand) >= HARRY_THE_GIANT_DISCARD_COUNT
+                    else player_obj.hand[:]
+                )
+                for card in discard:
+                    player_obj.hand.remove(card)
+                current_round.ability_state.resolve_bendt(ability.player_id, drawn_cards, discard)
+            await self._ability_resolved(game, current_round, ability, trick)
+        else:
+            player = game.get_player(ability.player_id)
+            if player:
+                player.hand.extend(drawn_cards)
+            await self._send_ability_prompt(
+                game,
+                ability,
+                {
+                    "drawn_cards": [c.value for c in drawn_cards],
+                    "must_discard": min(2, len(drawn_cards)),
+                },
+            )
+
+    async def _handle_roatan_ability(
+        self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
+    ) -> None:
+        """Handle Roatán's extra bet ability."""
+        if self._is_bot_player(game, ability.player_id):
+            current_round.ability_state.resolve_roatan(ability.player_id, 10)
+            await self._ability_resolved(game, current_round, ability, trick)
+        else:
+            await self._send_ability_prompt(game, ability, {"options": [0, 10, 20]})
+
+    async def _handle_jade_ability(
+        self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
+    ) -> None:
+        """Handle Jade's view deck ability."""
+        undealt = self._get_undealt_cards(game)
+        current_round.ability_state.resolve_jade(ability.player_id)
+
+        if not self._is_bot_player(game, ability.player_id):
+            await self.manager.send_personal_message(
+                ServerMessage(
+                    command=Command.SHOW_DECK,
+                    game_id=game.id,
+                    content={"undealt_cards": [c.value for c in undealt]},
+                ),
+                game.id,
+                ability.player_id,
+            )
+
+        await self._ability_resolved(game, current_round, ability, trick)
+
     async def _handle_ability_trigger(
-        self, game: Game, current_round: Any, ability: PendingAbility, trick: Trick
+        self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
     ) -> None:
         """Handle a triggered pirate ability."""
-        player = game.get_player(ability.player_id)
-        # Check both the bots dict (for actual bots) and is_bot flag (for tests)
-        is_bot = ability.player_id in self.bots.get(game.id, {}) or (
-            player is not None and player.is_bot
-        )
-
         if ability.ability_type == AbilityType.CHOOSE_STARTER:
-            # Rosie - choose who starts next trick
-            if is_bot:
-                # Bot just chooses itself (simple strategy)
-                current_round.ability_state.resolve_rosie(ability.player_id, ability.player_id)
-                await self._ability_resolved(game, current_round, ability, trick)
-            else:
-                # Send prompt to human player
-                await self._send_ability_prompt(
-                    game,
-                    ability,
-                    {
-                        "options": [
-                            {"player_id": p.id, "username": p.username} for p in game.players
-                        ]
-                    },
-                )
-
+            await self._handle_rosie_ability(game, current_round, ability, trick)
         elif ability.ability_type == AbilityType.DRAW_DISCARD:
-            # Bendt - draw 2, discard 2
-            drawn_cards = self._draw_cards_from_deck(game, 2)
-            ability.drawn_cards = drawn_cards
-
-            if is_bot:
-                # Bot discards the weakest two cards
-                player_obj = game.get_player(ability.player_id)
-                if player_obj:
-                    # Add drawn cards to hand temporarily for selection
-                    player_obj.hand.extend(drawn_cards)
-                    # Pick two weakest to discard (just pick first two for simplicity)
-                    discard = (
-                        player_obj.hand[:2] if len(player_obj.hand) >= 2 else player_obj.hand[:]
-                    )
-                    for card in discard:
-                        player_obj.hand.remove(card)
-                    current_round.ability_state.resolve_bendt(
-                        ability.player_id, drawn_cards, discard
-                    )
-                await self._ability_resolved(game, current_round, ability, trick)
-            else:
-                # Send drawn cards to player, wait for discard choice
-                if player:
-                    player.hand.extend(drawn_cards)
-                await self._send_ability_prompt(
-                    game,
-                    ability,
-                    {
-                        "drawn_cards": [c.value for c in drawn_cards],
-                        "must_discard": min(2, len(drawn_cards)),
-                    },
-                )
-
+            await self._handle_bendt_ability(game, current_round, ability, trick)
         elif ability.ability_type == AbilityType.EXTRA_BET:
-            # Roatán - declare extra bet
-            if is_bot:
-                # Bot always bets 10 (moderate risk)
-                current_round.ability_state.resolve_roatan(ability.player_id, 10)
-                await self._ability_resolved(game, current_round, ability, trick)
-            else:
-                await self._send_ability_prompt(game, ability, {"options": [0, 10, 20]})
-
+            await self._handle_roatan_ability(game, current_round, ability, trick)
         elif ability.ability_type == AbilityType.VIEW_DECK:
-            # Jade - view undealt cards
-            undealt = self._get_undealt_cards(game)
-            current_round.ability_state.resolve_jade(ability.player_id)
-
-            if not is_bot:
-                # Send deck contents to human player
-                await self.manager.send_personal_message(
-                    ServerMessage(
-                        command=Command.SHOW_DECK,
-                        game_id=game.id,
-                        content={"undealt_cards": [c.value for c in undealt]},
-                    ),
-                    game.id,
-                    ability.player_id,
-                )
-
-            # Auto-resolve (no action needed)
-            await self._ability_resolved(game, current_round, ability, trick)
-
+            await self._handle_jade_ability(game, current_round, ability, trick)
         elif ability.ability_type == AbilityType.MODIFY_BID:
-            # Harry - this is handled at end of round, not here
-            # The trigger_ability method already set harry_armed
+            # Harry - handled at end of round, just mark as armed
             await self._ability_resolved(game, current_round, ability, trick)
 
     async def _send_ability_prompt(
@@ -662,7 +726,7 @@ class GameHandler:
         )
 
     async def _ability_resolved(
-        self, game: Game, current_round: Any, ability: PendingAbility, _trick: Trick
+        self, game: Game, current_round: "Round", ability: PendingAbility, _trick: Trick
     ) -> None:
         """Handle ability resolution and continue game flow."""
         # Notify all players that ability was resolved
@@ -688,8 +752,7 @@ class GameHandler:
     def _draw_cards_from_deck(self, game: Game, count: int) -> list[CardId]:
         """Draw cards from the deck (undealt cards)."""
         undealt = self._get_undealt_cards(game)
-        drawn = undealt[:count]
-        return drawn
+        return undealt[:count]
 
     def _get_undealt_cards(self, game: Game) -> list[CardId]:
         """Get cards that weren't dealt this round."""
@@ -705,7 +768,7 @@ class GameHandler:
         # Return cards not in dealt set
         return [card_id for card_id in game.deck.cards if card_id not in dealt]
 
-    async def _complete_round(self, game: Game, current_round: Any) -> None:
+    async def _complete_round(self, game: Game, current_round: "Round") -> None:
         """Complete a round and calculate scores."""
         # Check for Harry's ability before scoring
         players_with_harry = [
@@ -846,8 +909,7 @@ class GameHandler:
         )
 
     def _build_game_state(self, game: Game, player_id: str) -> dict[str, Any]:
-        """
-        Build complete game state for a player.
+        """Build complete game state for a player.
 
         Includes all public information plus player's private hand.
         """
@@ -929,7 +991,7 @@ class GameHandler:
             await self._send_error(game.id, player_id, "Cannot add bot after game started")
             return
 
-        if len(game.players) >= 8:
+        if len(game.players) >= MAX_PLAYERS:
             await self._send_error(game.id, player_id, "Game is full")
             return
 
@@ -963,8 +1025,6 @@ class GameHandler:
         difficulty_enum = BotDifficulty[difficulty.upper()]
         if bot_type == "rl" and _load_rl_model():
             # Use RL bot with trained model
-            from app.bots.rl_bot import RLBot
-
             bot = RLBot(bot_id, model=_load_rl_model(), difficulty=difficulty_enum)
             logger.info("Added RL bot %s to game %s", bot_id, game.id)
         elif bot_type == "random":
@@ -1020,10 +1080,11 @@ class GameHandler:
         )
 
     async def _process_bot_actions(self, game: Game) -> None:
-        """
-        Process bot actions sequentially. This is called after any game state change
-        to check if a bot should take an action. No locks needed because this is
-        a sequential turn-based game - only one action happens at a time.
+        """Process bot actions sequentially.
+
+        This is called after any game state change to check if a bot should take an action.
+        No locks needed because this is a sequential turn-based game - only one action
+        happens at a time.
         """
         if game.id not in self.bots:
             return
@@ -1084,41 +1145,47 @@ class GameHandler:
                 await self._process_single_bot_bid(game)
                 return  # Exit after processing chain
 
-    async def _process_single_bot_pick(self, game: Game) -> None:
+    def _validate_bot_pick_state(
+        self, game: Game, trick: Trick | None
+    ) -> tuple[str, BaseBot, Player] | None:
+        """Validate that we can process a bot pick.
+
+        Returns:
+            Tuple of (picking_player_id, bot, player) if valid, None otherwise.
+
         """
-        Process ONE bot card pick. Does NOT recursively continue - the game flow
-        handles continuation through _prompt_continue or _advance_to_next_player.
-        """
-        if game.id not in self.bots:
-            return
-
-        if game.state != GameState.PICKING:
-            return
-
-        current_round = game.get_current_round()
-        if not current_round:
-            return
-
-        trick = current_round.get_current_trick()
-        if not trick:
-            return
-
-        if trick.is_complete(len(game.players)):
-            return
+        if not trick or trick.is_complete(len(game.players)):
+            return None
 
         picking_player_id = trick.picking_player_id
         if picking_player_id not in self.bots.get(game.id, {}):
-            return  # Not a bot's turn
+            return None
 
         if any(pc.player_id == picking_player_id for pc in trick.picked_cards):
             logger.warning("Bot %s already played in trick %d", picking_player_id, trick.number)
-            return
+            return None
 
         bot = self.bots[game.id][picking_player_id]
         player = game.get_player(picking_player_id)
         if not player or not player.hand:
-            return
+            return None
 
+        return (picking_player_id, bot, player)
+
+    def _choose_bot_card(
+        self,
+        game: Game,
+        current_round: "Round",
+        bot: BaseBot,
+        player: Player,
+        trick: Trick,
+    ) -> tuple[CardId, TigressChoice | None]:
+        """Choose a card for the bot to play.
+
+        Returns:
+            Tuple of (card_id, tigress_choice).
+
+        """
         cards_in_trick = [pc.card_id for pc in trick.picked_cards]
         valid_cards = trick.get_valid_cards(player.hand, cards_in_trick)
 
@@ -1127,38 +1194,55 @@ class GameHandler:
 
         tigress_choice: TigressChoice | None = None
         if card.is_tigress():
-            tricks_won = current_round.get_tricks_won(picking_player_id)
+            tricks_won = current_round.get_tricks_won(player.id)
             bid = player.bid if player.bid is not None else 0
             need_more_wins = tricks_won < bid
             tigress_choice = TigressChoice.PIRATE if need_more_wins else TigressChoice.ESCAPE
 
+        return (card_id, tigress_choice)
+
+    async def _execute_bot_pick(
+        self,
+        game: Game,
+        player: Player,
+        trick: Trick,
+        card_id: CardId,
+        tigress_choice: TigressChoice | None,
+    ) -> bool:
+        """Execute the bot's card pick and broadcast.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         if card_id in player.hand:
             player.hand.remove(card_id)
 
         if trick.is_complete(len(game.players)):
-            logger.warning("Trick completed before bot %s could play", picking_player_id)
+            logger.warning("Trick completed before bot %s could play", player.id)
             player.hand.append(card_id)
-            return
+            return False
 
-        if not trick.add_card(picking_player_id, card_id, tigress_choice):
+        if not trick.add_card(player.id, card_id, tigress_choice):
             logger.error(
-                "Bot %s card rejected - already picked in trick %d", picking_player_id, trick.number
+                "Bot %s card rejected - already picked in trick %d", player.id, trick.number
             )
             player.hand.append(card_id)
-            return
+            return False
 
+        card = get_card(card_id)
         logger.info(
             "Bot %s plays %s%s",
-            picking_player_id,
+            player.id,
             card,
             f" as {tigress_choice.value}" if tigress_choice else "",
         )
 
         event_recorder.record_card_played(
-            game, picking_player_id, card_id.value, tigress_choice.value if tigress_choice else None
+            game, player.id, card_id.value, tigress_choice.value if tigress_choice else None
         )
 
-        pick_content: dict[str, Any] = {"player_id": picking_player_id, "card_id": card_id.value}
+        pick_content: dict[str, Any] = {"player_id": player.id, "card_id": card_id.value}
         if tigress_choice:
             pick_content["tigress_choice"] = tigress_choice.value
 
@@ -1170,15 +1254,37 @@ class GameHandler:
             ),
             game.id,
         )
+        return True
+
+    async def _process_single_bot_pick(self, game: Game) -> None:
+        """Process ONE bot card pick.
+
+        Does NOT recursively continue - the game flow handles continuation
+        through _prompt_continue or _advance_to_next_player.
+        """
+        if game.id not in self.bots or game.state != GameState.PICKING:
+            return
+
+        current_round = game.get_current_round()
+        if not current_round:
+            return
+
+        trick = current_round.get_current_trick()
+        bot_info = self._validate_bot_pick_state(game, trick)
+        if not bot_info or not trick:
+            return
+
+        _picking_player_id, bot, player = bot_info
+        card_id, tigress_choice = self._choose_bot_card(game, current_round, bot, player, trick)
+
+        if not await self._execute_bot_pick(game, player, trick, card_id, tigress_choice):
+            return
 
         # Handle what comes next - NO recursive calls here
         if trick.is_complete(len(game.players)):
-            # Trick complete - _complete_trick will handle continuation
             await self._complete_trick(game, current_round, trick)
         else:
-            # Advance to next player
             await self._advance_to_next_player(game, current_round, trick)
-            # If next player is also a bot, process their turn
             next_player_id = trick.picking_player_id
             if next_player_id in self.bots.get(game.id, {}):
                 await asyncio.sleep(0.5)

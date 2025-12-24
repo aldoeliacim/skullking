@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Enhanced MaskablePPO training with self-play.
+"""Enhanced MaskablePPO training with self-play.
 
 Training Phases:
 1. Random opponents (warmup)
@@ -37,8 +36,7 @@ from app.gym_env.skullking_env_masked import SkullKingEnvMasked
 
 
 class SelfPlayCallback(BaseCallback):
-    """
-    Callback for self-play training.
+    """Callback for self-play training.
 
     Periodically copies the current model to an opponent pool,
     then updates the environment to play against past versions.
@@ -156,8 +154,7 @@ def train_with_selfplay(
     save_dir: str = "./models/selfplay_ppo",
     load_path: str | None = None,
 ):
-    """
-    Train with self-play curriculum.
+    """Train with self-play curriculum.
 
     Curriculum:
     - Phase 1-3: Random opponents (warmup)

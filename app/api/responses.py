@@ -64,8 +64,7 @@ class ScoreUpdate(BaseModel):
 
 @dataclass
 class ServerMessage:
-    """
-    Message sent from server to clients via WebSocket.
+    """Message sent from server to clients via WebSocket.
 
     Attributes:
         command: Command type
@@ -73,6 +72,7 @@ class ServerMessage:
         content: Message payload (varies by command)
         receiver_id: Specific player to receive (empty = broadcast)
         excluded_id: Player to exclude from broadcast
+
     """
 
     command: Command

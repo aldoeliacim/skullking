@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-CLI script to watch bots play Skull King.
+"""CLI script to watch bots play Skull King.
 
 This script creates a game with multiple bot players and simulates
 a complete game, displaying the results.
@@ -24,16 +23,17 @@ from app.models.trick import Trick
 class BotGameSimulator:
     """Simulates a game between bot players."""
 
-    def __init__(self, num_players: int = 4, bot_types: list[str] = None):
-        """
-        Initialize simulator.
+    def __init__(self, num_players: int = 4, bot_types: list[str] | None = None):
+        """Initialize simulator.
 
         Args:
             num_players: Number of players (2-8)
             bot_types: List of bot types for each player ("random" or "rule_based")
+
         """
         if not (2 <= num_players <= 8):
-            raise ValueError("Must have 2-8 players")
+            msg = "Must have 2-8 players"
+            raise ValueError(msg)
 
         self.num_players = num_players
         self.bot_types = bot_types or ["rule_based"] * num_players
@@ -63,10 +63,7 @@ class BotGameSimulator:
             self.game.add_player(player)
 
             # Create bot controller
-            if bot_type == "random":
-                bot = RandomBot(player_id)
-            else:
-                bot = RuleBasedBot(player_id)
+            bot = RandomBot(player_id) if bot_type == "random" else RuleBasedBot(player_id)
 
             self.bots.append((player_id, bot))
             print(f"  Player {i + 1}: {player.username} ({bot})")

@@ -9,18 +9,17 @@ from typing import TYPE_CHECKING
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.api.responses import ServerMessage
-from app.models.game import Game
+from app.api.game_handler import GameHandler
 
 if TYPE_CHECKING:
-    from app.api.game_handler import GameHandler
+    from app.api.responses import ServerMessage
+    from app.models.game import Game
 
 logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
-    """
-    Manages WebSocket connections for multiplayer games.
+    """Manages WebSocket connections for multiplayer games.
 
     Handles:
     - Player connections per game
@@ -38,25 +37,25 @@ class ConnectionManager:
         # Message queue for broadcasting
         self.message_queue: asyncio.Queue[ServerMessage] = asyncio.Queue()
         self.games: dict[str, Game] = {}
-        self._game_handler: GameHandler | None = None
+        self.game_handler: GameHandler
 
-    @property
-    def game_handler(self) -> GameHandler:
-        """Lazy-initialize game handler to avoid circular imports."""
-        if self._game_handler is None:
-            from app.api.game_handler import GameHandler
+    def set_game_handler(self, game_handler: GameHandler) -> None:
+        """Set the game handler after initialization to avoid circular imports.
 
-            self._game_handler = GameHandler(self)
-        return self._game_handler
+        Args:
+            game_handler: The game handler instance
+
+        """
+        self.game_handler = game_handler
 
     async def connect(self, websocket: WebSocket, game_id: str, player_id: str) -> None:
-        """
-        Accept a new WebSocket connection for a player.
+        """Accept a new WebSocket connection for a player.
 
         Args:
             websocket: WebSocket connection
             game_id: Game identifier
             player_id: Player identifier
+
         """
         await websocket.accept()
 
@@ -73,13 +72,13 @@ class ConnectionManager:
     async def connect_spectator(
         self, websocket: WebSocket, game_id: str, spectator_id: str
     ) -> None:
-        """
-        Accept a new WebSocket connection for a spectator.
+        """Accept a new WebSocket connection for a spectator.
 
         Args:
             websocket: WebSocket connection
             game_id: Game identifier
             spectator_id: Spectator identifier
+
         """
         await websocket.accept()
 
@@ -90,12 +89,12 @@ class ConnectionManager:
         logger.info("Spectator %s connected to game %s", spectator_id, game_id)
 
     def disconnect(self, game_id: str, player_id: str) -> None:
-        """
-        Remove a player WebSocket connection.
+        """Remove a player WebSocket connection.
 
         Args:
             game_id: Game identifier
             player_id: Player identifier
+
         """
         if game_id in self.active_connections and player_id in self.active_connections[game_id]:
             del self.active_connections[game_id][player_id]
@@ -113,12 +112,12 @@ class ConnectionManager:
                     del self.games[game_id]
 
     def disconnect_spectator(self, game_id: str, spectator_id: str) -> None:
-        """
-        Remove a spectator WebSocket connection.
+        """Remove a spectator WebSocket connection.
 
         Args:
             game_id: Game identifier
             spectator_id: Spectator identifier
+
         """
         if (
             game_id in self.spectator_connections
@@ -140,13 +139,13 @@ class ConnectionManager:
     async def send_personal_message(
         self, message: ServerMessage, game_id: str, player_id: str
     ) -> None:
-        """
-        Send message to specific player.
+        """Send message to specific player.
 
         Args:
             message: Message to send
             game_id: Game identifier
             player_id: Player identifier
+
         """
         if game_id in self.active_connections and player_id in self.active_connections[game_id]:
             websocket = self.active_connections[game_id][player_id]
@@ -162,13 +161,13 @@ class ConnectionManager:
         game_id: str,
         excluded_player_id: str | None = None,
     ) -> None:
-        """
-        Broadcast message to all players and spectators in a game.
+        """Broadcast message to all players and spectators in a game.
 
         Args:
             message: Message to broadcast
             game_id: Game identifier
             excluded_player_id: Player to exclude from broadcast
+
         """
         disconnected_players = []
         disconnected_spectators = []
@@ -201,17 +200,16 @@ class ConnectionManager:
             self.disconnect_spectator(game_id, spectator_id)
 
     async def dispatch_message(self, message: ServerMessage) -> None:
-        """
-        Queue a message for dispatch.
+        """Queue a message for dispatch.
 
         Args:
             message: Message to dispatch
+
         """
         await self.message_queue.put(message)
 
     async def run(self) -> None:
-        """
-        Background task to process message queue.
+        """Background task to process message queue.
 
         This runs continuously, processing messages from the queue
         and dispatching them to the appropriate recipients.
@@ -241,13 +239,13 @@ class ConnectionManager:
     async def handle_player_message(
         self, websocket: WebSocket, game_id: str, player_id: str
     ) -> None:
-        """
-        Handle incoming messages from a player.
+        """Handle incoming messages from a player.
 
         Args:
             websocket: WebSocket connection
             game_id: Game identifier
             player_id: Player identifier
+
         """
         try:
             while True:
@@ -281,14 +279,15 @@ class ConnectionManager:
     async def handle_spectator_message(
         self, websocket: WebSocket, game_id: str, spectator_id: str
     ) -> None:
-        """
-        Handle incoming messages from a spectator.
+        """Handle incoming messages from a spectator.
+
         Spectators can only observe, not send game commands.
 
         Args:
             websocket: WebSocket connection
             game_id: Game identifier
             spectator_id: Spectator identifier
+
         """
         try:
             while True:
@@ -322,3 +321,6 @@ class ConnectionManager:
 
 # Global WebSocket manager instance
 websocket_manager = ConnectionManager()
+
+# Initialize game handler to resolve circular dependency
+websocket_manager.set_game_handler(GameHandler(websocket_manager))

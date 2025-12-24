@@ -83,6 +83,7 @@ class PendingAbility:
         ability_type: What kind of ability
         trick_number: Which trick triggered it (for timing)
         resolved: Whether the ability has been used
+
     """
 
     player_id: str
@@ -107,6 +108,7 @@ class AbilityState:
         harry_armed: Player IDs who won with Harry (activate at round end)
         roatan_bets: Extra bets from Roatán (player_id -> amount)
         rosie_next_starter: Override for who starts next trick
+
     """
 
     pending_abilities: list[PendingAbility] = field(default_factory=list)
@@ -126,6 +128,7 @@ class AbilityState:
 
         Returns:
             PendingAbility if ability was triggered, None otherwise
+
         """
         pirate = get_pirate_type(card_id)
         if not pirate:
@@ -164,6 +167,7 @@ class AbilityState:
 
         Returns:
             True if ability was resolved successfully
+
         """
         ability = self.get_pending_ability(player_id)
         if not ability or ability.ability_type != AbilityType.CHOOSE_STARTER:
@@ -183,6 +187,7 @@ class AbilityState:
 
         Returns:
             True if ability was resolved successfully
+
         """
         if extra_bet not in (0, 10, 20):
             return False
@@ -208,6 +213,7 @@ class AbilityState:
 
         Returns:
             True if ability was resolved successfully
+
         """
         ability = self.get_pending_ability(player_id)
         if not ability or ability.ability_type != AbilityType.DRAW_DISCARD:
@@ -231,6 +237,7 @@ class AbilityState:
 
         Returns:
             True if ability was resolved successfully
+
         """
         ability = self.get_pending_ability(player_id)
         if not ability or ability.ability_type != AbilityType.VIEW_DECK:
@@ -248,6 +255,7 @@ class AbilityState:
 
         Returns:
             True if ability was resolved successfully
+
         """
         if modifier not in (-1, 0, 1):
             return False
@@ -275,6 +283,7 @@ class AbilityState:
 
         Returns:
             The bid modifier, or 0 if none
+
         """
         for ability in self.pending_abilities:
             if (
@@ -290,7 +299,7 @@ class AbilityState:
         """Check if player has Harry's ability armed."""
         return self.harry_armed.get(player_id, False)
 
-    def get_roatan_bonus(self, player_id: str, bid_correct: bool) -> int:
+    def get_roatan_bonus(self, player_id: str, *, bid_correct: bool) -> int:
         """Get the bonus/penalty from Roatán's extra bets.
 
         Args:
@@ -299,6 +308,7 @@ class AbilityState:
 
         Returns:
             Positive bonus if bid correct, negative penalty if wrong
+
         """
         bet = self.roatan_bets.get(player_id, 0)
         return bet if bid_correct else -bet
@@ -315,6 +325,7 @@ class AbilityState:
 
         Returns:
             True if there are pending abilities
+
         """
         for ability in self.pending_abilities:
             if not ability.resolved and (player_id is None or ability.player_id == player_id):

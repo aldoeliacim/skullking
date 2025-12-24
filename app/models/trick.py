@@ -24,8 +24,7 @@ class PickedCard:
 
 @dataclass
 class Trick:
-    """
-    Represents a single trick within a round.
+    """Represents a single trick within a round.
 
     A trick consists of each player playing one card in turn order.
     The winner is determined by card hierarchy rules.
@@ -37,6 +36,7 @@ class Trick:
         winner_player_id: ID of player who won this trick
         winner_card_id: Card that won this trick
         starter_player_index: Index of player who started this trick
+
     """
 
     number: int
@@ -57,8 +57,7 @@ class Trick:
     def add_card(
         self, player_id: str, card_id: CardId, tigress_choice: TigressChoice | None = None
     ) -> bool:
-        """
-        Add a picked card to this trick.
+        """Add a picked card to this trick.
 
         Args:
             player_id: ID of the player playing the card
@@ -67,6 +66,7 @@ class Trick:
 
         Returns:
             True if card was added, False if player already picked.
+
         """
         # Guard: don't allow duplicate picks from same player
         if self.has_player_picked(player_id):
@@ -75,12 +75,12 @@ class Trick:
         return True
 
     def determine_winner(self) -> tuple[CardId | None, str | None]:
-        """
-        Determine the winner of this trick.
+        """Determine the winner of this trick.
 
         Returns:
             Tuple of (winner_card_id, winner_player_id)
             If Kraken wins, returns (None, None)
+
         """
         if not self.picked_cards:
             return None, None
@@ -112,8 +112,7 @@ class Trick:
         return winner_card_id, winner_player_id
 
     def calculate_bonus_points(self) -> int:
-        """
-        Calculate bonus points for the trick winner.
+        """Calculate bonus points for the trick winner.
 
         Bonus points are awarded for:
         - Capturing 14s of standard suits: +10 each
@@ -124,6 +123,7 @@ class Trick:
 
         Returns:
             Total bonus points for this trick
+
         """
         if not self.winner_card_id or not self.winner_player_id:
             return 0
@@ -132,8 +132,6 @@ class Trick:
         winner_card = get_card(self.winner_card_id)
 
         # Special card IDs for 14s
-        from app.models.card import CardId
-
         for picked_card in self.picked_cards:
             card = get_card(picked_card.card_id)
 
@@ -158,8 +156,7 @@ class Trick:
         return len(self.picked_cards) == num_players
 
     def get_valid_cards(self, hand: list[CardId], cards_in_trick: list[CardId]) -> list[CardId]:
-        """
-        Get valid cards that can be played from the hand.
+        """Get valid cards that can be played from the hand.
 
         In Skull King, the rules are:
         - Special cards (Pirates, Mermaids, Escapes, etc.) can always be played
@@ -205,7 +202,7 @@ class Trick:
         return list(hand)
 
     def __str__(self) -> str:
-        """String representation."""
+        """Return string representation of the trick."""
         if self.winner_player_id:
             return f"Trick {self.number}: Winner {self.winner_player_id}"
         return f"Trick {self.number}: {len(self.picked_cards)} cards played"

@@ -2,10 +2,10 @@
 
 import re
 
-import matplotlib
+import matplotlib as mpl
 import numpy as np
 
-matplotlib.use("Agg")
+mpl.use("Agg")
 from collections import defaultdict
 
 
@@ -18,9 +18,7 @@ def parse_training_log(log_file):
     timesteps = []
 
     # Extract all timestep blocks
-    blocks = re.findall(
-        r"total_timesteps\s+\|\s+(\d+).*?(?=total_timesteps|\Z)", content, re.DOTALL
-    )
+    re.findall(r"total_timesteps\s+\|\s+(\d+).*?(?=total_timesteps|\Z)", content, re.DOTALL)
 
     for match in re.finditer(r"total_timesteps\s+\|\s+(\d+)", content):
         ts = int(match.group(1))
@@ -65,7 +63,7 @@ def calculate_trends(timesteps, values):
 
     # Linear regression
     A = np.vstack([ts, np.ones(len(ts))]).T
-    slope, intercept = np.linalg.lstsq(A, vs, rcond=None)[0]
+    slope, _intercept = np.linalg.lstsq(A, vs, rcond=None)[0]
 
     return {
         "slope": slope,

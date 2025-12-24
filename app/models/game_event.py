@@ -1,5 +1,5 @@
-"""
-Game event model for replay system.
+"""Game event model for replay system.
+
 Captures all significant game events for later replay.
 """
 

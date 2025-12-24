@@ -12,10 +12,16 @@
     "gameCode": "Game Code",
     "enterGameId": "Enter code...",
     "joinGame": "Join Game",
+    "spectateGame": "Spectate",
+    "viewHistory": "History",
     "errorEnterName": "Please enter your name",
     "errorEnterGameId": "Please enter a game code",
     "errorCreateFailed": "Failed to create game",
     "errorConnection": "Connection failed"
+  },
+  "history": {
+    "title": "Game History",
+    "loading": "Loading..."
   },
   "lobby": {
     "title": "Game Lobby",

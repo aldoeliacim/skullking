@@ -1,5 +1,4 @@
-"""
-Enhanced Gymnasium environment for Skull King with improved reward shaping.
+"""Enhanced Gymnasium environment for Skull King with improved reward shaping.
 
 Key improvements:
 1. Reward for bidding accuracy (matching bid exactly)
@@ -20,12 +19,12 @@ from app.models.card import CardId
 from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, GameState
 from app.models.game import Game
 from app.models.player import Player
+from app.models.round import Round
 from app.models.trick import Trick
 
 
 class SkullKingEnvEnhanced(gym.Env):
-    """
-    Enhanced Gymnasium environment for Skull King with better reward shaping.
+    """Enhanced Gymnasium environment for Skull King with better reward shaping.
 
     Improvements over base environment:
     - Bidding accuracy rewards: +10 for exact match, scaled penalties for misses
@@ -36,20 +35,39 @@ class SkullKingEnvEnhanced(gym.Env):
 
     metadata: ClassVar[dict[str, Any]] = {"render_modes": ["human", "ansi"], "render_fps": 1}
 
+    # Constants
+    MAX_INVALID_MOVES = 10
+    PERFECT_BID_REWARD = 10.0
+    CLOSE_BID_REWARD = 3.0
+    BID_ERROR_2_PENALTY = -2.0
+    TRICK_WIN_NEEDED_REWARD = 2.0
+    TRICK_LOSE_NEEDED_REWARD = 1.0
+    TRICK_CANT_MAKE_BID_REWARD = 0.5
+    TRICK_OVERBID_PENALTY = -1.5
+    INVALID_CARD_PENALTY = -0.5
+    INVALID_MOVE_PENALTY = -1.0
+    TRUNCATION_PENALTY = -10.0
+    FIRST_RANK_REWARD = 40
+    SECOND_RANK_REWARD = 10
+    THIRD_RANK_PENALTY = -10
+    FOURTH_RANK_PENALTY = -30
+    WINNER_BONUS = 20
+    BID_ACCURACY_1 = 1
+    BID_ACCURACY_2 = 2
+
     def __init__(
         self,
         num_opponents: int = 3,
         opponent_bot_type: str = "rule_based",
         opponent_difficulty: str = "medium",
         render_mode: str | None = None,
-    ):
+    ) -> None:
         """Initialize enhanced environment."""
         super().__init__()
 
         self.num_players = num_opponents + 1
         self.opponent_bot_type = opponent_bot_type
         self.render_mode = render_mode
-        self.max_invalid_moves = 10
 
         # Convert difficulty string to enum
         difficulty_map = {
@@ -84,7 +102,7 @@ class SkullKingEnvEnhanced(gym.Env):
         self.previous_tricks_won = 0
 
     def reset(
-        self, seed: int | None = None, options: dict[str, Any] | None = None
+        self, seed: int | None = None, _options: dict[str, Any] | None = None
     ) -> tuple[np.ndarray, dict[str, Any]]:
         """Reset environment."""
         super().reset(seed=seed)
@@ -138,142 +156,162 @@ class SkullKingEnvEnhanced(gym.Env):
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """Execute action and return result with enhanced rewards."""
         if self.game is None:
-            raise RuntimeError("Environment not initialized. Call reset() first.")
-
-        reward = 0.0
-        terminated = False
-        truncated = False
+            msg = "Environment not initialized. Call reset() first."
+            raise RuntimeError(msg)
 
         agent_player = self.game.get_player(self.agent_player_id)
         if not agent_player:
-            raise RuntimeError("Agent player not found")
+            msg = "Agent player not found"
+            raise RuntimeError(msg)
 
-        # Execute action based on game state
+        reward = self._execute_enhanced_action(action, agent_player)
+        terminated, truncated, final_reward = self._check_enhanced_termination(reward, agent_player)
+
+        observation = self._get_observation()
+        info = self._get_info()
+
+        return observation, final_reward, terminated, truncated, info
+
+    def _execute_enhanced_action(self, action: int, agent_player: Player) -> float:
+        """Execute action and return enhanced reward."""
         if self.game.state == GameState.BIDDING:
-            # Action is bid amount
-            current_round = self.game.get_current_round()
-            bid = min(action, current_round.number)
-            agent_player.bid = bid
-            current_round.add_bid(self.agent_player_id, bid)
+            return self._handle_enhanced_bidding(action, agent_player)
+        if self.game.state == GameState.PICKING:
+            return self._handle_enhanced_picking(action, agent_player)
+        return 0.0
 
-            # Have bots make their bids
-            for bot_id, bot in self.bots:
-                bot_player = self.game.get_player(bot_id)
-                if bot_player and bot_player.bid is None:
-                    bot_bid = bot.make_bid(
-                        self.game,
-                        current_round.number,
-                        bot_player.hand,
-                    )
-                    bot_player.bid = bot_bid
-                    current_round.add_bid(bot_id, bot_bid)
+    def _handle_enhanced_bidding(self, action: int, agent_player: Player) -> float:
+        """Handle bidding phase with enhanced rewards."""
+        current_round = self.game.get_current_round()
+        bid = min(action, current_round.number)
+        agent_player.bid = bid
+        current_round.add_bid(self.agent_player_id, bid)
 
-            # Transition to picking after all bids
-            if self._all_players_bid():
-                self.game.state = GameState.PICKING
-                self._start_new_trick()
+        # Have bots make their bids
+        for bot_id, bot in self.bots:
+            bot_player = self.game.get_player(bot_id)
+            if bot_player and bot_player.bid is None:
+                bot_bid = bot.make_bid(self.game, current_round.number, bot_player.hand)
+                bot_player.bid = bot_bid
+                current_round.add_bid(bot_id, bot_bid)
 
-                # Have bots play if agent isn't first
-                self._bots_play_cards()
+        # Transition to picking after all bids
+        if self._all_players_bid():
+            self.game.state = GameState.PICKING
+            self._start_new_trick()
+            self._bots_play_cards()
 
-        elif self.game.state == GameState.PICKING:
-            # Action is card index
-            card_index = action
-            if 0 <= card_index < len(agent_player.hand):
-                card_to_play = agent_player.hand[card_index]
+        return 0.0
 
-                # Track state before playing
-                current_round = self.game.get_current_round()
-                tricks_won_before = current_round.get_tricks_won(self.agent_player_id)
+    def _handle_enhanced_picking(self, action: int, agent_player: Player) -> float:
+        """Handle card picking phase with enhanced rewards."""
+        card_index = action
+        if not 0 <= card_index < len(agent_player.hand):
+            self.invalid_move_count += 1
+            return self.INVALID_MOVE_PENALTY
 
-                success = self._play_card(self.agent_player_id, card_to_play)
+        card_to_play = agent_player.hand[card_index]
+        current_round = self.game.get_current_round()
+        tricks_won_before = current_round.get_tricks_won(self.agent_player_id)
 
-                if not success:
-                    reward = -0.5
-                    self.invalid_move_count += 1
-                else:
-                    # ENHANCED: Trick-level strategic reward
-                    current_trick = current_round.get_current_trick()
-                    if current_trick and current_trick.is_complete(self.num_players):
-                        tricks_won_after = current_round.get_tricks_won(self.agent_player_id)
-                        won_trick = tricks_won_after > tricks_won_before
+        success = self._play_card(self.agent_player_id, card_to_play)
+        if not success:
+            self.invalid_move_count += 1
+            return self.INVALID_CARD_PENALTY
 
-                        bid = agent_player.bid if agent_player.bid is not None else 0
-                        tricks_needed = bid - tricks_won_before
-                        tricks_remaining = current_round.number - len(current_round.tricks) + 1
+        return self._calculate_trick_reward(agent_player, current_round, tricks_won_before)
 
-                        # Reward for strategic play
-                        if tricks_needed > 0 and won_trick:
-                            # Needed to win and did win
-                            reward += 2.0
-                        elif tricks_needed == 0 and not won_trick:
-                            # Didn't need to win and didn't win
-                            reward += 1.0
-                        elif tricks_needed > tricks_remaining and not won_trick:
-                            # Can't make bid anyway, good to avoid winning
-                            reward += 0.5
-                        elif tricks_needed == 0 and won_trick:
-                            # Overbidding penalty
-                            reward -= 1.5
+    def _calculate_trick_reward(
+        self, agent_player: Player, current_round: Round, tricks_won_before: int
+    ) -> float:
+        """Calculate reward for trick completion."""
+        current_trick = current_round.get_current_trick()
+        if not current_trick or not current_trick.is_complete(self.num_players):
+            return 0.0
 
-            else:
-                # Invalid card index
-                reward = -1.0
-                self.invalid_move_count += 1
+        tricks_won_after = current_round.get_tricks_won(self.agent_player_id)
+        won_trick = tricks_won_after > tricks_won_before
 
-        # Check for invalid move threshold
-        if self.invalid_move_count >= self.max_invalid_moves:
+        bid = agent_player.bid if agent_player.bid is not None else 0
+        tricks_needed = bid - tricks_won_before
+        tricks_remaining = current_round.number - len(current_round.tricks) + 1
+
+        # Reward for strategic play
+        if tricks_needed > 0 and won_trick:
+            return self.TRICK_WIN_NEEDED_REWARD
+        if tricks_needed == 0 and not won_trick:
+            return self.TRICK_LOSE_NEEDED_REWARD
+        if tricks_needed > tricks_remaining and not won_trick:
+            return self.TRICK_CANT_MAKE_BID_REWARD
+        if tricks_needed == 0 and won_trick:
+            return self.TRICK_OVERBID_PENALTY
+
+        return 0.0
+
+    def _check_enhanced_termination(
+        self, reward: float, agent_player: Player
+    ) -> tuple[bool, bool, float]:
+        """Check termination with enhanced rewards."""
+        terminated = False
+        truncated = False
+        final_reward = reward
+
+        if self.invalid_move_count >= self.MAX_INVALID_MOVES:
             truncated = True
-            reward = -10.0
+            final_reward = self.TRUNCATION_PENALTY
 
         # Check if round ended (for bidding accuracy reward)
         current_round = self.game.get_current_round()
         if current_round and current_round.is_complete():
-            # ENHANCED: Bidding accuracy reward
-            bid = agent_player.bid if agent_player.bid is not None else 0
-            tricks_won = current_round.get_tricks_won(self.agent_player_id)
-            bid_accuracy = abs(bid - tricks_won)
-
-            if bid_accuracy == 0:
-                # Perfect bid!
-                reward += 10.0
-            elif bid_accuracy == 1:
-                # Close
-                reward += 3.0
-            elif bid_accuracy == 2:
-                reward -= 2.0
-            else:
-                # Way off
-                reward -= 5.0 * bid_accuracy
-
-            # Update round score
+            final_reward += self._calculate_bidding_accuracy_reward(agent_player, current_round)
             current_round.update_scores()
 
         # Check if game is over
         if self.game.is_game_complete():
             terminated = True
+            final_reward += self._calculate_game_ranking_reward()
 
-            # ENHANCED: Better final ranking reward
-            leaderboard = self.game.get_leaderboard()
-            agent_rank = next(
-                i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id
-            )
+        return terminated, truncated, final_reward
 
-            # Scaled ranking reward: 1st=+40, 2nd=+10, 3rd=-10, 4th=-30
-            rank_rewards = [40, 10, -10, -30]
-            if agent_rank < len(rank_rewards):
-                reward += rank_rewards[agent_rank]
+    def _calculate_bidding_accuracy_reward(
+        self, agent_player: Player, current_round: Round
+    ) -> float:
+        """Calculate reward based on bidding accuracy."""
+        bid = agent_player.bid if agent_player.bid is not None else 0
+        tricks_won = current_round.get_tricks_won(self.agent_player_id)
+        bid_accuracy = abs(bid - tricks_won)
 
-            # Bonus for winning
-            if agent_rank == 0:
-                reward += 20
+        if bid_accuracy == 0:
+            return self.PERFECT_BID_REWARD
+        if bid_accuracy == self.BID_ACCURACY_1:
+            return self.CLOSE_BID_REWARD
+        if bid_accuracy == self.BID_ACCURACY_2:
+            return self.BID_ERROR_2_PENALTY
+        return -5.0 * bid_accuracy
 
-        observation = self._get_observation()
-        info = self._get_info()
+    def _calculate_game_ranking_reward(self) -> float:
+        """Calculate final ranking reward."""
+        leaderboard = self.game.get_leaderboard()
+        agent_rank = next(
+            i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id
+        )
 
-        return observation, reward, terminated, truncated, info
+        rank_rewards = [
+            self.FIRST_RANK_REWARD,
+            self.SECOND_RANK_REWARD,
+            self.THIRD_RANK_PENALTY,
+            self.FOURTH_RANK_PENALTY,
+        ]
+        reward = (
+            rank_rewards[agent_rank] if agent_rank < len(rank_rewards) else self.FOURTH_RANK_PENALTY
+        )
 
-    def _get_observation(self) -> np.ndarray:
+        if agent_rank == 0:
+            reward += self.WINNER_BONUS
+
+        return reward
+
+    def _get_observation(self) -> np.ndarray:  # noqa: C901
         """Build enhanced observation with bid tracking."""
         if self.game is None:
             return np.zeros(self.observation_space.shape, dtype=np.float32)
@@ -439,7 +477,7 @@ class SkullKingEnvEnhanced(gym.Env):
         else:
             self.game.state = GameState.ENDED
 
-    def _bots_play_cards(self) -> None:
+    def _bots_play_cards(self) -> None:  # noqa: C901
         """Have bots play their cards until it's the agent's turn (iterative, no recursion)."""
         if not self.game:
             return
@@ -501,13 +539,13 @@ class SkullKingEnvEnhanced(gym.Env):
             return self._render_ansi()
         return None
 
-    def set_opponent(self, opponent_type: str, difficulty: str = "medium"):
-        """
-        Change opponent type and difficulty (for curriculum learning).
+    def set_opponent(self, opponent_type: str, difficulty: str = "medium") -> None:
+        """Change opponent type and difficulty (for curriculum learning).
 
         Args:
             opponent_type: "random" or "rule_based"
             difficulty: "easy", "medium", or "hard"
+
         """
         self.opponent_bot_type = opponent_type
 

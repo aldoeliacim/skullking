@@ -7,8 +7,7 @@ from app.models.card import CardId
 
 @dataclass
 class Player:
-    """
-    Represents a player in the game.
+    """Represents a player in the game.
 
     Attributes:
         id: Unique player identifier
@@ -22,6 +21,7 @@ class Player:
         hand: Current cards in hand
         bid: Current round bid (None if not yet bid)
         tricks_won: Number of tricks won this round
+
     """
 
     id: str
@@ -68,6 +68,6 @@ class Player:
         return self.bid == self.tricks_won
 
     def __str__(self) -> str:
-        """String representation."""
+        """Return string representation."""
         bot_str = " (Bot)" if self.is_bot else ""
         return f"{self.username}{bot_str} - Score: {self.score}"

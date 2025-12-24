@@ -1,5 +1,4 @@
-"""
-Self-play bot that loads a trained PPO model to use as an opponent.
+"""Self-play bot that loads a trained PPO model to use as an opponent.
 
 This enables advanced training where the agent trains against copies of itself,
 leading to emergent strategies and continuous improvement.
@@ -11,13 +10,20 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from app.bots.base_bot import BaseBot, BotDifficulty
-from app.models.card import CardId
+from app.constants import HIGH_CARD_THRESHOLD
+from app.models.card import CardId, get_card
 from app.models.game import Game
+
+# Card value thresholds for bidding strategy
+MEDIUM_ROGER_THRESHOLD = 6
+HIGH_SUIT_THRESHOLD = 12
+
+# Initialize numpy random generator for non-cryptographic randomness
+rng = np.random.default_rng()
 
 
 class SelfPlayBot(BaseBot):
-    """
-    Bot that uses a trained PPO model to play.
+    """Bot that uses a trained PPO model to play.
 
     Used for self-play training where the agent competes against
     past versions of itself.
@@ -28,29 +34,30 @@ class SelfPlayBot(BaseBot):
         player_id: str,
         model_path: str,
         difficulty: BotDifficulty = BotDifficulty.HARD,
+        *,
         deterministic: bool = False,
-    ):
-        """
-        Initialize self-play bot.
+    ) -> None:
+        """Initialize self-play bot.
 
         Args:
             player_id: Player ID for this bot
             model_path: Path to trained PPO model
             difficulty: Difficulty level (affects randomness)
             deterministic: If True, always picks best action
+
         """
         super().__init__(player_id, difficulty)
 
         if not Path(model_path).exists():
-            raise ValueError(f"Model not found: {model_path}")
+            msg = f"Model not found: {model_path}"
+            raise ValueError(msg)
 
         self.model = PPO.load(model_path)
         self.deterministic = deterministic
         self.last_observation: np.ndarray | None = None
 
-    def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
-        """
-        Make a bid using the trained model.
+    def make_bid(self, _game: Game, round_number: int, hand: list[CardId]) -> int:
+        """Make a bid using the trained model.
 
         Note: This is simplified - ideally we'd create a full observation
         from the game state. For now, we use a heuristic similar to rule-based.
@@ -60,8 +67,6 @@ class SelfPlayBot(BaseBot):
         expected_tricks = 0.0
 
         for card_id in hand:
-            from app.models.card import get_card
-
             card = get_card(card_id)
 
             if card.is_king():
@@ -70,33 +75,32 @@ class SelfPlayBot(BaseBot):
                 expected_tricks += 0.55
             elif card.is_mermaid():
                 expected_tricks += 0.4
-            elif card.is_roger() and card.number >= 10:
+            elif card.is_roger() and card.number >= HIGH_CARD_THRESHOLD:
                 expected_tricks += 0.65
-            elif card.is_roger() and card.number >= 6:
+            elif card.is_roger() and card.number >= MEDIUM_ROGER_THRESHOLD:
                 expected_tricks += 0.35
-            elif card.is_suit() and card.number >= 12:
+            elif card.is_suit() and card.number >= HIGH_SUIT_THRESHOLD:
                 expected_tricks += 0.25
 
         # Add slight randomness based on difficulty
         if self.difficulty == BotDifficulty.EASY:
-            expected_tricks += np.random.uniform(-1.0, 1.0)
+            expected_tricks += rng.uniform(-1.0, 1.0)
         elif self.difficulty == BotDifficulty.MEDIUM:
-            expected_tricks += np.random.uniform(-0.5, 0.5)
+            expected_tricks += rng.uniform(-0.5, 0.5)
         else:
-            expected_tricks += np.random.uniform(-0.2, 0.2)
+            expected_tricks += rng.uniform(-0.2, 0.2)
 
         bid = round(expected_tricks)
         return max(0, min(round_number, bid))
 
     def pick_card(
         self,
-        game: Game,
+        _game: Game,
         hand: list[CardId],
-        cards_in_trick: list[CardId],
+        _cards_in_trick: list[CardId],
         valid_cards: list[CardId] | None = None,
     ) -> CardId:
-        """
-        Pick a card using the trained model.
+        """Pick a card using the trained model.
 
         Note: Simplified implementation using rule-based fallback.
         Full implementation would require observation reconstruction.
@@ -106,12 +110,11 @@ class SelfPlayBot(BaseBot):
             playable = hand
 
         if not playable:
-            raise ValueError("No cards to play")
+            msg = "No cards to play"
+            raise ValueError(msg)
 
         # Simple strategy: play medium-strength cards
         # Full model-based play would require proper observation
-        from app.models.card import get_card
-
         strengths = []
         for card_id in playable:
             card = get_card(card_id)
@@ -136,7 +139,7 @@ class SelfPlayBot(BaseBot):
 
         # Add some randomness for variety
         if not self.deterministic:
-            offset = np.random.randint(-1, 2)
+            offset = rng.integers(-1, 2)
             middle_index = max(0, min(len(strengths) - 1, middle_index + offset))
 
         return strengths[middle_index][0]

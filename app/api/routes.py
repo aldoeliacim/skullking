@@ -1,7 +1,7 @@
 """API routes."""
 
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket
 
@@ -22,10 +22,9 @@ from app.services.event_recorder import event_recorder
 router = APIRouter()
 
 
-@router.post("/games", response_model=CreateGameResponse)
+@router.post("/games")
 async def create_game(_request: CreateGameRequest) -> CreateGameResponse:
-    """
-    Create a new game.
+    """Create a new game.
 
     This endpoint creates a new game instance from a lobby.
     In the full implementation, this would fetch lobby details
@@ -55,14 +54,14 @@ async def join_game(
     player_id: str = Query(..., description="Player ID"),
     username: str = Query(default="Player", description="Player username"),
 ) -> None:
-    """
-    WebSocket endpoint to join a game.
+    """WebSocket endpoint to join a game.
 
     Args:
         websocket: WebSocket connection
         game_id: Game to join
         player_id: Player identifier
         username: Player display name
+
     """
     # Get game
     game = websocket_manager.get_game(game_id)
@@ -138,8 +137,7 @@ async def spectate_game(
     spectator_id: str = Query(..., description="Spectator ID"),
     username: str = Query(default="Spectator", description="Spectator username"),
 ) -> None:
-    """
-    WebSocket endpoint to spectate a game.
+    """WebSocket endpoint to spectate a game.
 
     Spectators can watch the game but cannot interact with it.
     They receive all public game events.
@@ -149,6 +147,7 @@ async def spectate_game(
         game_id: Game to spectate
         spectator_id: Spectator identifier
         username: Spectator display name
+
     """
     # Get game
     game = websocket_manager.get_game(game_id)
@@ -220,13 +219,13 @@ async def spectate_game(
     await websocket_manager.handle_spectator_message(websocket, game_id, spectator_id)
 
 
-@router.get("/games/cards", response_model=CardListResponse)
+@router.get("/games/cards")
 async def get_cards() -> CardListResponse:
-    """
-    Get all cards in the deck.
+    """Get all cards in the deck.
 
     Returns:
         List of all card definitions
+
     """
     all_cards = get_all_cards()
 
@@ -245,14 +244,14 @@ async def get_cards() -> CardListResponse:
 
 @router.get("/games/{game_id}")
 async def get_game(game_id: str) -> dict[str, Any]:
-    """
-    Get game state.
+    """Get game state.
 
     Args:
         game_id: Game identifier
 
     Returns:
         Game state information
+
     """
     game = websocket_manager.get_game(game_id)
 
@@ -284,15 +283,15 @@ async def get_game(game_id: str) -> dict[str, Any]:
 
 
 @router.get("/games/history")
-async def get_game_history_list(limit: int = Query(default=10, le=50)) -> dict[str, Any]:
-    """
-    Get list of recently completed games.
+async def get_game_history_list(limit: Annotated[int, Query(le=50)] = 10) -> dict[str, Any]:
+    """Get list of recently completed games.
 
     Args:
         limit: Maximum number of games to return (max 50)
 
     Returns:
         List of game summaries
+
     """
     histories = event_recorder.get_recent_histories(limit)
     return {"games": histories, "count": len(histories)}
@@ -300,14 +299,14 @@ async def get_game_history_list(limit: int = Query(default=10, le=50)) -> dict[s
 
 @router.get("/games/{game_id}/replay")
 async def get_game_replay(game_id: str) -> dict[str, Any]:
-    """
-    Get full replay data for a completed game.
+    """Get full replay data for a completed game.
 
     Args:
         game_id: ID of the completed game
 
     Returns:
         Complete game history with all events for replay
+
     """
     history = event_recorder.get_history(game_id)
 

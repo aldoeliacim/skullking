@@ -3,13 +3,22 @@
 import random
 
 from app.bots.base_bot import BaseBot, BotDifficulty
+from app.constants import HIGH_CARD_THRESHOLD
 from app.models.card import CardId, get_card
 from app.models.game import Game
 
+# Card value thresholds for bidding strategy
+MEDIUM_ROGER_THRESHOLD = 6
+HIGH_SUIT_THRESHOLD = 12
+MEDIUM_SUIT_THRESHOLD = 8
+
+# Strategy thresholds
+EASY_MISTAKE_PROBABILITY = 0.3
+MIN_HIGH_SUITS_FOR_WHALE = 2
+
 
 class RuleBasedBot(BaseBot):
-    """
-    Bot that uses heuristics and game rules to make intelligent decisions.
+    """Bot that uses heuristics and game rules to make intelligent decisions.
 
     Supports all 74 cards including expansion cards:
     - Tigress (Scary Mary): Can be played as pirate OR escape
@@ -28,13 +37,12 @@ class RuleBasedBot(BaseBot):
     - Handle special cards intelligently (Kraken to cancel, Whale situationally)
     """
 
-    def __init__(self, player_id: str, difficulty: BotDifficulty = BotDifficulty.MEDIUM):
+    def __init__(self, player_id: str, difficulty: BotDifficulty = BotDifficulty.MEDIUM) -> None:
         """Initialize rule-based bot."""
         super().__init__(player_id, difficulty)
 
-    def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
-        """
-        Make a bid based on hand strength.
+    def make_bid(self, _game: Game, round_number: int, hand: list[CardId]) -> int:  # noqa: C901, PLR0912
+        """Make a bid based on hand strength.
 
         Strategy (74-card deck):
         - Skull King: almost always wins (0.9)
@@ -49,12 +57,13 @@ class RuleBasedBot(BaseBot):
         - Escapes/Low cards: unlikely to win
 
         Args:
-            game: Current game state
+            _game: Current game state
             round_number: Current round number
             hand: Bot's cards
 
         Returns:
             Estimated bid
+
         """
         expected_tricks = 0.0
 
@@ -84,46 +93,43 @@ class RuleBasedBot(BaseBot):
                 expected_tricks += 0.4  # Can beat King
             elif card.is_roger():
                 # Jolly Roger (trump) strength based on number
-                if card.number >= 10:
+                if card.number >= HIGH_CARD_THRESHOLD:
                     expected_tricks += 0.7
-                elif card.number >= 6:
+                elif card.number >= MEDIUM_ROGER_THRESHOLD:
                     expected_tricks += 0.4
                 else:
                     expected_tricks += 0.2
             elif card.is_suit():
                 # Standard suits - less likely
-                if card.number >= 12:
+                if card.number >= HIGH_SUIT_THRESHOLD:
                     expected_tricks += 0.3
-                elif card.number >= 8:
+                elif card.number >= MEDIUM_SUIT_THRESHOLD:
                     expected_tricks += 0.15
             # Escapes: 0 probability
 
         # Apply difficulty modifier
         if self.difficulty == BotDifficulty.EASY:
             # Easy mode: less accurate bidding
-            expected_tricks += random.uniform(-1.0, 1.0)
+            expected_tricks += random.uniform(-1.0, 1.0)  # noqa: S311
         elif self.difficulty == BotDifficulty.HARD:
             # Hard mode: more accurate
-            expected_tricks += random.uniform(-0.2, 0.2)
+            expected_tricks += random.uniform(-0.2, 0.2)  # noqa: S311
         else:
             # Medium mode
-            expected_tricks += random.uniform(-0.5, 0.5)
+            expected_tricks += random.uniform(-0.5, 0.5)  # noqa: S311
 
         # Round to nearest integer and clamp
         bid = round(expected_tricks)
-        bid = max(0, min(round_number, bid))
+        return max(0, min(round_number, bid))
 
-        return bid
-
-    def pick_card(
+    def pick_card(  # noqa: C901
         self,
         game: Game,
         hand: list[CardId],
         cards_in_trick: list[CardId],
         valid_cards: list[CardId] | None = None,
     ) -> CardId:
-        """
-        Pick a card strategically.
+        """Pick a card strategically.
 
         Strategy:
         - Calculate if we want to win this trick
@@ -138,13 +144,15 @@ class RuleBasedBot(BaseBot):
 
         Returns:
             CardId to play
+
         """
         playable = self._get_valid_cards(hand, valid_cards)
         if not playable:
             playable = hand
 
         if not playable:
-            raise ValueError("No cards to play")
+            msg = "No cards to play"
+            raise ValueError(msg)
 
         # Determine strategy: should we try to win this trick?
         player = game.get_player(self.player_id)
@@ -154,7 +162,7 @@ class RuleBasedBot(BaseBot):
 
         current_round = game.get_current_round()
         if not current_round:
-            return random.choice(playable)
+            return random.choice(playable)  # noqa: S311
 
         tricks_won = current_round.get_tricks_won(self.player_id)
         tricks_remaining = current_round.number - len(current_round.tricks)
@@ -177,9 +185,9 @@ class RuleBasedBot(BaseBot):
             strategy = "lose"
 
         # Apply difficulty to strategy consistency
-        if self.difficulty == BotDifficulty.EASY and random.random() < 0.3:
+        if self.difficulty == BotDifficulty.EASY and random.random() < EASY_MISTAKE_PROBABILITY:  # noqa: S311
             # Easy bots make mistakes
-            strategy = random.choice(["win", "lose", "medium"])
+            strategy = random.choice(["win", "lose", "medium"])  # noqa: S311
 
         # Execute strategy
         if strategy == "win":
@@ -188,9 +196,8 @@ class RuleBasedBot(BaseBot):
             return self._play_weak_card(playable, cards_in_trick)
         return self._play_medium_card(playable, cards_in_trick)
 
-    def _evaluate_card_strength(self, card_id: CardId, hand: list[CardId]) -> float:
-        """
-        Evaluate the strength of a card (0.0 to 1.0).
+    def _evaluate_card_strength(self, card_id: CardId, hand: list[CardId]) -> float:  # noqa: C901, PLR0911
+        """Evaluate the strength of a card (0.0 to 1.0).
 
         Handles all 74 cards including expansion cards.
 
@@ -200,6 +207,7 @@ class RuleBasedBot(BaseBot):
 
         Returns:
             Strength score
+
         """
         card = get_card(card_id)
 
@@ -222,9 +230,11 @@ class RuleBasedBot(BaseBot):
             # Whale: highest suit wins - context-dependent
             # Good if we have high suits, bad otherwise
             high_suits = sum(
-                1 for cid in hand if get_card(cid).is_suit() and get_card(cid).number >= 12
+                1
+                for cid in hand
+                if get_card(cid).is_suit() and get_card(cid).number >= HIGH_SUIT_THRESHOLD
             )
-            return 0.6 if high_suits >= 2 else 0.35
+            return 0.6 if high_suits >= MIN_HIGH_SUITS_FOR_WHALE else 0.35
         if card.is_kraken():
             # Kraken: nobody wins - useful for dodging or disrupting
             return 0.25
@@ -236,7 +246,7 @@ class RuleBasedBot(BaseBot):
             return 0.1 + (card.number / 14) * 0.3
         return 0.2
 
-    def _play_strong_card(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
+    def _play_strong_card(self, playable: list[CardId], _cards_in_trick: list[CardId]) -> CardId:
         """Play the strongest available card."""
         strengths = [
             (card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable
@@ -244,7 +254,7 @@ class RuleBasedBot(BaseBot):
         strengths.sort(key=lambda x: x[1], reverse=True)
         return strengths[0][0]
 
-    def _play_weak_card(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
+    def _play_weak_card(self, playable: list[CardId], _cards_in_trick: list[CardId]) -> CardId:
         """Play the weakest available card."""
         strengths = [
             (card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable
@@ -252,7 +262,7 @@ class RuleBasedBot(BaseBot):
         strengths.sort(key=lambda x: x[1])
         return strengths[0][0]
 
-    def _play_medium_card(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
+    def _play_medium_card(self, playable: list[CardId], _cards_in_trick: list[CardId]) -> CardId:
         """Play a medium-strength card."""
         strengths = [
             (card_id, self._evaluate_card_strength(card_id, playable)) for card_id in playable

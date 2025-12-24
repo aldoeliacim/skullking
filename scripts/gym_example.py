@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Example script showing how to use the Skull King Gymnasium environment.
+"""Example script showing how to use the Skull King Gymnasium environment.
 
 This demonstrates:
 1. Creating the environment
@@ -87,7 +86,7 @@ def multiple_episodes_example():
 
         while True:
             action = env.action_space.sample()
-            observation, reward, terminated, truncated, info = env.step(action)
+            _observation, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
 
             if terminated or truncated:

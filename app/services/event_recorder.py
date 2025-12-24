@@ -1,5 +1,5 @@
-"""
-Event recorder service for capturing game events during gameplay.
+"""Event recorder service for capturing game events during gameplay.
+
 Used for replay and game history features.
 """
 
@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 class EventRecorder:
     """Records game events for later replay."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the event recorder.
+
+        Sets up in-memory storage for game events during gameplay and completed game histories.
+        """
         # In-memory storage during game
         # Key: game_id, Value: list of events
         self._events: dict[str, list[GameEvent]] = {}
@@ -41,7 +45,7 @@ class EventRecorder:
             },
         )
 
-    def record_event(
+    def record_event(  # noqa: PLR0913
         self,
         game_id: str,
         event_type: GameEventType,

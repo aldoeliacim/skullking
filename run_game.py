@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple standalone Skull King server.
+"""Simple standalone Skull King server.
 Runs without MongoDB/Redis for easy local gameplay.
 """
 
@@ -47,9 +46,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    print("🎮 Starting Skull King Game Server...")
-    print("📱 Open your browser to: http://localhost:8000")
-    print("🎯 Press CTRL+C to stop")
-    print()
-
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

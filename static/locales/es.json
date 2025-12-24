@@ -12,10 +12,16 @@
     "gameCode": "Codigo de Partida",
     "enterGameId": "Ingresa el codigo...",
     "joinGame": "Unirse",
+    "spectateGame": "Observar",
+    "viewHistory": "Historial",
     "errorEnterName": "Por favor ingresa tu nombre",
     "errorEnterGameId": "Por favor ingresa un codigo",
     "errorCreateFailed": "Error al crear partida",
     "errorConnection": "Error de conexion"
+  },
+  "history": {
+    "title": "Historial de Partidas",
+    "loading": "Cargando..."
   },
   "lobby": {
     "title": "Sala de Espera",

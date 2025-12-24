@@ -17,28 +17,26 @@ class BotDifficulty(str, Enum):
 
 
 class BaseBot(ABC):
-    """
-    Abstract base class for bot AI strategies.
+    """Abstract base class for bot AI strategies.
 
     All bot implementations must inherit from this class and implement
     the make_bid() and pick_card() methods.
     """
 
-    def __init__(self, player_id: str, difficulty: BotDifficulty = BotDifficulty.MEDIUM):
-        """
-        Initialize the bot.
+    def __init__(self, player_id: str, difficulty: BotDifficulty = BotDifficulty.MEDIUM) -> None:
+        """Initialize the bot.
 
         Args:
             player_id: ID of the player this bot controls
             difficulty: Bot difficulty level
+
         """
         self.player_id = player_id
         self.difficulty = difficulty
 
     @abstractmethod
     def make_bid(self, game: Game, round_number: int, hand: list[CardId]) -> int:
-        """
-        Make a bid for the current round.
+        """Make a bid for the current round.
 
         Args:
             game: Current game state
@@ -47,6 +45,7 @@ class BaseBot(ABC):
 
         Returns:
             Bid amount (0 to round_number)
+
         """
 
     @abstractmethod
@@ -57,8 +56,7 @@ class BaseBot(ABC):
         cards_in_trick: list[CardId],
         valid_cards: list[CardId] | None = None,
     ) -> CardId:
-        """
-        Pick a card to play in the current trick.
+        """Pick a card to play in the current trick.
 
         Args:
             game: Current game state
@@ -68,13 +66,13 @@ class BaseBot(ABC):
 
         Returns:
             CardId to play
+
         """
 
     def _get_valid_cards(
         self, hand: list[CardId], valid_cards: list[CardId] | None = None
     ) -> list[CardId]:
-        """
-        Get list of valid cards to play.
+        """Get list of valid cards to play.
 
         Args:
             hand: Bot's current hand
@@ -82,11 +80,12 @@ class BaseBot(ABC):
 
         Returns:
             List of valid card IDs
+
         """
         if valid_cards is not None:
             return [c for c in valid_cards if c in hand]
         return hand.copy()
 
     def __str__(self) -> str:
-        """String representation."""
+        """Return string representation."""
         return f"{self.__class__.__name__} ({self.difficulty.value})"

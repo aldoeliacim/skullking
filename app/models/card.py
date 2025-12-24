@@ -104,13 +104,13 @@ class CardId(IntEnum):
 
 @dataclass(frozen=True)
 class Card:
-    """
-    Represents a card in Skull King.
+    """Represents a card in Skull King.
 
     Attributes:
         id: Unique card identifier
         number: Card number (0 for special cards, 1-14 for suit cards)
         card_type: Type of card (suit, character, escape, etc.)
+
     """
 
     id: CardId
@@ -193,7 +193,7 @@ class Card:
         return self.card_type == CardType.LOOT
 
     def __str__(self) -> str:
-        """String representation of card."""
+        """Return string representation of card."""
         if self.number > 0:
             return f"{self.card_type.value.title()}{self.number}"
         return self.card_type.value.title().replace("_", " ")
@@ -256,11 +256,10 @@ def get_all_cards() -> dict[CardId, Card]:
     return _CARDS.copy()
 
 
-def determine_winner(
+def determine_winner(  # noqa: C901, PLR0912
     card_ids: list[CardId], tigress_choices: dict[CardId, str] | None = None
 ) -> CardId | None:
-    """
-    Determine the winner of a trick given the cards played.
+    """Determine the winner of a trick given the cards played.
 
     Args:
         card_ids: List of card IDs played in order
@@ -282,6 +281,7 @@ def determine_winner(
         10. Loot: Always loses (like Escape)
         11. Kraken + Whale: Last beast played takes effect
         12. Tigress: Acts as pirate or escape based on player choice
+
     """
     if not card_ids:
         return None

@@ -34,8 +34,7 @@ logging.getLogger("app").setLevel(logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """
-    Lifespan context manager for startup and shutdown events.
+    """Lifespan context manager for startup and shutdown events.
 
     Handles:
     - Database connection initialization
@@ -44,8 +43,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     - Cleanup on shutdown
     """
     # Startup
-    print(f"🚀 Starting Skull King Server on {settings.host}:{settings.port}")
-    print(f"📝 Environment: {settings.environment}")
 
     # Initialize services
     app.state.log_service = LogService()
@@ -55,21 +52,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.game_repository = GameRepository()
     try:
         await app.state.game_repository.connect()
-        print("✅ Connected to MongoDB")
-    except Exception as e:
-        print(f"⚠ Could not connect to MongoDB: {e}. Using in-memory storage.")
+    except (ConnectionError, TimeoutError):
         app.state.game_repository = None
 
     # Start WebSocket manager background task
     websocket_task = asyncio.create_task(websocket_manager.run())
 
-    print("✅ Server started successfully")
-    print(f"🌐 Access the game at: http://localhost:{settings.port}")
-
     yield
 
     # Shutdown
-    print("🛑 Shutting down server...")
 
     # Cancel WebSocket manager task
     websocket_task.cancel()
@@ -84,8 +75,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Close Redis connection
     with contextlib.suppress(Exception):
         await app.state.publisher_service.close()
-
-    print("✅ Server shutdown complete")
 
 
 # Create FastAPI app
@@ -115,7 +104,7 @@ if static_dir.exists():
 
 
 @app.get("/")
-async def root():
+async def root() -> FileResponse | dict[str, str]:
     """Serve the main game UI or API info."""
     static_path = static_dir / "index.html"
     if static_path.exists():

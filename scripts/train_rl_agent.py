@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Train a reinforcement learning agent to play Skull King.
+"""Train a reinforcement learning agent to play Skull King.
 
 This script trains a PPO agent using Stable-Baselines3 on the
 Skull King Gymnasium environment.
@@ -41,8 +40,7 @@ def train_ppo_agent(
     save_dir: str = "./models",
     eval_freq: int = 10000,
 ) -> None:
-    """
-    Train a PPO agent.
+    """Train a PPO agent.
 
     Args:
         total_timesteps: Total training steps
@@ -50,6 +48,7 @@ def train_ppo_agent(
         opponent_type: Type of opponent bots ("random" or "rule_based")
         save_dir: Directory to save models
         eval_freq: Frequency of evaluation
+
     """
     print("=" * 60)
     print("Training PPO Agent for Skull King")
@@ -136,14 +135,14 @@ def evaluate_agent(
     opponent_type: str = "rule_based",
     render: bool = False,
 ) -> None:
-    """
-    Evaluate a trained agent.
+    """Evaluate a trained agent.
 
     Args:
         model_path: Path to trained model
         n_episodes: Number of episodes to evaluate
         opponent_type: Type of opponent bots
         render: Whether to render games
+
     """
     print("=" * 60)
     print("Evaluating PPO Agent")

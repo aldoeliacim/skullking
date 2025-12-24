@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class GameRepository:
-    """
-    Repository for game persistence using MongoDB.
+    """Repository for game persistence using MongoDB.
 
     Handles game CRUD operations with async Motor driver.
     """
@@ -44,14 +43,14 @@ class GameRepository:
             logger.info("Disconnected from MongoDB")
 
     async def create(self, game: Game) -> bool:
-        """
-        Save a new game to database.
+        """Save a new game to database.
 
         Args:
             game: Game instance to save
 
         Returns:
             True if successful
+
         """
         if not self.db:
             logger.error("Database not connected")
@@ -78,21 +77,21 @@ class GameRepository:
 
             await self.db.games.insert_one(game_dict)
             logger.info("Game %s saved to database", game.id)
-            return True
-
         except PyMongoError:
             logger.exception("Error saving game %s", game.id)
             return False
+        else:
+            return True
 
     async def find_by_id(self, game_id: str) -> dict | None:
-        """
-        Find game by ID.
+        """Find game by ID.
 
         Args:
             game_id: Game identifier
 
         Returns:
             Game document or None
+
         """
         if not self.db:
             return None
@@ -104,14 +103,14 @@ class GameRepository:
             return None
 
     async def update(self, game: Game) -> bool:
-        """
-        Update existing game.
+        """Update existing game.
 
         Args:
             game: Game instance to update
 
         Returns:
             True if successful
+
         """
         if not self.db:
             return False
@@ -133,9 +132,8 @@ class GameRepository:
             }
 
             result = await self.db.games.update_one({"_id": game.id}, {"$set": update_dict})
-
-            return result.modified_count > 0
-
         except PyMongoError:
             logger.exception("Error updating game %s", game.id)
             return False
+        else:
+            return result.modified_count > 0

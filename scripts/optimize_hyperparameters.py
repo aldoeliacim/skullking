@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Hyperparameter optimization for PPO training.
+"""Hyperparameter optimization for PPO training.
 
 Uses a grid search or random search to find optimal hyperparameters.
 Tests different combinations of:
@@ -41,8 +40,7 @@ def quick_train_and_evaluate(
     train_steps: int = 50_000,
     eval_games: int = 20,
 ) -> float:
-    """
-    Quickly train a model with given hyperparameters and evaluate it.
+    """Quickly train a model with given hyperparameters and evaluate it.
 
     Returns average reward as the optimization metric.
     """
@@ -91,7 +89,7 @@ def quick_train_and_evaluate(
         if eval_env.game and eval_env.game.players:
             agent_score = eval_env.game.players[0].score
             opponent_scores = [p.score for p in eval_env.game.players[1:]]
-            if agent_score == max([agent_score] + opponent_scores):
+            if agent_score == max([agent_score, *opponent_scores]):
                 wins += 1
 
     eval_env.close()
@@ -109,13 +107,13 @@ def grid_search_hyperparameters(
     train_steps: int = 50_000,
     eval_games: int = 20,
 ):
-    """
-    Perform grid search over hyperparameter space.
+    """Perform grid search over hyperparameter space.
 
     Args:
         param_grid: Dictionary mapping parameter names to lists of values
         train_steps: Training steps per configuration
         eval_games: Evaluation games per configuration
+
     """
     print("=" * 70)
     print("HYPERPARAMETER GRID SEARCH")
@@ -173,8 +171,7 @@ def random_search_hyperparameters(
     train_steps: int = 50_000,
     eval_games: int = 20,
 ):
-    """
-    Perform random search over hyperparameter space.
+    """Perform random search over hyperparameter space.
 
     Samples random combinations from continuous ranges.
     """

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Advanced RL training with curriculum learning and self-play.
+"""Advanced RL training with curriculum learning and self-play.
 
 This script implements advanced training strategies:
 1. Curriculum learning - start with easy opponents, increase difficulty
@@ -24,19 +23,18 @@ from app.gym_env import SkullKingEnv
 
 
 class CurriculumCallback(BaseCallback):
-    """
-    Callback for curriculum learning.
+    """Callback for curriculum learning.
 
     Gradually increases opponent difficulty during training.
     """
 
     def __init__(self, difficulty_steps: list[tuple[int, str]], verbose: int = 0):
-        """
-        Initialize curriculum callback.
+        """Initialize curriculum callback.
 
         Args:
             difficulty_steps: List of (timestep, opponent_type) tuples
             verbose: Verbosity level
+
         """
         super().__init__(verbose)
         self.difficulty_steps = sorted(difficulty_steps, key=lambda x: x[0])
@@ -60,12 +58,12 @@ def train_with_curriculum(
     total_timesteps: int = 2_000_000,
     save_dir: str = "./models/curriculum",
 ) -> None:
-    """
-    Train agent with curriculum learning.
+    """Train agent with curriculum learning.
 
     Args:
         total_timesteps: Total training steps
         save_dir: Directory to save models
+
     """
     print("=" * 60)
     print("Training with Curriculum Learning")
@@ -113,12 +111,12 @@ def compare_algorithms(
     timesteps_per_algo: int = 500_000,
     save_dir: str = "./models/comparison",
 ) -> None:
-    """
-    Compare different RL algorithms.
+    """Compare different RL algorithms.
 
     Args:
         timesteps_per_algo: Training steps per algorithm
         save_dir: Directory to save models
+
     """
     print("=" * 60)
     print("Comparing RL Algorithms")
@@ -170,7 +168,7 @@ def compare_algorithms(
             done = False
             while not done:
                 action, _ = model.predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, info = eval_env.step(action)
+                obs, reward, terminated, truncated, _info = eval_env.step(action)
                 total_reward += reward
                 done = terminated or truncated
 

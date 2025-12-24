@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Train MaskablePPO with critical improvements:
+"""Train MaskablePPO with critical improvements:
 1. Action masking (only sample valid actions)
 2. Dense reward shaping (trick-level, bid quality)
 3. Enhanced observations (171 dims with context awareness)
@@ -33,11 +32,11 @@ class CurriculumCallback(BaseCallback):
     """Callback to change opponent difficulty during training."""
 
     def __init__(self, curriculum_schedule, vec_env, verbose=0):
-        """
-        Args:
-            curriculum_schedule: List of (timestep, opponent_type, difficulty)
-            vec_env: Vectorized environment to update
-            verbose: Verbosity level
+        """Args:
+        curriculum_schedule: List of (timestep, opponent_type, difficulty)
+        vec_env: Vectorized environment to update
+        verbose: Verbosity level
+
         """
         super().__init__(verbose)
         self.curriculum_schedule = sorted(curriculum_schedule, key=lambda x: x[0])
@@ -87,14 +86,14 @@ def train_masked_ppo(
     save_dir: str = "./models/masked_ppo",
     load_path: str | None = None,
 ):
-    """
-    Train MaskablePPO agent with optimized curriculum.
+    """Train MaskablePPO agent with optimized curriculum.
 
     Args:
         total_timesteps: Total training timesteps (default 1.5M)
         n_envs: Number of parallel environments
         save_dir: Directory to save models
         load_path: Optional path to load existing model
+
     """
     # Check GPU availability
     device = "cuda" if torch.cuda.is_available() else "cpu"

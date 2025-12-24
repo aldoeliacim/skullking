@@ -6,8 +6,7 @@ from app.models.card import CardId, get_all_cards
 
 
 class Deck:
-    """
-    Represents a deck of Skull King cards.
+    """Represents a deck of Skull King cards.
 
     The deck contains 63 cards total:
     - 1 Skull King
@@ -34,8 +33,7 @@ class Deck:
         random.shuffle(self.cards)
 
     def deal(self, num_players: int, cards_per_player: int) -> list[list[CardId]]:
-        """
-        Deal cards to players.
+        """Deal cards to players.
 
         Args:
             num_players: Number of players to deal to
@@ -43,6 +41,7 @@ class Deck:
 
         Returns:
             List of hands, where each hand is a list of CardIds
+
         """
         if not self.cards:
             self.shuffle()

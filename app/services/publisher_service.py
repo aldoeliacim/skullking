@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class PublisherService:
-    """
-    Service for publishing game events to Redis pub/sub.
+    """Service for publishing game events to Redis pub/sub.
 
     Used for inter-service communication and event broadcasting.
     """
@@ -38,8 +37,7 @@ class PublisherService:
             self.redis_client = None
 
     async def publish(self, channel: str, message: dict[str, Any]) -> bool:
-        """
-        Publish message to Redis channel.
+        """Publish message to Redis channel.
 
         Args:
             channel: Channel name
@@ -47,6 +45,7 @@ class PublisherService:
 
         Returns:
             True if successful
+
         """
         if not self.redis_client:
             logger.warning("Redis not connected, skipping publish")
@@ -56,15 +55,14 @@ class PublisherService:
             message_json = json.dumps(message)
             await self.redis_client.publish(channel, message_json)
             logger.debug("Published message to channel %s", channel)
-            return True
-
         except (RedisError, json.JSONEncodeError):
             logger.exception("Error publishing message")
             return False
+        else:
+            return True
 
     async def publish_game_event(self, event_type: str, game_id: str, data: dict[str, Any]) -> bool:
-        """
-        Publish game event.
+        """Publish game event.
 
         Args:
             event_type: Type of event (e.g., "game_started", "round_ended")
@@ -73,6 +71,7 @@ class PublisherService:
 
         Returns:
             True if successful
+
         """
         message = {
             "event": event_type,

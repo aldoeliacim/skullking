@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     )
 
     # Server Configuration
-    host: str = Field(default="0.0.0.0", description="Server host")
+    host: str = Field(default="0.0.0.0", description="Server host")  # noqa: S104
     port: int = Field(default=8000, description="Server port")
     environment: str = Field(default="development", description="Environment")
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")

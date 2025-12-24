@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Analyze and visualize training results.
+"""Analyze and visualize training results.
 
 Features:
 - Compare multiple trained models
@@ -27,8 +26,7 @@ def evaluate_model_comprehensive(
     model_path: str,
     n_games: int = 100,
 ) -> dict[str, any]:
-    """
-    Comprehensively evaluate a trained model.
+    """Comprehensively evaluate a trained model.
 
     Returns detailed statistics including:
     - Win rates against each opponent type
@@ -73,7 +71,7 @@ def evaluate_model_comprehensive(
 
             while not done:
                 action, _ = model.predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, info = env.step(action)
+                obs, reward, terminated, truncated, _info = env.step(action)
                 total_reward += reward
                 done = terminated or truncated
 
@@ -178,7 +176,7 @@ def compare_models(model_paths: list[str], n_games: int = 50):
     print("COMPARISON SUMMARY")
     print("=" * 70)
 
-    opponent_types = list(all_results[list(all_results.keys())[0]].keys())
+    opponent_types = list(all_results[next(iter(all_results.keys()))].keys())
 
     for opp_type in opponent_types:
         print(f"\n{opp_type.upper().replace('_', ' ')}:")
@@ -213,8 +211,7 @@ def compare_models(model_paths: list[str], n_games: int = 50):
 
 
 def analyze_checkpoints(checkpoint_dir: str):
-    """
-    Analyze training checkpoints to see progression over time.
+    """Analyze training checkpoints to see progression over time.
 
     Plots win rate and bidding accuracy as training progresses.
     """
@@ -257,12 +254,9 @@ def analyze_checkpoints(checkpoint_dir: str):
             obs, _ = env.reset()
             done = False
 
-            round_bids = []
-            round_actuals = []
-
             while not done:
                 action, _ = model.predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, _ = env.step(action)
+                obs, _reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
 
                 if env.game and env.game.get_current_round():
@@ -278,7 +272,7 @@ def analyze_checkpoints(checkpoint_dir: str):
             if env.game and env.game.players:
                 agent_score = env.game.players[0].score
                 opponent_scores = [p.score for p in env.game.players[1:]]
-                if agent_score == max([agent_score] + opponent_scores):
+                if agent_score == max([agent_score, *opponent_scores]):
                     wins += 1
 
         env.close()
