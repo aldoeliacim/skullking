@@ -106,7 +106,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "PLR2004", "S101", "SIM102", "E501", "SLF001", "PLC0415"]  # Late imports in tests
-"scripts/**/*.py" = ["T20", "PTH103", "PTH118", "PTH110", "PTH120", "PTH123", "SIM102", "E501", "B007", "F841", "RUF015", "RUF005", "ICN001", "N806", "ARG001", "RUF013", "PLR1722", "PLC0415"]  # Late imports
+"scripts/**/*.py" = ["T20", "PTH103", "PTH118", "PTH110", "PTH120", "PTH123", "SIM102", "E501", "B007", "F841", "RUF015", "RUF005", "ICN001", "N806", "ARG001", "RUF013", "PLR1722", "PLC0415", "RUF059"]  # Late imports, unused unpacking
 "app/bots/*.py" = ["ARG002", "PLC0415"]  # Interface methods, late imports for circular deps
 "app/gym_env/*.py" = ["ARG002", "PLC0415"]  # Interface methods, late imports
 "app/api/websocket.py" = ["TC001", "PLC0415"]  # Runtime imports, late import for circular deps
