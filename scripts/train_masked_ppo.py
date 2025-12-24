@@ -187,33 +187,34 @@ def train_masked_ppo(
         )
     else:
         print("\nCreating new MaskablePPO model...")
-        print("Hyperparameters (v3 - optimized for high-end hardware):")
-        print("  learning_rate: 1e-4")
-        print("  n_steps: 2048 (more frequent updates)")
-        print("  batch_size: 512 (better GPU utilization)")
-        print("  n_epochs: 20")
+        print("Hyperparameters (v4 - MAXIMIZED for RTX 4080 SUPER):")
+        print("  learning_rate: 3e-4")
+        print("  n_steps: 4096 (large buffer for stability)")
+        print("  batch_size: 1024 (maximum GPU utilization)")
+        print("  n_epochs: 15 (balanced training)")
         print("  gamma: 0.995")
-        print("  gae_lambda: 0.99")
-        print("  ent_coef: 0.02")
-        print("  vf_coef: 1.0")
+        print("  gae_lambda: 0.98")
+        print("  ent_coef: 0.01")
+        print("  vf_coef: 0.5")
         print()
 
         model = MaskablePPO(
             "MlpPolicy",
             vec_env,
-            learning_rate=1e-4,
-            n_steps=2048,  # Reduced for more frequent updates
-            batch_size=512,  # Increased for better GPU utilization
-            n_epochs=20,
+            learning_rate=3e-4,  # Higher LR for faster learning
+            n_steps=4096,  # Large buffer for stable updates
+            batch_size=1024,  # Maximize GPU batch processing
+            n_epochs=15,  # Slightly fewer epochs, more throughput
             gamma=0.995,
-            gae_lambda=0.99,
-            clip_range=0.15,
-            ent_coef=0.02,
-            vf_coef=1.0,
+            gae_lambda=0.98,
+            clip_range=0.2,  # Standard clip range
+            ent_coef=0.01,  # Less exploration, more exploitation
+            vf_coef=0.5,
             max_grad_norm=0.5,
             verbose=1,
             tensorboard_log=f"{save_dir}/tensorboard",
             device=device,
+            policy_kwargs={"net_arch": [256, 256]},  # Larger network
         )
 
     print("\n🏋️ Starting training...\n")
