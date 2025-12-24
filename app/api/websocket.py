@@ -151,8 +151,8 @@ class ConnectionManager:
             websocket = self.active_connections[game_id][player_id]
             try:
                 await websocket.send_json(message.to_dict())
-            except Exception:
-                logger.exception("Error sending message to %s", player_id)
+            except (WebSocketDisconnect, RuntimeError, ConnectionError, OSError):
+                logger.warning("Connection lost to %s", player_id)
                 self.disconnect(game_id, player_id)
 
     async def broadcast_to_game(
@@ -180,8 +180,8 @@ class ConnectionManager:
 
                 try:
                     await websocket.send_json(message.to_dict())
-                except Exception:
-                    logger.exception("Error broadcasting to player %s", player_id)
+                except (WebSocketDisconnect, RuntimeError, ConnectionError, OSError):
+                    logger.warning("Connection lost to player %s", player_id)
                     disconnected_players.append(player_id)
 
         # Send to spectators (spectators receive all public broadcasts)
@@ -189,8 +189,8 @@ class ConnectionManager:
             for spectator_id, websocket in self.spectator_connections[game_id].items():
                 try:
                     await websocket.send_json(message.to_dict())
-                except Exception:
-                    logger.exception("Error broadcasting to spectator %s", spectator_id)
+                except (WebSocketDisconnect, RuntimeError, ConnectionError, OSError):
+                    logger.warning("Connection lost to spectator %s", spectator_id)
                     disconnected_spectators.append(spectator_id)
 
         # Clean up disconnected
@@ -232,8 +232,8 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 logger.info("WebSocket manager shutting down")
                 break
-            except Exception:
-                logger.exception("Error in WebSocket manager")
+            except (WebSocketDisconnect, RuntimeError, ConnectionError, OSError) as e:
+                logger.warning("WebSocket manager connection error: %s", e)
                 await asyncio.sleep(0.1)
 
     async def handle_player_message(
@@ -272,8 +272,8 @@ class ConnectionManager:
             logger.info("Player %s disconnected from game %s", player_id, game_id)
             self.disconnect(game_id, player_id)
 
-        except Exception:
-            logger.exception("Error handling message from %s", player_id)
+        except (RuntimeError, ConnectionError, OSError, json.JSONDecodeError) as e:
+            logger.warning("Error handling message from %s: %s", player_id, e)
             self.disconnect(game_id, player_id)
 
     async def handle_spectator_message(
@@ -306,8 +306,8 @@ class ConnectionManager:
             logger.info("Spectator %s disconnected from game %s", spectator_id, game_id)
             self.disconnect_spectator(game_id, spectator_id)
 
-        except Exception:
-            logger.exception("Error handling spectator message from %s", spectator_id)
+        except (RuntimeError, ConnectionError, OSError, json.JSONDecodeError) as e:
+            logger.warning("Error handling spectator message from %s: %s", spectator_id, e)
             self.disconnect_spectator(game_id, spectator_id)
 
     def get_game(self, game_id: str) -> Game | None:
