@@ -758,49 +758,11 @@ class SkullKingGame {
     }
 
     updateTurnArrow() {
+        // Turn indicator is now handled by highlighting the opponent card
+        // Just hide the arrow element completely
         const arrow = document.getElementById('turn-arrow');
-        if (!arrow) return;
-
-        const currentPlayerId = this.gameState.picking_player_id || this.gameState.current_player_id;
-
-        // If it's our turn, hide arrow
-        if (!currentPlayerId || currentPlayerId === this.playerId) {
+        if (arrow) {
             arrow.classList.add('hidden');
-            return;
-        }
-
-        // Find which container has the current player
-        const opponentCard = document.querySelector(`.opponent-card[data-player-id="${currentPlayerId}"]`);
-        if (!opponentCard) {
-            arrow.classList.add('hidden');
-            return;
-        }
-
-        const parentId = opponentCard.parentElement?.id;
-        arrow.classList.remove('hidden', 'arrow-up', 'arrow-down', 'arrow-left', 'arrow-right');
-
-        // Position arrow based on opponent location
-        if (parentId === 'opponents-top') {
-            arrow.classList.add('arrow-up');
-            const rect = opponentCard.getBoundingClientRect();
-            const gameMain = document.querySelector('.game-main');
-            const gameRect = gameMain?.getBoundingClientRect() || { left: 0, top: 0 };
-            arrow.style.left = `${rect.left - gameRect.left + rect.width / 2 - 20}px`;
-            arrow.style.top = `${rect.bottom - gameRect.top + 5}px`;
-        } else if (parentId === 'opponents-left') {
-            arrow.classList.add('arrow-left');
-            const rect = opponentCard.getBoundingClientRect();
-            const gameMain = document.querySelector('.game-main');
-            const gameRect = gameMain?.getBoundingClientRect() || { left: 0, top: 0 };
-            arrow.style.left = `${rect.right - gameRect.left + 5}px`;
-            arrow.style.top = `${rect.top - gameRect.top + rect.height / 2 - 20}px`;
-        } else if (parentId === 'opponents-right') {
-            arrow.classList.add('arrow-right');
-            const rect = opponentCard.getBoundingClientRect();
-            const gameMain = document.querySelector('.game-main');
-            const gameRect = gameMain?.getBoundingClientRect() || { left: 0, top: 0 };
-            arrow.style.left = `${rect.left - gameRect.left - 45}px`;
-            arrow.style.top = `${rect.top - gameRect.top + rect.height / 2 - 20}px`;
         }
     }
 
@@ -1360,7 +1322,8 @@ class SkullKingGame {
         });
 
         const winnerLabel = document.getElementById('trick-winner');
-        const winnerName = winner?.username || 'Unknown';
+        // Use winner_name from server if available, otherwise fall back to lookup
+        const winnerName = data.winner_name || winner?.username || 'Unknown';
 
         winnerLabel.textContent = `${winnerName} ${window.i18n.t('game.wonTrick')}`;
         winnerLabel.classList.remove('hidden');

@@ -349,14 +349,47 @@ class GameHandler:
         starter_index = current_round.starter_player_index
         default_starter_id: str | None = None
 
+        logger.info(
+            "[START_NEW_TRICK] Starting trick %d. Round starter_index=%d, tricks so far=%d",
+            trick_number,
+            current_round.starter_player_index,
+            len(current_round.tricks),
+        )
+
         # Adjust starter for subsequent tricks (winner leads)
         if current_round.tricks:
             last_trick = current_round.tricks[-1]
+            logger.info(
+                "[START_NEW_TRICK] Last trick %d: winner_player_id=%s, winner_card_id=%s",
+                last_trick.number,
+                last_trick.winner_player_id,
+                last_trick.winner_card_id,
+            )
             if last_trick.winner_player_id:
                 winner = game.get_player(last_trick.winner_player_id)
+                logger.info(
+                    "[START_NEW_TRICK] Looking up winner %s: found=%s",
+                    last_trick.winner_player_id,
+                    winner is not None,
+                )
                 if winner:
                     starter_index = winner.index
                     default_starter_id = winner.id
+                    logger.info(
+                        "[START_NEW_TRICK] Winner %s has index %d, setting as starter",
+                        winner.username,
+                        winner.index,
+                    )
+                else:
+                    logger.error(
+                        "[START_NEW_TRICK] Could not find winner player %s! Players: %s",
+                        last_trick.winner_player_id,
+                        [p.id for p in game.players],
+                    )
+            else:
+                logger.warning("[START_NEW_TRICK] Last trick has no winner (Kraken?)")
+        else:
+            logger.info("[START_NEW_TRICK] First trick of round, using round starter")
 
         # Check for Rosie's ability override
         if default_starter_id:
@@ -364,6 +397,11 @@ class GameHandler:
             actual_starter = game.get_player(actual_starter_id)
             if actual_starter:
                 starter_index = actual_starter.index
+                logger.info(
+                    "[START_NEW_TRICK] After Rosie check: actual starter is %s (index %d)",
+                    actual_starter.username,
+                    starter_index,
+                )
 
         trick = Trick(
             number=trick_number,
@@ -374,6 +412,17 @@ class GameHandler:
         starter_player = game.get_player_by_index(starter_index)
         if starter_player:
             trick.picking_player_id = starter_player.id
+            logger.info(
+                "[START_NEW_TRICK] Final starter: %s (id=%s, index=%d)",
+                starter_player.username,
+                starter_player.id,
+                starter_index,
+            )
+        else:
+            logger.error(
+                "[START_NEW_TRICK] Could not find starter player at index %d!",
+                starter_index,
+            )
 
         current_round.tricks.append(trick)
         game.state = GameState.PICKING
@@ -423,10 +472,15 @@ class GameHandler:
         bonus_points = trick.calculate_bonus_points()
 
         logger.info(
-            "Trick %d won by %s (bonus: %d)",
+            "[COMPLETE_TRICK] Trick %d: winner_player_id=%s, winner_card_id=%s, bonus=%d",
             trick.number,
             winner_player_id,
+            winner_card_id,
             bonus_points,
+        )
+        logger.info(
+            "[COMPLETE_TRICK] Trick object winner_player_id after determine_winner: %s",
+            trick.winner_player_id,
         )
 
         # Record trick won event for replay
@@ -457,9 +511,11 @@ class GameHandler:
                     )
 
         # Build announce content
+        winner = game.get_player(winner_player_id) if winner_player_id else None
         announce_content: dict[str, Any] = {
             "trick": trick.number,
             "winner_player_id": winner_player_id,
+            "winner_name": winner.username if winner else None,
             "winner_card_id": winner_card_id.value if winner_card_id else None,
             "bonus_points": bonus_points,
         }
