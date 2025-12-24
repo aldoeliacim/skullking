@@ -1312,12 +1312,51 @@ class SkullKingGame {
         // Update UI immediately to show new trick count
         this.updateGameScreen();
 
+        // After a delay, animate collection then clear
         setTimeout(() => {
-            winnerLabel.classList.add('hidden');
-            // Clear trick cards
-            this.gameState.trick_cards = [];
-            this.updateGameScreen();
-        }, 2000);
+            // Add collection animation
+            const trickCardsContainer = document.getElementById('trick-cards');
+            const collectDirection = this.getCollectDirection(data.winner_player_id);
+            trickCardsContainer.classList.add('collecting', collectDirection);
+
+            // After animation completes, clear the cards
+            setTimeout(() => {
+                winnerLabel.classList.add('hidden');
+                trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
+                this.gameState.trick_cards = [];
+                this.updateGameScreen();
+            }, 600);
+        }, 1400);
+    }
+
+    // Determine which direction cards should fly to based on winner position
+    getCollectDirection(winnerId) {
+        if (winnerId === this.playerId) {
+            return 'collect-bottom';
+        }
+
+        const players = this.gameState?.players || [];
+        const myIndex = players.findIndex(p => p.id === this.playerId);
+        const winnerIndex = players.findIndex(p => p.id === winnerId);
+        const playerCount = players.length;
+
+        if (myIndex === -1 || winnerIndex === -1) {
+            return 'collect-top';
+        }
+
+        // Calculate relative position
+        const relativePos = (winnerIndex - myIndex + playerCount) % playerCount;
+        const halfCount = playerCount / 2;
+
+        if (relativePos === 0) {
+            return 'collect-bottom';
+        } else if (relativePos < halfCount) {
+            return 'collect-left';
+        } else if (relativePos > halfCount) {
+            return 'collect-right';
+        } else {
+            return 'collect-top';
+        }
     }
 
     handleTrickComplete(data) {
@@ -1337,12 +1376,19 @@ class SkullKingGame {
         // Update UI immediately
         this.updateGameScreen();
 
+        // After a delay, animate collection then clear
         setTimeout(() => {
-            winnerLabel.classList.add('hidden');
-            // Clear trick cards
-            this.gameState.trick_cards = [];
-            this.updateGameScreen();
-        }, 2000);
+            const trickCardsContainer = document.getElementById('trick-cards');
+            const collectDirection = this.getCollectDirection(data.winner_player_id);
+            trickCardsContainer.classList.add('collecting', collectDirection);
+
+            setTimeout(() => {
+                winnerLabel.classList.add('hidden');
+                trickCardsContainer.classList.remove('collecting', 'collect-top', 'collect-left', 'collect-right', 'collect-bottom');
+                this.gameState.trick_cards = [];
+                this.updateGameScreen();
+            }, 600);
+        }, 1400);
     }
 
     handleScoresAnnounced(data) {

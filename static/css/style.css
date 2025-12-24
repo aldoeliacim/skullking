@@ -1653,6 +1653,50 @@ input[type="text"]::placeholder {
     font-weight: 600;
 }
 
+/* Trick collection animation */
+.trick-cards.collecting .trick-card-wrapper {
+    animation: collectCards 0.6s ease-in forwards;
+}
+
+.trick-cards.collecting .trick-card-wrapper:nth-child(1) { animation-delay: 0s; }
+.trick-cards.collecting .trick-card-wrapper:nth-child(2) { animation-delay: 0.05s; }
+.trick-cards.collecting .trick-card-wrapper:nth-child(3) { animation-delay: 0.1s; }
+.trick-cards.collecting .trick-card-wrapper:nth-child(4) { animation-delay: 0.15s; }
+.trick-cards.collecting .trick-card-wrapper:nth-child(5) { animation-delay: 0.2s; }
+.trick-cards.collecting .trick-card-wrapper:nth-child(6) { animation-delay: 0.25s; }
+.trick-cards.collecting .trick-card-wrapper:nth-child(7) { animation-delay: 0.3s; }
+
+@keyframes collectCards {
+    0% {
+        opacity: 1;
+        transform: translateY(var(--lift)) rotate(var(--rotation)) scale(1);
+    }
+    30% {
+        transform: translateY(-20px) rotate(0deg) scale(1.1);
+    }
+    100% {
+        opacity: 0;
+        transform: var(--collect-direction, translateY(-80px)) rotate(10deg) scale(0.5);
+    }
+}
+
+/* Collect to different positions based on winner */
+.trick-cards.collect-top .trick-card-wrapper {
+    --collect-direction: translateY(-100px) translateX(0);
+}
+
+.trick-cards.collect-left .trick-card-wrapper {
+    --collect-direction: translateY(-50px) translateX(-150px);
+}
+
+.trick-cards.collect-right .trick-card-wrapper {
+    --collect-direction: translateY(-50px) translateX(150px);
+}
+
+.trick-cards.collect-bottom .trick-card-wrapper {
+    --collect-direction: translateY(80px) translateX(0);
+}
+
 /* ============================================
    BIDDING MODAL (Non-blocking top panel)
    ============================================ */
