@@ -20,6 +20,11 @@
             <span id="lang-flag">EN</span>
         </button>
 
+        <!-- Sound Toggle -->
+        <button id="sound-toggle" class="sound-btn" title="Toggle sound">
+            <span id="sound-icon">🔊</span>
+        </button>
+
         <!-- Rulebook Button -->
         <button id="rules-toggle" class="rules-btn" title="View Rules">
             <span>&#128214;</span>
@@ -147,6 +152,9 @@
                         <div class="game-phase" id="game-status-text" data-i18n="game.waiting">Waiting...</div>
                     </div>
                     <div class="topbar-right">
+                        <button id="sound-toggle-game" class="topbar-btn" title="Toggle sound">
+                            <span id="sound-icon-game">🔊</span>
+                        </button>
                         <button id="rules-toggle-game" class="topbar-btn" title="Rules">
                             <span>&#128214;</span>
                         </button>
@@ -430,6 +438,7 @@
     </div>
 
     <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/sounds.js"></script>
     <script src="/static/js/game.js"></script>
 </body>
 </html>

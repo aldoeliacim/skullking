@@ -140,6 +140,31 @@ h4 {
     color: var(--accent-gold);
 }
 
+/* Sound Toggle Button */
+.sound-btn {
+    position: fixed;
+    top: var(--spacing-md);
+    right: calc(var(--spacing-md) + 60px);
+    z-index: 1000;
+    background: var(--bg-panel);
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.sound-btn:hover {
+    border-color: var(--accent-gold);
+}
+
+.sound-btn.muted {
+    opacity: 0.5;
+}
+
 /* ============================================
    SCREENS
    ============================================ */

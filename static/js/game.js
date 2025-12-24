@@ -22,6 +22,64 @@ class SkullKingGame {
         });
     }
 
+    initializeSounds() {
+        // Initialize sound manager on first interaction
+        if (window.soundManager) {
+            window.soundManager.init();
+            this.updateSoundIcon();
+        }
+    }
+
+    toggleSound() {
+        if (window.soundManager) {
+            window.soundManager.toggle();
+            this.updateSoundIcon();
+            window.soundManager.click();
+        }
+    }
+
+    updateSoundIcon() {
+        const enabled = window.soundManager?.enabled;
+        const icon = enabled ? '🔊' : '🔇';
+
+        const soundIcon = document.getElementById('sound-icon');
+        const soundIconGame = document.getElementById('sound-icon-game');
+        const soundBtn = document.getElementById('sound-toggle');
+        const soundBtnGame = document.getElementById('sound-toggle-game');
+
+        if (soundIcon) soundIcon.textContent = icon;
+        if (soundIconGame) soundIconGame.textContent = icon;
+        if (soundBtn) soundBtn.classList.toggle('muted', !enabled);
+        if (soundBtnGame) soundBtnGame.classList.toggle('muted', !enabled);
+    }
+
+    playSound(soundName) {
+        if (window.soundManager) {
+            window.soundManager[soundName]?.();
+        }
+    }
+
+    playCardSound(cardId) {
+        if (!window.soundManager) return;
+
+        // Special card sounds based on card ID
+        // Card IDs: 1=Skull King, 2=White Whale, 3=Kraken, 4-5=Mermaids, 6-10=Pirates
+        // 67-71=Escapes, 72=Tigress, 73-74=Loot
+        if (cardId === 1) {
+            window.soundManager.skullKing();
+        } else if (cardId === 3) {
+            window.soundManager.kraken();
+        } else if (cardId >= 4 && cardId <= 10) {
+            // Pirates and mermaids
+            window.soundManager.specialCard();
+        } else if (cardId === 72) {
+            // Tigress
+            window.soundManager.specialCard();
+        } else {
+            window.soundManager.cardPlay();
+        }
+    }
+
     updateLangFlag() {
         const locale = window.i18n.getLocale().toUpperCase();
         // Update both login screen and game screen language flags
@@ -82,6 +140,19 @@ class SkullKingGame {
             window.i18n.toggleLocale();
             this.updateLangFlag();
         });
+
+        // Sound toggle (both login and game screens)
+        document.getElementById('sound-toggle')?.addEventListener('click', () => {
+            this.initializeSounds();
+            this.toggleSound();
+        });
+        document.getElementById('sound-toggle-game')?.addEventListener('click', () => {
+            this.initializeSounds();
+            this.toggleSound();
+        });
+
+        // Initialize sounds on first user interaction
+        document.addEventListener('click', () => this.initializeSounds(), { once: true });
 
         // Game log toggle
         document.getElementById('log-toggle')?.addEventListener('click', () => {
@@ -281,6 +352,7 @@ class SkullKingGame {
                 this.updateGameScreen();
                 // Then show bidding UI
                 this.showBiddingUI(message.content);
+                this.playSound('notify');
                 break;
             case 'BADE':
                 // Another player made their bid - update their bid value
@@ -300,6 +372,7 @@ class SkullKingGame {
                     player: message.content.player_id === this.playerId ? 'You' : bidPlayerName,
                     bid: message.content.bid
                 }), 'bid');
+                this.playSound('bidPlaced');
                 this.updateGameScreen();
                 break;
             case 'END_BIDDING':
@@ -333,6 +406,10 @@ class SkullKingGame {
                 this.gameState.picking_player_id = message.content.picking_player_id;
                 this.gameState.current_trick = message.content.trick;
                 console.log('[START_PICKING] Is my turn:', message.content.picking_player_id === this.playerId);
+                // Play your turn sound if it's our turn
+                if (message.content.picking_player_id === this.playerId) {
+                    this.playSound('yourTurn');
+                }
                 this.updateGameScreen();
                 break;
             case 'PICKED':
@@ -349,10 +426,16 @@ class SkullKingGame {
                     this.gameState.hand = this.gameState.hand.filter(c => c !== message.content.card_id);
                     console.log('[PICKED] After removal:', this.gameState.hand);
                 }
+                // Play card sound - special sounds for special cards
+                this.playCardSound(message.content.card_id);
                 this.updateGameScreen();
                 break;
             case 'NEXT_TRICK':
                 this.gameState.picking_player_id = message.content.picking_player_id;
+                // Play your turn sound if it's now our turn
+                if (message.content.picking_player_id === this.playerId) {
+                    this.playSound('yourTurn');
+                }
                 this.updateGameScreen();
                 break;
             case 'ANNOUNCE_TRICK_WINNER':
@@ -1143,6 +1226,13 @@ class SkullKingGame {
             winner.tricks_won = (winner.tricks_won || 0) + 1;
         }
 
+        // Play sound - different for player winning vs losing
+        if (data.winner_player_id === this.playerId) {
+            this.playSound('trickWon');
+        } else {
+            this.playSound('trickLost');
+        }
+
         // Mark the winning card in the trick area
         const trickCards = document.querySelectorAll('.trick-card-wrapper');
         trickCards.forEach(wrapper => {
@@ -1229,10 +1319,12 @@ class SkullKingGame {
     }
 
     handleRoundComplete(data) {
+        this.playSound('roundComplete');
         this.addLog(window.i18n.t('log.roundComplete', { round: data.round_number || data.round }));
     }
 
     handleGameOver(data) {
+        this.playSound('gameOver');
         // Get players from either leaderboard (server) or final_scores format
         let players = data.leaderboard || data.final_scores || [];
 
