@@ -75,7 +75,12 @@
     "tigressPirate": "Pirate",
     "tigressPirateDesc": "Win tricks, beats suits",
     "tigressEscape": "Escape",
-    "tigressEscapeDesc": "Lose on purpose"
+    "tigressEscapeDesc": "Lose on purpose",
+    "continue": "Continue",
+    "waitingForPlayers": "Waiting for players...",
+    "ready": "ready",
+    "scoreboard": "Scoreboard",
+    "rules": "Rules"
   },
   "results": {
     "title": "Game Over!",
@@ -96,6 +101,51 @@
     "biddingComplete": "All bids placed - playing begins",
     "trickWon": "{winner} won the trick",
     "roundComplete": "Round {round} complete",
-    "gameWon": "{winner} won the game!"
+    "gameWon": "{winner} won the game!",
+    "abilityResolved": "{ability} ability resolved",
+    "abilityTriggered": "{pirate}'s ability triggered!",
+    "playerReady": "{player} is ready to continue"
+  },
+  "ability": {
+    "rosie": {
+      "name": "Rosie",
+      "description": "Choose who will start the next trick:"
+    },
+    "bendt": {
+      "name": "Bendt the Bandit",
+      "description": "You drew 2 cards. Select 2 cards to discard:",
+      "drawnCards": "Drawn cards:",
+      "yourHand": "Your hand:",
+      "confirmDiscard": "Confirm Discard"
+    },
+    "roatan": {
+      "name": "Roatan",
+      "description": "Choose your extra bet amount:",
+      "noBet": "No Bet",
+      "hint": "If you win this trick and make your bid, you get the bonus. Otherwise, lose the points!"
+    },
+    "jade": {
+      "name": "Jade",
+      "description": "These cards were not dealt this round:",
+      "gotIt": "Got it!"
+    },
+    "harry": {
+      "name": "Harry the Giant",
+      "description": "Adjust your bid by +1 or -1:",
+      "noChange": "No change"
+    }
+  },
+  "scoreboard": {
+    "title": "Scoreboard",
+    "player": "Player",
+    "score": "Score",
+    "bid": "Bid",
+    "tricks": "Tricks"
+  },
+  "continue": {
+    "title": "Trick Complete",
+    "message": "Ready to continue?",
+    "button": "Continue",
+    "waiting": "Waiting for other players..."
   }
 }

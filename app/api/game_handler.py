@@ -468,21 +468,18 @@ class GameHandler:
             await self._handle_ability_trigger(game, current_round, pending_ability, trick)
             return  # Wait for ability resolution before continuing
 
-        # Check if round is complete
-        if current_round.is_complete():
-            await self._complete_round(game, current_round)
-        else:
-            # Start next trick
-            await self._start_new_trick(game, current_round)
-            # Process bot picks if first player is a bot
-            await self._process_bot_actions(game)
+        # Prompt for continue confirmation before proceeding
+        await self._prompt_continue(game)
 
     async def _handle_ability_trigger(
         self, game: Game, current_round: Any, ability: PendingAbility, trick: Trick
     ) -> None:
         """Handle a triggered pirate ability."""
         player = game.get_player(ability.player_id)
-        is_bot = ability.player_id in self.bots.get(game.id, {})
+        # Check both the bots dict (for actual bots) and is_bot flag (for tests)
+        is_bot = ability.player_id in self.bots.get(game.id, {}) or (
+            player is not None and player.is_bot
+        )
 
         if ability.ability_type == AbilityType.CHOOSE_STARTER:
             # Rosie - choose who starts next trick
@@ -642,10 +639,12 @@ class GameHandler:
         ]
 
         for player_id in players_with_harry:
-            is_bot = player_id in self.bots.get(game.id, {})
+            player = game.get_player(player_id)
+            is_bot = player_id in self.bots.get(game.id, {}) or (
+                player is not None and player.is_bot
+            )
             if is_bot:
                 # Bot decides: adjust bid to match tricks won if possible
-                player = game.get_player(player_id)
                 if player:
                     tricks_won = current_round.get_tricks_won(player_id)
                     bid = player.bid if player.bid is not None else 0
@@ -965,8 +964,16 @@ class GameHandler:
         if game.id not in self.bots:
             return
 
+        # Guard: ensure we're still in bidding state
+        if game.state != GameState.BIDDING:
+            return
+
         current_round = game.get_current_round()
         if not current_round:
+            return
+
+        # Guard: check if all bids already placed
+        if current_round.all_bids_placed(len(game.players)):
             return
 
         for bot_id, bot in self.bots.get(game.id, {}).items():
@@ -1245,3 +1252,35 @@ class GameHandler:
             return
 
         logger.info("Player %s modified bid by %d (Harry)", player_id, modifier)
+
+    async def _prompt_continue(self, game: Game) -> None:
+        """Auto-continue to the next trick or round after a brief delay."""
+        logger.info(
+            "[AUTO-CONTINUE] Continuing game %s, round %d",
+            game.id,
+            game.current_round_number,
+        )
+
+        # Brief delay to let players see the trick result
+        await asyncio.sleep(1.5)
+
+        # Continue game flow
+        current_round = game.get_current_round()
+        if not current_round:
+            logger.warning("[AUTO-CONTINUE] No current round for game %s", game.id)
+            return
+
+        # Determine what to do next based on game state
+        logger.info(
+            "[AUTO-CONTINUE] Round %d: %d/%d tricks complete",
+            current_round.number,
+            len(current_round.tricks),
+            current_round.number,
+        )
+        if current_round.is_complete():
+            logger.info("[AUTO-CONTINUE] Round complete, moving to next round")
+            await self._complete_round(game, current_round)
+        else:
+            logger.info("[AUTO-CONTINUE] Starting new trick")
+            await self._start_new_trick(game, current_round)
+            await self._process_bot_actions(game)

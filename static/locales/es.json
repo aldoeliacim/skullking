@@ -75,7 +75,12 @@
     "tigressPirate": "Pirata",
     "tigressPirateDesc": "Ganar bazas, vence palos",
     "tigressEscape": "Huida",
-    "tigressEscapeDesc": "Perder a proposito"
+    "tigressEscapeDesc": "Perder a proposito",
+    "continue": "Continuar",
+    "waitingForPlayers": "Esperando jugadores...",
+    "ready": "listo",
+    "scoreboard": "Marcador",
+    "rules": "Reglas"
   },
   "results": {
     "title": "Fin del Juego!",
@@ -96,6 +101,51 @@
     "biddingComplete": "Todas las apuestas hechas - comienza el juego",
     "trickWon": "{winner} gano la baza",
     "roundComplete": "Ronda {round} completa",
-    "gameWon": "{winner} gano el juego!"
+    "gameWon": "{winner} gano el juego!",
+    "abilityResolved": "Habilidad {ability} resuelta",
+    "abilityTriggered": "Se activo la habilidad de {pirate}!",
+    "playerReady": "{player} esta listo para continuar"
+  },
+  "ability": {
+    "rosie": {
+      "name": "Rosie",
+      "description": "Elige quien empezara la siguiente baza:"
+    },
+    "bendt": {
+      "name": "Bendt el Bandido",
+      "description": "Robaste 2 cartas. Selecciona 2 cartas para descartar:",
+      "drawnCards": "Cartas robadas:",
+      "yourHand": "Tu mano:",
+      "confirmDiscard": "Confirmar Descarte"
+    },
+    "roatan": {
+      "name": "Roatan",
+      "description": "Elige tu apuesta extra:",
+      "noBet": "Sin Apuesta",
+      "hint": "Si ganas esta baza y cumples tu apuesta, obtienes el bono. De lo contrario, pierdes los puntos!"
+    },
+    "jade": {
+      "name": "Jade",
+      "description": "Estas cartas no fueron repartidas esta ronda:",
+      "gotIt": "Entendido!"
+    },
+    "harry": {
+      "name": "Harry el Gigante",
+      "description": "Ajusta tu apuesta en +1 o -1:",
+      "noChange": "Sin cambio"
+    }
+  },
+  "scoreboard": {
+    "title": "Marcador",
+    "player": "Jugador",
+    "score": "Puntos",
+    "bid": "Apuesta",
+    "tricks": "Bazas"
+  },
+  "continue": {
+    "title": "Baza Completa",
+    "message": "Listo para continuar?",
+    "button": "Continuar",
+    "waiting": "Esperando a otros jugadores..."
   }
 }

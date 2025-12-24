@@ -99,10 +99,25 @@ class I18n {
             return keyPath;
         }
 
+        // Ensure we have a string value
+        if (typeof value !== 'string') {
+            console.warn(`Translation key "${keyPath}" resolved to non-string:`, value);
+            return keyPath;
+        }
+
         // Interpolate parameters
-        if (typeof value === 'string' && Object.keys(params).length > 0) {
+        if (Object.keys(params).length > 0) {
             return value.replace(/\{(\w+)\}/g, (match, key) => {
-                return params[key] !== undefined ? params[key] : match;
+                const paramValue = params[key];
+                // Ensure param value is a string/number, not an object
+                if (paramValue !== undefined && paramValue !== null) {
+                    if (typeof paramValue === 'object') {
+                        console.warn(`Parameter "${key}" is an object in translation "${keyPath}":`, paramValue);
+                        return paramValue.username || paramValue.name || paramValue.id || match;
+                    }
+                    return String(paramValue);
+                }
+                return match;
             });
         }
 

@@ -29,7 +29,7 @@ def game_handler(mock_manager):
 
 
 def create_game_with_players(num_players: int = 3) -> Game:
-    """Create a game with specified number of players."""
+    """Create a game with specified number of bot players (for auto-continue in tests)."""
     game = Game(id="multiplayer-test", slug="multiplayer-test")
     for i in range(num_players):
         player = Player(
@@ -38,6 +38,7 @@ def create_game_with_players(num_players: int = 3) -> Game:
             avatar_id=i,
             index=i,
             game_id=game.id,
+            is_bot=True,  # Bots auto-continue in game flow
         )
         game.add_player(player)
     return game

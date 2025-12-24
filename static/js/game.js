@@ -23,16 +23,32 @@ class SkullKingGame {
     }
 
     updateLangFlag() {
+        const locale = window.i18n.getLocale().toUpperCase();
+        // Update both login screen and game screen language flags
         const flag = document.getElementById('lang-flag');
+        const flagGame = document.getElementById('lang-flag-game');
         if (flag) {
-            flag.textContent = window.i18n.getLocale().toUpperCase();
+            flag.textContent = locale;
+        }
+        if (flagGame) {
+            flagGame.textContent = locale;
         }
     }
 
     updateDynamicContent() {
-        if (this.gameState) {
+        // Only update game screen if we're actually in a game (not lobby)
+        if (this.gameState && this.isGameInProgress()) {
             this.updateGameScreen();
+        } else if (this.gameState) {
+            // Update lobby if we have game state but game hasn't started
+            this.updateLobby();
         }
+    }
+
+    isGameInProgress() {
+        // Game is in progress if state is not PENDING/LOBBY
+        const state = this.gameState?.state;
+        return state && state !== 'PENDING' && state !== 'LOBBY';
     }
 
     initializeEventListeners() {
@@ -57,19 +73,27 @@ class SkullKingGame {
         // Results screen
         document.getElementById('new-game-btn').addEventListener('click', () => this.returnToLogin());
 
-        // Language switcher
-        document.getElementById('lang-toggle').addEventListener('click', () => {
+        // Language switcher (both login and game screens)
+        document.getElementById('lang-toggle')?.addEventListener('click', () => {
             window.i18n.toggleLocale();
+            this.updateLangFlag();
+        });
+        document.getElementById('lang-toggle-game')?.addEventListener('click', () => {
+            window.i18n.toggleLocale();
+            this.updateLangFlag();
         });
 
         // Game log toggle
-        document.getElementById('log-toggle').addEventListener('click', () => {
-            document.getElementById('game-log').classList.toggle('collapsed');
+        document.getElementById('log-toggle')?.addEventListener('click', () => {
+            document.getElementById('game-log')?.classList.toggle('collapsed');
         });
 
-        // Rules modal
-        document.getElementById('rules-toggle').addEventListener('click', () => {
-            document.getElementById('rules-modal').classList.remove('hidden');
+        // Rules modal (both login and game screens)
+        document.getElementById('rules-toggle')?.addEventListener('click', () => {
+            document.getElementById('rules-modal')?.classList.remove('hidden');
+        });
+        document.getElementById('rules-toggle-game')?.addEventListener('click', () => {
+            document.getElementById('rules-modal')?.classList.remove('hidden');
         });
         document.getElementById('rules-close').addEventListener('click', () => {
             document.getElementById('rules-modal').classList.add('hidden');
@@ -80,18 +104,24 @@ class SkullKingGame {
             }
         });
 
-        // Scoreboard toggle
-        document.getElementById('scoreboard-toggle').addEventListener('click', () => {
-            document.getElementById('scoreboard-panel').classList.toggle('hidden');
+        // Scoreboard toggle (legacy panel)
+        document.getElementById('scoreboard-toggle')?.addEventListener('click', () => {
+            document.getElementById('scoreboard-panel')?.classList.toggle('hidden');
         });
-        document.getElementById('scoreboard-close').addEventListener('click', () => {
-            document.getElementById('scoreboard-panel').classList.add('hidden');
+        document.getElementById('scoreboard-close')?.addEventListener('click', () => {
+            document.getElementById('scoreboard-panel')?.classList.add('hidden');
         });
 
-        // Continue button
-        document.getElementById('continue-btn').addEventListener('click', () => {
-            this.confirmContinue();
+        // Scoreboard dropdown bar toggle
+        document.getElementById('scoreboard-toggle-bar')?.addEventListener('click', () => {
+            const bar = document.getElementById('scoreboard-bar');
+            const dropdown = document.getElementById('scoreboard-dropdown');
+            if (bar && dropdown) {
+                bar.classList.toggle('expanded');
+                dropdown.classList.toggle('hidden');
+            }
         });
+
     }
 
     async createGame() {
@@ -348,6 +378,16 @@ class SkullKingGame {
             case 'ERROR':
                 this.showError('lobby', message.content.error || message.content.message || window.i18n.t('lobby.errorOccurred'));
                 break;
+            // Pirate ability handlers
+            case 'ABILITY_TRIGGERED':
+                this.handleAbilityTriggered(message.content);
+                break;
+            case 'ABILITY_RESOLVED':
+                this.handleAbilityResolved(message.content);
+                break;
+            case 'SHOW_DECK':
+                this.handleShowDeck(message.content);
+                break;
         }
     }
 
@@ -419,13 +459,19 @@ class SkullKingGame {
     }
 
     updateGameScreen() {
-        if (!this.gameState) return;
+        if (!this.gameState || !this.isGameInProgress()) return;
 
         console.log('[updateGameScreen] State:', this.gameState.state, 'Round:', this.gameState.current_round, 'Hand:', this.gameState.hand?.length, 'cards');
 
-        // Switch to game screen
+        // Switch to game screen only if game is actually in progress
         if (!document.getElementById('game-screen').classList.contains('active')) {
             this.switchScreen('game');
+        }
+
+        // Hide bidding modal when not in bidding state
+        const biddingModal = document.getElementById('bidding-modal');
+        if (biddingModal && this.gameState.state !== 'BIDDING') {
+            biddingModal.classList.add('hidden');
         }
 
         // Update round info
@@ -467,55 +513,158 @@ class SkullKingGame {
     }
 
     updateOpponents() {
-        const container = document.getElementById('opponents-container');
-        container.innerHTML = '';
+        // Clear all position containers
+        const topContainer = document.getElementById('opponents-top');
+        const leftContainer = document.getElementById('opponents-left');
+        const rightContainer = document.getElementById('opponents-right');
+        const legacyContainer = document.getElementById('opponents-container');
+
+        if (topContainer) topContainer.innerHTML = '';
+        if (leftContainer) leftContainer.innerHTML = '';
+        if (rightContainer) rightContainer.innerHTML = '';
+        if (legacyContainer) legacyContainer.innerHTML = '';
 
         const players = this.gameState.players || [];
         const opponents = players.filter(p => p.id !== this.playerId);
 
-        opponents.forEach(player => {
-            const div = document.createElement('div');
-            div.className = 'opponent-card';
+        // Get current round for card count
+        const currentRound = this.gameState.current_round || 1;
 
-            // Check if it's this opponent's turn to pick
-            if (this.gameState.picking_player_id === player.id ||
-                this.gameState.current_player_id === player.id) {
-                div.classList.add('current-turn');
-            }
+        // Distribute opponents: 1=top, 2=top+left or top+right, 3=left+top+right
+        const positions = this.getOpponentPositions(opponents.length);
 
-            // Get bid from player object or from gameState.bids
-            const playerBid = player.bid ?? this.gameState.bids?.[player.id] ?? null;
-            const bidDisplay = playerBid !== null && playerBid !== undefined ? playerBid : '-';
+        opponents.forEach((player, index) => {
+            const div = this.createOpponentCard(player, currentRound);
+            const position = positions[index];
 
-            // Check for score animation
-            const scoreChange = this.lastScoreChanges?.[player.id];
-            let scoreClass = 'stat-value';
-            if (scoreChange !== undefined) {
-                scoreClass += scoreChange > 0 ? ' score-up' : ' score-down';
-            }
+            // Determine container based on position
+            let container;
+            if (position === 'top' && topContainer) container = topContainer;
+            else if (position === 'left' && leftContainer) container = leftContainer;
+            else if (position === 'right' && rightContainer) container = rightContainer;
+            else container = legacyContainer;
 
-            div.innerHTML = `
-                <div class="opponent-name">
-                    ${player.is_bot ? '🤖 ' : ''}${player.username}
-                </div>
-                <div class="opponent-stats">
-                    <div class="stat">
-                        <span class="${scoreClass}">${player.score || 0}</span>
-                        <span class="stat-label">${window.i18n.t('game.score')}</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${bidDisplay}</span>
-                        <span class="stat-label">${window.i18n.t('game.bid')}</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${player.tricks_won || 0}</span>
-                        <span class="stat-label">${window.i18n.t('game.tricks')}</span>
-                    </div>
-                </div>
-            `;
-
-            container.appendChild(div);
+            if (container) container.appendChild(div);
         });
+
+        // Update turn arrow
+        this.updateTurnArrow();
+    }
+
+    getOpponentPositions(count) {
+        // Distribute opponents around the table
+        switch (count) {
+            case 1: return ['top'];
+            case 2: return ['left', 'right'];
+            case 3: return ['left', 'top', 'right'];
+            case 4: return ['left', 'top', 'top', 'right'];
+            case 5: return ['left', 'top', 'top', 'top', 'right'];
+            case 6: return ['left', 'left', 'top', 'top', 'right', 'right'];
+            case 7: return ['left', 'left', 'top', 'top', 'top', 'right', 'right'];
+            default: return Array(count).fill('top');
+        }
+    }
+
+    createOpponentCard(player, currentRound) {
+        const div = document.createElement('div');
+        div.className = 'opponent-card';
+        div.dataset.playerId = player.id;
+
+        // Check if it's this opponent's turn to pick
+        const isCurrentTurn = this.gameState.picking_player_id === player.id ||
+            this.gameState.current_player_id === player.id;
+        if (isCurrentTurn) {
+            div.classList.add('current-turn');
+        }
+
+        // Get bid from player object or from gameState.bids
+        const playerBid = player.bid ?? this.gameState.bids?.[player.id] ?? null;
+        const bidDisplay = playerBid !== null && playerBid !== undefined ? playerBid : '-';
+
+        // Check for score animation
+        const scoreChange = this.lastScoreChanges?.[player.id];
+        let scoreClass = 'stat-value';
+        if (scoreChange !== undefined) {
+            scoreClass += scoreChange > 0 ? ' score-up' : ' score-down';
+        }
+
+        // Calculate hand size (cards remaining)
+        const handSize = player.hand_size ?? currentRound;
+
+        // Create face-down cards for opponent's hand
+        const cardBacks = Array(handSize).fill(0).map(() =>
+            '<div class="card-back"></div>'
+        ).join('');
+
+        div.innerHTML = `
+            <div class="opponent-name">
+                ${player.is_bot ? '🤖 ' : ''}${player.username}
+            </div>
+            <div class="opponent-stats">
+                <div class="stat">
+                    <span class="${scoreClass}">${player.score || 0}</span>
+                    <span class="stat-label">${window.i18n.t('game.score')}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">${bidDisplay}</span>
+                    <span class="stat-label">${window.i18n.t('game.bid')}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">${player.tricks_won || 0}</span>
+                    <span class="stat-label">${window.i18n.t('game.tricks')}</span>
+                </div>
+            </div>
+            <div class="opponent-hand">${cardBacks}</div>
+        `;
+
+        return div;
+    }
+
+    updateTurnArrow() {
+        const arrow = document.getElementById('turn-arrow');
+        if (!arrow) return;
+
+        const currentPlayerId = this.gameState.picking_player_id || this.gameState.current_player_id;
+
+        // If it's our turn, hide arrow
+        if (!currentPlayerId || currentPlayerId === this.playerId) {
+            arrow.classList.add('hidden');
+            return;
+        }
+
+        // Find which container has the current player
+        const opponentCard = document.querySelector(`.opponent-card[data-player-id="${currentPlayerId}"]`);
+        if (!opponentCard) {
+            arrow.classList.add('hidden');
+            return;
+        }
+
+        const parentId = opponentCard.parentElement?.id;
+        arrow.classList.remove('hidden', 'arrow-up', 'arrow-down', 'arrow-left', 'arrow-right');
+
+        // Position arrow based on opponent location
+        if (parentId === 'opponents-top') {
+            arrow.classList.add('arrow-up');
+            const rect = opponentCard.getBoundingClientRect();
+            const gameMain = document.querySelector('.game-main');
+            const gameRect = gameMain?.getBoundingClientRect() || { left: 0, top: 0 };
+            arrow.style.left = `${rect.left - gameRect.left + rect.width / 2 - 20}px`;
+            arrow.style.top = `${rect.bottom - gameRect.top + 5}px`;
+        } else if (parentId === 'opponents-left') {
+            arrow.classList.add('arrow-left');
+            const rect = opponentCard.getBoundingClientRect();
+            const gameMain = document.querySelector('.game-main');
+            const gameRect = gameMain?.getBoundingClientRect() || { left: 0, top: 0 };
+            arrow.style.left = `${rect.right - gameRect.left + 5}px`;
+            arrow.style.top = `${rect.top - gameRect.top + rect.height / 2 - 20}px`;
+        } else if (parentId === 'opponents-right') {
+            arrow.classList.add('arrow-right');
+            const rect = opponentCard.getBoundingClientRect();
+            const gameMain = document.querySelector('.game-main');
+            const gameRect = gameMain?.getBoundingClientRect() || { left: 0, top: 0 };
+            arrow.style.left = `${rect.left - gameRect.left - 45}px`;
+            arrow.style.top = `${rect.top - gameRect.top + rect.height / 2 - 20}px`;
+        }
     }
 
     updateHand() {
@@ -527,11 +676,32 @@ class SkullKingGame {
 
         document.getElementById('hand-count').textContent = hand.length;
 
+        // Set CSS variable for card fan centering
+        handContainer.style.setProperty('--total', hand.length);
+
+        // Note: Cards are also shown in bidding modal, but we still render hand
+
+        // Check if it's our turn and what's playable
+        const isMyTurn = this.gameState.picking_player_id === this.playerId;
+        const playableCards = isMyTurn ? this.getPlayableCards(hand) : new Set(hand);
+
+        // Add/remove your-turn class on player area
+        const playerArea = document.querySelector('.player-area');
+        if (playerArea) {
+            playerArea.classList.toggle('your-turn', isMyTurn);
+        }
+
         hand.forEach((cardId, index) => {
             // Convert card ID to card object for display
             const card = this.cardIdToCard(cardId);
             const cardElement = this.createCardElement(card);
             cardElement.dataset.cardId = cardId; // Store actual ID
+
+            // Mark unplayable cards
+            if (!playableCards.has(cardId)) {
+                cardElement.classList.add('unplayable');
+            }
+
             cardElement.addEventListener('click', () => {
                 console.log('[card click] Card clicked:', cardId);
                 this.playCard(cardId);
@@ -539,6 +709,68 @@ class SkullKingGame {
             handContainer.appendChild(cardElement);
         });
         console.log('[updateHand] Done rendering hand');
+    }
+
+    // Get the suit of a card ID
+    getCardSuit(cardId) {
+        // Special cards (can always be played)
+        if (cardId <= 10) return 'special'; // King, Whale, Kraken, Mermaids, Pirates
+        if (cardId >= 67) return 'special'; // Escapes, Tigress, Loot
+
+        // Suit cards
+        if (cardId >= 11 && cardId <= 24) return 'roger';  // Black/Trump
+        if (cardId >= 25 && cardId <= 38) return 'parrot'; // Green
+        if (cardId >= 39 && cardId <= 52) return 'map';    // Purple
+        if (cardId >= 53 && cardId <= 66) return 'chest';  // Yellow
+
+        return 'unknown';
+    }
+
+    // Determine which cards are playable based on game rules
+    getPlayableCards(hand) {
+        const playable = new Set();
+        const trickCards = this.gameState.trick_cards || [];
+
+        // If we're leading (no cards played), all cards are playable
+        if (trickCards.length === 0) {
+            hand.forEach(id => playable.add(id));
+            return playable;
+        }
+
+        // Find the lead suit (first non-special card played)
+        let leadSuit = null;
+        for (const tc of trickCards) {
+            const cardId = tc.card_id || tc.card;
+            const suit = this.getCardSuit(cardId);
+            if (suit !== 'special') {
+                leadSuit = suit;
+                break;
+            }
+        }
+
+        // If no lead suit established (all specials), all cards are playable
+        if (!leadSuit) {
+            hand.forEach(id => playable.add(id));
+            return playable;
+        }
+
+        // Check if we have cards of the lead suit
+        const suitCards = hand.filter(id => this.getCardSuit(id) === leadSuit);
+
+        if (suitCards.length > 0) {
+            // Must follow suit - only suit cards and specials are playable
+            hand.forEach(id => {
+                const suit = this.getCardSuit(id);
+                if (suit === leadSuit || suit === 'special') {
+                    playable.add(id);
+                }
+            });
+        } else {
+            // Can't follow suit - all cards are playable
+            hand.forEach(id => playable.add(id));
+        }
+
+        return playable;
     }
 
     // Pirate names for card IDs 6-10
@@ -579,6 +811,9 @@ class SkullKingGame {
         const trickCards = this.gameState.trick_cards || [];
         const container = document.getElementById('trick-cards');
         container.innerHTML = '';
+
+        // Set CSS variable for fan centering
+        container.style.setProperty('--total', trickCards.length || 1);
 
         trickCards.forEach(({ player_id, card_id, player_name, card }) => {
             const wrapper = document.createElement('div');
@@ -766,16 +1001,12 @@ class SkullKingGame {
         const buttonsContainer = document.getElementById('bid-buttons');
         buttonsContainer.innerHTML = '';
 
-        // Add hint about cards being visible
+        // Remove old hint if exists
         const contentDiv = modal.querySelector('.bidding-content');
-        let hint = contentDiv.querySelector('.cards-hint');
-        if (!hint) {
-            hint = document.createElement('div');
-            hint.className = 'cards-hint';
-            hint.innerHTML = `<span>&#128071;</span> ${window.i18n.t('game.cardsVisibleBelow') || 'Your cards are visible below'}`;
-            contentDiv.querySelector('p').after(hint);
-        }
+        const hint = contentDiv.querySelector('.cards-hint');
+        if (hint) hint.remove();
 
+        // Render bid buttons
         for (let i = 0; i <= maxBid; i++) {
             const button = document.createElement('button');
             button.className = 'bid-btn';
@@ -783,11 +1014,83 @@ class SkullKingGame {
             button.addEventListener('click', () => this.makeBid(i));
             buttonsContainer.appendChild(button);
         }
+
+        // Render hand cards in the modal
+        this.renderBidHandPreview();
+    }
+
+    renderBidHandPreview() {
+        const bidHandContainer = document.getElementById('bid-hand-cards');
+        if (!bidHandContainer) return;
+
+        bidHandContainer.innerHTML = '';
+        const hand = this.gameState?.hand || [];
+
+        // Set CSS variable for card fan centering
+        bidHandContainer.style.setProperty('--total', hand.length);
+
+        hand.forEach((cardId) => {
+            const card = this.cardIdToCard(cardId);
+            const cardElement = this.createCardElement(card);
+            cardElement.dataset.cardId = cardId;
+            bidHandContainer.appendChild(cardElement);
+        });
     }
 
     makeBid(bid) {
         this.sendMessage('BID', { bid });
-        document.getElementById('bidding-modal').classList.add('hidden');
+
+        // Animate cards from modal to hand area
+        this.animateCardsToHand();
+    }
+
+    animateCardsToHand() {
+        const modal = document.getElementById('bidding-modal');
+        const bidCards = document.querySelectorAll('#bid-hand-cards .card');
+        const handContainer = document.getElementById('player-hand');
+
+        if (!bidCards.length || !handContainer) {
+            modal.classList.add('hidden');
+            return;
+        }
+
+        // Get target position (hand area)
+        const handRect = handContainer.getBoundingClientRect();
+        const targetX = handRect.left + handRect.width / 2;
+        const targetY = handRect.top + handRect.height / 2;
+
+        // Clone cards and animate them
+        const flyingCards = [];
+        bidCards.forEach((card, index) => {
+            const rect = card.getBoundingClientRect();
+            const clone = card.cloneNode(true);
+
+            // Position clone at card's current position
+            clone.classList.add('flying-to-hand');
+            clone.style.left = `${rect.left}px`;
+            clone.style.top = `${rect.top}px`;
+            clone.style.width = `${rect.width}px`;
+            clone.style.height = `${rect.height}px`;
+
+            document.body.appendChild(clone);
+            flyingCards.push(clone);
+
+            // Animate to target with stagger
+            setTimeout(() => {
+                clone.style.left = `${targetX - rect.width / 2 + (index - bidCards.length / 2) * 20}px`;
+                clone.style.top = `${targetY - rect.height / 2}px`;
+                clone.style.opacity = '0';
+                clone.style.transform = 'scale(1.2)';
+            }, 50 + index * 30);
+        });
+
+        // Hide modal immediately
+        modal.classList.add('hidden');
+
+        // Clean up flying cards after animation
+        setTimeout(() => {
+            flyingCards.forEach(card => card.remove());
+        }, 700);
     }
 
     playCard(cardId) {
@@ -870,15 +1173,13 @@ class SkullKingGame {
 
     handleTrickComplete(data) {
         // Update tricks won for the winner
-        if (data.winner_player_id && this.gameState?.players) {
-            const winner = this.gameState.players.find(p => p.id === data.winner_player_id);
-            if (winner) {
-                winner.tricks_won = (winner.tricks_won || 0) + 1;
-            }
+        const winner = this.gameState?.players?.find(p => p.id === data.winner_player_id);
+        if (winner) {
+            winner.tricks_won = (winner.tricks_won || 0) + 1;
         }
 
         const winnerLabel = document.getElementById('trick-winner');
-        const winnerName = data.winner_name || 'Unknown';
+        const winnerName = winner?.username || data.winner_name || 'Unknown';
         winnerLabel.textContent = `${winnerName} ${window.i18n.t('game.wonTrick')}`;
         winnerLabel.classList.remove('hidden');
 
@@ -1028,6 +1329,224 @@ class SkullKingGame {
         this.gameEnded = true;
     }
 
+    // ============================================
+    // Pirate Ability Handlers
+    // ============================================
+
+    handleAbilityTriggered(data) {
+        // Show ability prompt modal based on ability type
+        const abilityType = data.ability_type;
+        const pirateType = data.pirate_type;
+
+        console.log('[ABILITY_TRIGGERED] Type:', abilityType, 'Pirate:', pirateType);
+
+        switch (abilityType) {
+            case 'choose_starter':
+                // Rosie - choose who starts next trick
+                this.showRosieModal(data.options);
+                break;
+            case 'draw_discard':
+                // Bendt - draw 2, discard 2
+                this.showBendtModal(data.drawn_cards, data.must_discard);
+                break;
+            case 'extra_bet':
+                // Roatán - declare extra bet
+                this.showRoatanModal(data.options);
+                break;
+            case 'view_deck':
+                // Jade - view undealt cards (handled by SHOW_DECK)
+                break;
+            case 'modify_bid':
+                // Harry - shown at end of round
+                this.showHarryModal();
+                break;
+        }
+    }
+
+    handleAbilityResolved(data) {
+        // Hide any ability modal and show confirmation
+        this.hideAbilityModal();
+        this.addLog(window.i18n.t('log.abilityResolved', { ability: data.ability_type }) || `${data.ability_type} ability resolved`, 'ability', '⚔️');
+    }
+
+    handleShowDeck(data) {
+        // Jade's ability - show undealt cards
+        this.showJadeModal(data.undealt_cards);
+    }
+
+    showRosieModal(options) {
+        const modal = this.createAbilityModal('rosie-modal', 'Rosie\'s Ability');
+        const content = modal.querySelector('.ability-content');
+
+        content.innerHTML = `
+            <p class="ability-description">${window.i18n.t('ability.rosie.description') || 'Choose who will start the next trick:'}</p>
+            <div class="ability-options">
+                ${options.map(opt => `
+                    <button class="ability-option" data-player-id="${opt.player_id}">
+                        ${opt.username}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+
+        content.querySelectorAll('.ability-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.sendMessage('RESOLVE_ROSIE', { chosen_player_id: btn.dataset.playerId });
+                this.hideAbilityModal();
+            });
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    showBendtModal(drawnCards, mustDiscard) {
+        const modal = this.createAbilityModal('bendt-modal', 'Bendt\'s Ability');
+        const content = modal.querySelector('.ability-content');
+
+        content.innerHTML = `
+            <p class="ability-description">${window.i18n.t('ability.bendt.description') || `You drew ${drawnCards.length} cards. Select ${mustDiscard} cards to discard:`}</p>
+            <div class="ability-cards drawn-cards">
+                <p class="cards-label">${window.i18n.t('ability.bendt.drawnCards') || 'Drawn cards:'}</p>
+                <div class="card-row">
+                    ${drawnCards.map(cardId => this.renderCardForAbility(cardId, true)).join('')}
+                </div>
+            </div>
+            <div class="ability-cards hand-cards">
+                <p class="cards-label">${window.i18n.t('ability.bendt.yourHand') || 'Your hand:'}</p>
+                <div class="card-row">
+                    ${(this.gameState?.hand || []).filter(c => !drawnCards.includes(c)).map(cardId => this.renderCardForAbility(cardId, true)).join('')}
+                </div>
+            </div>
+            <p class="discard-count">Selected: <span id="discard-count">0</span> / ${mustDiscard}</p>
+            <button class="ability-confirm" disabled>Confirm Discard</button>
+        `;
+
+        const selectedCards = [];
+        content.querySelectorAll('.ability-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const cardId = parseInt(card.dataset.cardId);
+                const idx = selectedCards.indexOf(cardId);
+                if (idx >= 0) {
+                    selectedCards.splice(idx, 1);
+                    card.classList.remove('selected');
+                } else if (selectedCards.length < mustDiscard) {
+                    selectedCards.push(cardId);
+                    card.classList.add('selected');
+                }
+                document.getElementById('discard-count').textContent = selectedCards.length;
+                content.querySelector('.ability-confirm').disabled = selectedCards.length !== mustDiscard;
+            });
+        });
+
+        content.querySelector('.ability-confirm').addEventListener('click', () => {
+            this.sendMessage('RESOLVE_BENDT', { discard_cards: selectedCards });
+            this.hideAbilityModal();
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    showRoatanModal(options) {
+        const modal = this.createAbilityModal('roatan-modal', 'Roatán\'s Ability');
+        const content = modal.querySelector('.ability-content');
+
+        content.innerHTML = `
+            <p class="ability-description">${window.i18n.t('ability.roatan.description') || 'Choose your extra bet amount:'}</p>
+            <div class="ability-options">
+                ${options.map(amount => `
+                    <button class="ability-option" data-amount="${amount}">
+                        ${amount === 0 ? 'No Bet' : `+${amount} points`}
+                    </button>
+                `).join('')}
+            </div>
+            <p class="ability-hint">${window.i18n.t('ability.roatan.hint') || 'If you win this trick and make your bid, you get the bonus. Otherwise, lose the points!'}</p>
+        `;
+
+        content.querySelectorAll('.ability-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.sendMessage('RESOLVE_ROATAN', { extra_bet: parseInt(btn.dataset.amount) });
+                this.hideAbilityModal();
+            });
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    showJadeModal(undealtCards) {
+        const modal = this.createAbilityModal('jade-modal', 'Jade\'s Ability');
+        const content = modal.querySelector('.ability-content');
+
+        content.innerHTML = `
+            <p class="ability-description">${window.i18n.t('ability.jade.description') || 'These cards were not dealt this round:'}</p>
+            <div class="ability-cards deck-cards">
+                <div class="card-row">
+                    ${undealtCards.map(cardId => this.renderCardForAbility(cardId, false)).join('')}
+                </div>
+            </div>
+            <button class="ability-confirm">Got it!</button>
+        `;
+
+        content.querySelector('.ability-confirm').addEventListener('click', () => {
+            this.sendMessage('RESOLVE_JADE', {});
+            this.hideAbilityModal();
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    showHarryModal() {
+        const modal = this.createAbilityModal('harry-modal', 'Harry\'s Ability');
+        const content = modal.querySelector('.ability-content');
+
+        content.innerHTML = `
+            <p class="ability-description">${window.i18n.t('ability.harry.description') || 'Adjust your bid by ±1:'}</p>
+            <div class="ability-options">
+                <button class="ability-option" data-modifier="-1">−1</button>
+                <button class="ability-option" data-modifier="0">No change</button>
+                <button class="ability-option" data-modifier="1">+1</button>
+            </div>
+        `;
+
+        content.querySelectorAll('.ability-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.sendMessage('RESOLVE_HARRY', { modifier: parseInt(btn.dataset.modifier) });
+                this.hideAbilityModal();
+            });
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    createAbilityModal(id, title) {
+        // Remove any existing ability modal
+        this.hideAbilityModal();
+
+        const modal = document.createElement('div');
+        modal.id = id;
+        modal.className = 'modal ability-modal';
+        modal.innerHTML = `
+            <div class="modal-content ability-modal-content">
+                <h2 class="ability-title">${title}</h2>
+                <div class="ability-content"></div>
+            </div>
+        `;
+
+        return modal;
+    }
+
+    hideAbilityModal() {
+        document.querySelectorAll('.ability-modal').forEach(modal => modal.remove());
+    }
+
+    renderCardForAbility(cardId, selectable) {
+        const cardInfo = this.getCardInfo(cardId);
+        return `
+            <div class="ability-card ${selectable ? 'selectable' : ''}" data-card-id="${cardId}">
+                <div class="card ${cardInfo.suitClass}">${cardInfo.display}</div>
+            </div>
+        `;
+    }
+
     addBot() {
         const botType = document.getElementById('bot-type-select').value;
         const difficulty = document.getElementById('bot-difficulty-select').value;
@@ -1125,68 +1644,57 @@ class SkullKingGame {
 
     updateScoreboard() {
         const tbody = document.getElementById('scoreboard-body');
-        if (!tbody || !this.gameState?.players) return;
+        const dropdownBody = document.getElementById('scoreboard-dropdown-body');
 
-        tbody.innerHTML = '';
+        if (!this.gameState?.players) return;
 
         // Sort players by score
         const sortedPlayers = [...this.gameState.players].sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        sortedPlayers.forEach((player, index) => {
-            const tr = document.createElement('tr');
-            const isYou = player.id === this.playerId;
-            const isCurrentTurn = player.id === this.gameState.picking_player_id;
-            const bid = player.bid ?? this.gameState.bids?.[player.id] ?? null;
-            const tricksWon = player.tricks_won || 0;
+        // Update both scoreboards
+        [tbody, dropdownBody].forEach(container => {
+            if (!container) return;
+            container.innerHTML = '';
 
-            if (isYou) tr.classList.add('is-you');
-            if (isCurrentTurn) tr.classList.add('current-turn');
+            sortedPlayers.forEach((player, index) => {
+                const tr = document.createElement('tr');
+                const isYou = player.id === this.playerId;
+                const isCurrentTurn = player.id === this.gameState.picking_player_id;
+                const bid = player.bid ?? this.gameState.bids?.[player.id] ?? null;
+                const tricksWon = player.tricks_won || 0;
 
-            // Bid progress indicator
-            if (bid !== null) {
-                if (tricksWon === bid) {
-                    tr.classList.add('bid-match');
-                } else if (tricksWon > bid) {
-                    tr.classList.add('bid-over');
+                if (isYou) tr.classList.add('is-you', 'current-player');
+                if (isCurrentTurn) tr.classList.add('current-turn');
+
+                // Bid progress indicator
+                if (bid !== null) {
+                    if (tricksWon === bid) {
+                        tr.classList.add('bid-match');
+                    } else if (tricksWon > bid) {
+                        tr.classList.add('bid-over');
+                    }
                 }
-            }
 
-            tr.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${player.is_bot ? '&#129302; ' : ''}${player.username}${isYou ? ' &#11088;' : ''}</td>
-                <td>${bid !== null ? bid : '-'}</td>
-                <td>${tricksWon}</td>
-                <td><strong>${player.score || 0}</strong></td>
-            `;
-            tbody.appendChild(tr);
+                // Dropdown uses compact format (no rank column)
+                if (container === dropdownBody) {
+                    tr.innerHTML = `
+                        <td>${player.is_bot ? '🤖 ' : ''}${player.username}${isYou ? ' ⭐' : ''}</td>
+                        <td>${bid !== null ? bid : '-'}</td>
+                        <td>${tricksWon}</td>
+                        <td><strong>${player.score || 0}</strong></td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${player.is_bot ? '&#129302; ' : ''}${player.username}${isYou ? ' &#11088;' : ''}</td>
+                        <td>${bid !== null ? bid : '-'}</td>
+                        <td>${tricksWon}</td>
+                        <td><strong>${player.score || 0}</strong></td>
+                    `;
+                }
+                container.appendChild(tr);
+            });
         });
-    }
-
-    confirmContinue() {
-        // Send continue confirmation to server
-        this.sendMessage('CONTINUE', {});
-        // Hide the modal
-        document.getElementById('continue-modal').classList.add('hidden');
-    }
-
-    showContinueModal(winnerName, bonusPoints = 0) {
-        const modal = document.getElementById('continue-modal');
-        const winnerDiv = document.getElementById('continue-winner');
-        const readyList = document.getElementById('ready-list');
-
-        winnerDiv.innerHTML = `&#127942; ${winnerName} won the trick!${bonusPoints > 0 ? ` (+${bonusPoints} bonus)` : ''}`;
-
-        // Show player ready states
-        readyList.innerHTML = '';
-        this.gameState.players.forEach(player => {
-            const span = document.createElement('span');
-            span.className = `player-ready ${player.is_bot ? 'ready' : 'waiting'}`;
-            span.textContent = player.is_bot ? `${player.username} &#10004;` : player.username;
-            span.innerHTML = `${player.username} ${player.is_bot ? '&#10004;' : '&#8987;'}`;
-            readyList.appendChild(span);
-        });
-
-        modal.classList.remove('hidden');
     }
 
     switchScreen(screenName) {
@@ -1194,6 +1702,14 @@ class SkullKingGame {
             screen.classList.remove('active');
         });
         document.getElementById(`${screenName}-screen`).classList.add('active');
+
+        // Hide/show login screen floating buttons based on current screen
+        const langBtn = document.getElementById('lang-toggle');
+        const rulesBtn = document.getElementById('rules-toggle');
+        const isGameScreen = screenName === 'game';
+
+        if (langBtn) langBtn.style.display = isGameScreen ? 'none' : '';
+        if (rulesBtn) rulesBtn.style.display = isGameScreen ? 'none' : '';
     }
 
     showError(screen, message) {
@@ -1203,6 +1719,45 @@ class SkullKingGame {
             setTimeout(() => {
                 errorElement.textContent = '';
             }, 5000);
+        }
+        // Also show as toast
+        this.showToast(message, 'error');
+    }
+
+    showToast(message, type = 'info', duration = 3000) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const icons = {
+            success: '&#10004;',
+            error: '&#10060;',
+            info: '&#8505;',
+            warning: '&#9888;'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type] || icons.info}</span>
+            <span class="toast-message">${message}</span>
+        `;
+
+        container.appendChild(toast);
+
+        // Auto remove after duration
+        setTimeout(() => {
+            toast.classList.add('toast-out');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    setButtonLoading(button, loading = true) {
+        if (loading) {
+            button.classList.add('loading');
+            button.disabled = true;
+        } else {
+            button.classList.remove('loading');
+            button.disabled = false;
         }
     }
 

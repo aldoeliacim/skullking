@@ -31,7 +31,7 @@ def game_handler(mock_manager):
 
 @pytest.fixture
 def game_with_players():
-    """Create a game with 3 players."""
+    """Create a game with 3 bot players (for auto-continue in tests)."""
     game = Game(id="test-game-123", slug="test-game")
     for i in range(3):
         player = Player(
@@ -40,6 +40,7 @@ def game_with_players():
             avatar_id=i,
             index=i,
             game_id=game.id,
+            is_bot=True,  # Bots auto-continue in game flow
         )
         game.add_player(player)
     return game

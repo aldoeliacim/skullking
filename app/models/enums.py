@@ -54,6 +54,11 @@ class Command(str, Enum):
     RESOLVE_JADE = "RESOLVE_JADE"  # Acknowledge deck view
     RESOLVE_HARRY = "RESOLVE_HARRY"  # Choose bid modifier
 
+    # Continue button (between turns)
+    CONTINUE = "CONTINUE"  # Player confirms ready to continue
+    CONTINUE_PROMPT = "CONTINUE_PROMPT"  # Server prompts for continue
+    ALL_READY = "ALL_READY"  # All players ready to continue
+
 
 class CardType(str, Enum):
     """Card types in Skull King."""

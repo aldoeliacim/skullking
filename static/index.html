@@ -12,6 +12,9 @@
 </head>
 <body>
     <div id="app">
+        <!-- Toast Notifications -->
+        <div id="toast-container" class="toast-container"></div>
+
         <!-- Language Switcher -->
         <button id="lang-toggle" class="lang-btn" title="Switch language">
             <span id="lang-flag">EN</span>
@@ -134,67 +137,88 @@
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="game-layout">
-                <!-- Top Bar -->
+                <!-- Top Bar - Fixed -->
                 <header class="game-topbar">
-                    <div class="round-badge">
-                        <span data-i18n="game.round">Round</span>
-                        <strong><span id="current-round">1</span>/10</strong>
-                    </div>
-                    <div class="game-phase" id="game-status-text" data-i18n="game.waiting">Waiting...</div>
-                    <div class="topbar-right">
-                        <button id="scoreboard-toggle" class="topbar-btn" title="Toggle Scoreboard">
-                            <span>&#127942;</span>
-                        </button>
-                        <div class="score-display">
-                            <span data-i18n="game.yourScore">Your Score:</span>
-                            <strong id="player-score">0</strong>
+                    <div class="topbar-left">
+                        <div class="round-badge">
+                            <span data-i18n="game.round">Round</span>
+                            <strong><span id="current-round">1</span>/10</strong>
                         </div>
+                        <div class="game-phase" id="game-status-text" data-i18n="game.waiting">Waiting...</div>
+                    </div>
+                    <div class="topbar-right">
+                        <button id="rules-toggle-game" class="topbar-btn" title="Rules">
+                            <span>&#128214;</span>
+                        </button>
+                        <button id="lang-toggle-game" class="topbar-btn" title="Language">
+                            <span id="lang-flag-game">EN</span>
+                        </button>
                     </div>
                 </header>
 
-                <!-- Scoreboard Panel -->
-                <aside class="scoreboard-panel hidden" id="scoreboard-panel">
-                    <div class="scoreboard-header">
-                        <h4 data-i18n="game.scoreboard">Scoreboard</h4>
-                        <button id="scoreboard-close" class="btn-icon-only" title="Close">&#10005;</button>
+                <!-- Floating Scoreboard Dropdown -->
+                <div id="scoreboard-bar" class="scoreboard-bar">
+                    <button id="scoreboard-toggle-bar" class="scoreboard-toggle-bar">
+                        <span class="toggle-icon">▼</span>
+                        <span data-i18n="game.scoreboard">Scoreboard</span>
+                    </button>
+                    <div id="scoreboard-dropdown" class="scoreboard-dropdown hidden">
+                        <table class="scoreboard-table-compact">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="results.player">Player</th>
+                                    <th data-i18n="game.bid">Bid</th>
+                                    <th data-i18n="game.tricks">Won</th>
+                                    <th data-i18n="results.score">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scoreboard-dropdown-body"></tbody>
+                        </table>
                     </div>
-                    <table class="scoreboard-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th data-i18n="results.player">Player</th>
-                                <th data-i18n="game.bid">Bid</th>
-                                <th data-i18n="game.tricks">Won</th>
-                                <th data-i18n="results.score">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody id="scoreboard-body"></tbody>
-                    </table>
-                </aside>
+                </div>
 
-                <!-- Main Game Area -->
-                <main class="game-main">
-                    <!-- Opponents Area (Top) -->
-                    <div class="opponents-area" id="opponents-container"></div>
+                <!-- Main Game Area - Table Layout -->
+                <main class="game-main game-table-layout">
+                    <!-- Turn Arrow Indicator -->
+                    <div id="turn-arrow" class="turn-arrow hidden">
+                        <div class="arrow-indicator"></div>
+                    </div>
 
-                    <!-- Center Play Area -->
-                    <div class="play-area">
-                        <div class="table-felt">
-                            <h3 class="area-label" data-i18n="game.currentTrick">Current Trick</h3>
-                            <div id="trick-cards" class="trick-cards"></div>
-                            <div id="trick-winner" class="trick-winner hidden"></div>
+                    <!-- Top opponents -->
+                    <div class="table-side table-top" id="opponents-top"></div>
+
+                    <!-- Middle row: Left opponents, Table, Right opponents -->
+                    <div class="table-middle-row">
+                        <div class="table-side table-left" id="opponents-left"></div>
+
+                        <!-- Center Play Area -->
+                        <div class="play-area">
+                            <div class="table-felt">
+                                <h3 class="area-label" data-i18n="game.currentTrick">Current Trick</h3>
+                                <div id="trick-cards" class="trick-cards"></div>
+                                <div id="trick-winner" class="trick-winner hidden"></div>
+                            </div>
                         </div>
+
+                        <div class="table-side table-right" id="opponents-right"></div>
                     </div>
+
+                    <!-- Legacy container for JS compatibility -->
+                    <div id="opponents-container" class="hidden"></div>
 
                     <!-- Player Hand Area (Bottom) -->
                     <div class="player-area">
                         <div class="player-info-bar">
+                            <div class="player-stat-item score-item">
+                                <span class="stat-label" data-i18n="game.yourScore">Score:</span>
+                                <span class="stat-value score-value" id="player-score">0</span>
+                            </div>
                             <div class="player-stat-item">
-                                <span class="stat-label" data-i18n="game.yourBid">Your Bid:</span>
+                                <span class="stat-label" data-i18n="game.yourBid">Bid:</span>
                                 <span class="stat-value" id="player-bid">-</span>
                             </div>
                             <div class="player-stat-item">
-                                <span class="stat-label" data-i18n="game.tricksWon">Tricks Won:</span>
+                                <span class="stat-label" data-i18n="game.tricksWon">Won:</span>
                                 <span class="stat-value" id="player-tricks">0</span>
                             </div>
                             <div class="player-stat-item your-turn-indicator hidden" id="your-turn-indicator">
@@ -217,6 +241,10 @@
                         <h3 data-i18n="game.makeYourBid">Make Your Bid</h3>
                         <p data-i18n="game.bidQuestion">How many tricks will you win?</p>
                         <div id="bid-buttons" class="bid-buttons"></div>
+                        <div class="bid-hand-preview">
+                            <div class="bid-hand-label" data-i18n="game.yourHand">Your Hand</div>
+                            <div id="bid-hand-cards" class="bid-hand-cards"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -238,21 +266,6 @@
                                 <small data-i18n="game.tigressEscapeDesc">Lose on purpose</small>
                             </button>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Continue Button Modal (between turns) -->
-                <div id="continue-modal" class="modal hidden">
-                    <div class="modal-content continue-content">
-                        <h3 data-i18n="game.trickComplete">Trick Complete!</h3>
-                        <div id="continue-winner" class="continue-winner"></div>
-                        <div class="continue-waiting">
-                            <span data-i18n="game.waitingPlayers">Waiting for players...</span>
-                            <div class="player-ready-list" id="ready-list"></div>
-                        </div>
-                        <button id="continue-btn" class="btn btn-primary">
-                            <span data-i18n="game.continue">Continue</span>
-                        </button>
                     </div>
                 </div>
 
