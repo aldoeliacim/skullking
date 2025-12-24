@@ -466,12 +466,13 @@ class SkullKingGame {
                 this.updateGameScreen();
                 break;
             case 'PICKED':
-                console.log('[PICKED] Player:', message.content.player_id, 'played card:', message.content.card_id);
+                console.log('[PICKED] Player:', message.content.player_id, 'played card:', message.content.card_id, 'tigress_choice:', message.content.tigress_choice);
                 // A card was played
                 this.gameState.trick_cards = this.gameState.trick_cards || [];
                 this.gameState.trick_cards.push({
                     player_id: message.content.player_id,
-                    card_id: message.content.card_id
+                    card_id: message.content.card_id,
+                    tigress_choice: message.content.tigress_choice || null
                 });
                 // Remove from hand if it's our card
                 if (message.content.player_id === this.playerId && this.gameState.hand) {
@@ -750,7 +751,7 @@ class SkullKingGame {
                     <span class="stat-label">${window.i18n.t('game.tricks')}</span>
                 </div>
             </div>
-            <div class="opponent-hand">${cardBacks}</div>
+            <div class="opponent-hand" style="--card-count: ${handSize}">${cardBacks}</div>
         `;
 
         return div;
@@ -1004,7 +1005,7 @@ class SkullKingGame {
         // Set CSS variable for fan centering
         container.style.setProperty('--total', trickCards.length || 1);
 
-        trickCards.forEach(({ player_id, card_id, player_name, card }) => {
+        trickCards.forEach(({ player_id, card_id, player_name, card, tigress_choice }) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'trick-card-wrapper';
             wrapper.dataset.playerId = player_id;
@@ -1012,6 +1013,16 @@ class SkullKingGame {
             // Handle both formats: {card_id} from server or {card} object
             const cardData = card || this.cardIdToCard(card_id);
             const cardElement = this.createCardElement(cardData);
+
+            // Add Tigress choice badge if this is Tigress
+            if (card_id === 72 && tigress_choice) {
+                const choiceBadge = document.createElement('div');
+                choiceBadge.className = `card-choice-badge ${tigress_choice}`;
+                choiceBadge.innerHTML = tigress_choice === 'pirate'
+                    ? '<span class="choice-icon">🏴‍☠️</span><span class="choice-text">Pirate</span>'
+                    : '<span class="choice-icon">👻</span><span class="choice-text">Escape</span>';
+                cardElement.appendChild(choiceBadge);
+            }
 
             const label = document.createElement('div');
             label.className = 'trick-player-name';
@@ -1373,7 +1384,7 @@ class SkullKingGame {
                 this.gameState.trick_cards = [];
                 this.updateGameScreen();
             }, 600);
-        }, 1400);
+        }, 2500); // Increased from 1400ms to give more time to see results
     }
 
     // Determine which direction cards should fly to based on winner position
@@ -1435,7 +1446,7 @@ class SkullKingGame {
                 this.gameState.trick_cards = [];
                 this.updateGameScreen();
             }, 600);
-        }, 1400);
+        }, 2500); // Increased from 1400ms to give more time to see results
     }
 
     handleScoresAnnounced(data) {
@@ -1464,10 +1475,72 @@ class SkullKingGame {
         this.addLog(window.i18n.t('log.roundComplete', { round: data.round }));
         this.updateGameScreen();
 
-        // Clear score changes after animation completes
+        // Show round summary overlay
+        this.showRoundSummary(data.round, data.scores);
+
+        // Auto-expand scoreboard dropdown
+        const scoreboardBar = document.getElementById('scoreboard-bar');
+        const scoreboardDropdown = document.getElementById('scoreboard-dropdown');
+        if (scoreboardBar && scoreboardDropdown) {
+            scoreboardBar.classList.add('expanded');
+            scoreboardDropdown.classList.remove('hidden');
+        }
+
+        // Clear score changes and collapse scoreboard after delay
         setTimeout(() => {
             this.lastScoreChanges = null;
+            // Collapse scoreboard after viewing
+            setTimeout(() => {
+                if (scoreboardBar) scoreboardBar.classList.remove('expanded');
+                if (scoreboardDropdown) scoreboardDropdown.classList.add('hidden');
+            }, 2000);
         }, 1000);
+    }
+
+    showRoundSummary(roundNumber, scores) {
+        // Remove any existing summary
+        const existingSummary = document.querySelector('.round-summary-overlay');
+        if (existingSummary) existingSummary.remove();
+
+        // Create summary overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'round-summary-overlay';
+
+        const sortedScores = [...(scores || [])].sort((a, b) => b.total_score - a.total_score);
+        const myScore = scores?.find(s => s.player_id === this.playerId);
+
+        overlay.innerHTML = `
+            <div class="round-summary-content">
+                <h3>Round ${roundNumber} Complete!</h3>
+                <div class="round-summary-scores">
+                    ${sortedScores.slice(0, 4).map((s, i) => {
+                        const player = this.gameState?.players?.find(p => p.id === s.player_id);
+                        const isMe = s.player_id === this.playerId;
+                        const deltaClass = s.score_delta >= 0 ? 'positive' : 'negative';
+                        const deltaSign = s.score_delta >= 0 ? '+' : '';
+                        return `
+                            <div class="summary-player ${isMe ? 'is-you' : ''}">
+                                <span class="summary-rank">${i + 1}</span>
+                                <span class="summary-name">${player?.username || 'Player'}${isMe ? ' ⭐' : ''}</span>
+                                <span class="summary-delta ${deltaClass}">${deltaSign}${s.score_delta}</span>
+                                <span class="summary-total">${s.total_score}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                ${myScore ? `<div class="your-round-result ${myScore.score_delta >= 0 ? 'positive' : 'negative'}">
+                    Your score: ${myScore.score_delta >= 0 ? '+' : ''}${myScore.score_delta}
+                </div>` : ''}
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Auto-remove after delay
+        setTimeout(() => {
+            overlay.classList.add('fade-out');
+            setTimeout(() => overlay.remove(), 500);
+        }, 3500);
     }
 
     handleRoundComplete(data) {
@@ -1950,10 +2023,12 @@ class SkullKingGame {
         // Hide/show login screen floating buttons based on current screen
         const langBtn = document.getElementById('lang-toggle');
         const rulesBtn = document.getElementById('rules-toggle');
+        const soundBtn = document.getElementById('sound-toggle');
         const isGameScreen = screenName === 'game';
 
         if (langBtn) langBtn.style.display = isGameScreen ? 'none' : '';
         if (rulesBtn) rulesBtn.style.display = isGameScreen ? 'none' : '';
+        if (soundBtn) soundBtn.style.display = isGameScreen ? 'none' : '';
     }
 
     showError(screen, message) {

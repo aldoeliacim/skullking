@@ -1015,8 +1015,6 @@ input[type="text"]::placeholder {
 }
 
 .trick-cards {
-    --fan-spread: 10deg;
-    --fan-lift: 6px;
     --total: 4;
 
     display: flex;
@@ -1025,21 +1023,16 @@ input[type="text"]::placeholder {
     position: relative;
     z-index: 1;
     min-height: 100px;
-    perspective: 600px;
+    gap: 0;
 }
 
 .trick-card-wrapper {
     --index: 0;
-    --center-offset: calc((var(--index) - (var(--total) - 1) / 2));
-    --rotation: calc(var(--center-offset) * var(--fan-spread));
-    --lift: calc(abs(var(--center-offset)) * var(--fan-lift) * -1);
 
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 0 -10px;
-    transform-origin: center 120%;
-    transform: rotate(var(--rotation)) translateY(var(--lift));
+    margin: 0 -8px;
     animation: cardPlayedToTable 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
@@ -1071,15 +1064,15 @@ input[type="text"]::placeholder {
 @keyframes cardPlayedToTable {
     0% {
         opacity: 0;
-        transform: translateY(80px) rotate(0deg) scale(0.5);
+        transform: translateY(80px) scale(0.5);
     }
     60% {
         opacity: 1;
-        transform: translateY(-5px) rotate(calc(var(--rotation) * 1.1)) scale(1.02);
+        transform: translateY(-5px) scale(1.02);
     }
     100% {
         opacity: 1;
-        transform: rotate(var(--rotation)) translateY(var(--lift)) scale(1);
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -1113,6 +1106,57 @@ input[type="text"]::placeholder {
 
 .trick-winner.hidden {
     display: none;
+}
+
+/* Card choice badge (for Tigress pirate/escape choice) */
+.card-choice-badge {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.65rem;
+    font-weight: 700;
+    white-space: nowrap;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    animation: badgePopIn 0.3s ease-out;
+}
+
+.card-choice-badge.pirate {
+    background: linear-gradient(135deg, #2d1b69 0%, #1a0f3c 100%);
+    color: #e8d5ff;
+    border: 1px solid #6b4e9e;
+}
+
+.card-choice-badge.escape {
+    background: linear-gradient(135deg, #1a3d3d 0%, #0d2626 100%);
+    color: #a8e6cf;
+    border: 1px solid #4caf93;
+}
+
+.card-choice-badge .choice-icon {
+    font-size: 0.8rem;
+}
+
+.card-choice-badge .choice-text {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@keyframes badgePopIn {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.5);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
 }
 
 /* Player Area */
@@ -2329,7 +2373,7 @@ input[type="text"]::placeholder {
 .rules-btn {
     position: fixed;
     top: var(--spacing-md);
-    right: calc(var(--spacing-md) + 60px);
+    right: calc(var(--spacing-md) + 110px);
     z-index: 1000;
     background: var(--bg-panel);
     border: 2px solid var(--border-color);
@@ -3751,49 +3795,87 @@ input[type="text"]:focus,
     max-width: 140px;
 }
 
-/* Opponent hand display (face-down cards) */
+/* Opponent hand display (face-down cards) - curved fan layout */
 .opponent-hand {
+    --fan-spread: 8deg;
+    --card-count: 10;
+
     display: flex;
     justify-content: center;
+    align-items: flex-start;
     margin-top: var(--spacing-xs);
-    gap: -8px;
+    position: relative;
+    height: 50px;
+    perspective: 400px;
 }
 
 .opponent-hand .card-back {
+    --index: 0;
+    --center-offset: calc(var(--index) - (var(--card-count) - 1) / 2);
+    --rotation: calc(var(--center-offset) * var(--fan-spread));
+    --lift: calc(abs(var(--center-offset)) * 2px);
+
     width: 28px;
     height: 40px;
     background: url('/static/images/cards/back.png') center/cover no-repeat;
     border-radius: 4px;
     box-shadow: var(--shadow-sm);
-    margin-left: -8px;
+    margin-left: -12px;
     transition: transform 0.2s ease;
+    transform-origin: center 150%;
+    transform: rotate(var(--rotation)) translateY(var(--lift));
+    position: relative;
 }
 
 .opponent-hand .card-back:first-child {
     margin-left: 0;
 }
 
+/* Index for fan spread calculation */
+.opponent-hand .card-back:nth-child(1) { --index: 0; }
+.opponent-hand .card-back:nth-child(2) { --index: 1; }
+.opponent-hand .card-back:nth-child(3) { --index: 2; }
+.opponent-hand .card-back:nth-child(4) { --index: 3; }
+.opponent-hand .card-back:nth-child(5) { --index: 4; }
+.opponent-hand .card-back:nth-child(6) { --index: 5; }
+.opponent-hand .card-back:nth-child(7) { --index: 6; }
+.opponent-hand .card-back:nth-child(8) { --index: 7; }
+.opponent-hand .card-back:nth-child(9) { --index: 8; }
+.opponent-hand .card-back:nth-child(10) { --index: 9; }
+
 .opponent-card.current-turn .opponent-hand .card-back {
     animation: cardHover 0.8s ease-in-out infinite alternate;
 }
 
 @keyframes cardHover {
-    from { transform: translateY(0); }
-    to { transform: translateY(-3px); }
+    from { transform: rotate(var(--rotation)) translateY(var(--lift)); }
+    to { transform: rotate(var(--rotation)) translateY(calc(var(--lift) - 3px)); }
 }
 
-/* Left/Right opponent hands rotate */
+/* Left/Right opponent hands - vertical fanned */
 .table-left .opponent-hand,
 .table-right .opponent-hand {
+    --fan-spread: 6deg;
     flex-direction: column;
-    gap: 0;
+    height: auto;
+    width: 50px;
     margin-top: var(--spacing-sm);
+    align-items: center;
 }
 
 .table-left .opponent-hand .card-back,
 .table-right .opponent-hand .card-back {
     margin-left: 0;
-    margin-top: -25px;
+    margin-top: -28px;
+    transform-origin: center center;
+}
+
+.table-left .opponent-hand .card-back {
+    transform: rotate(calc(var(--center-offset) * var(--fan-spread) * -1)) translateX(calc(var(--center-offset) * 3px));
+}
+
+.table-right .opponent-hand .card-back {
+    transform: rotate(calc(var(--center-offset) * var(--fan-spread))) translateX(calc(var(--center-offset) * -3px));
 }
 
 .table-left .opponent-hand .card-back:first-child,
@@ -4025,9 +4107,14 @@ input[type="text"]:focus,
         max-width: none;
     }
 
+    .opponent-hand {
+        --fan-spread: 5deg;
+    }
+
     .opponent-hand .card-back {
         width: 22px;
         height: 32px;
+        margin-left: -10px;
     }
 
     .table-felt {
@@ -4051,10 +4138,14 @@ input[type="text"]:focus,
         font-size: 0.75rem;
     }
 
+    .opponent-hand {
+        --fan-spread: 3deg;
+    }
+
     .opponent-hand .card-back {
         width: 18px;
         height: 26px;
-        margin-left: -6px;
+        margin-left: -8px;
     }
 
     .turn-arrow {
@@ -4252,4 +4343,158 @@ input[type="text"]:focus,
 
 .btn-spectate .btn-icon {
     font-size: 1rem;
+}
+
+/* ============================================
+   ROUND SUMMARY OVERLAY
+   ============================================ */
+
+.round-summary-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2000;
+    animation: summaryFadeIn 0.4s ease-out;
+}
+
+.round-summary-overlay.fade-out {
+    animation: summaryFadeOut 0.5s ease-in forwards;
+}
+
+@keyframes summaryFadeIn {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes summaryFadeOut {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9) translateY(-20px);
+    }
+}
+
+.round-summary-content {
+    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
+    border: 2px solid var(--accent-gold);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    min-width: 280px;
+    max-width: 400px;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(245, 197, 24, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.round-summary-content h3 {
+    text-align: center;
+    font-family: 'Pirata One', cursive;
+    font-size: 1.5rem;
+    color: var(--accent-gold);
+    margin-bottom: var(--spacing-lg);
+    text-shadow: 0 0 20px rgba(245, 197, 24, 0.5);
+}
+
+.round-summary-scores {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.summary-player {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-dark);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.summary-player.is-you {
+    background: rgba(245, 197, 24, 0.1);
+    border-color: var(--accent-gold);
+}
+
+.summary-rank {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-panel);
+    border-radius: var(--radius-full);
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.summary-player:first-child .summary-rank {
+    background: var(--accent-gold);
+    color: var(--bg-dark);
+}
+
+.summary-name {
+    flex: 1;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.summary-delta {
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.summary-delta.positive {
+    color: var(--accent-green);
+    background: rgba(16, 185, 129, 0.15);
+}
+
+.summary-delta.negative {
+    color: var(--accent-red);
+    background: rgba(220, 53, 69, 0.15);
+}
+
+.summary-total {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+    min-width: 40px;
+    text-align: right;
+}
+
+.your-round-result {
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-md);
+    text-align: center;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.your-round-result.positive {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.your-round-result.negative {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.2) 0%, rgba(220, 53, 69, 0.1) 100%);
+    color: var(--accent-red);
+    border: 1px solid rgba(220, 53, 69, 0.3);
 }
