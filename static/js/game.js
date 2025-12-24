@@ -7,9 +7,16 @@ class SkullKingGame {
         this.username = null;
         this.gameState = null;
         this.isHost = false;
+        this.selectedCardId = null; // For tap-to-confirm on mobile
+        this.isTouchDevice = this.detectTouchDevice();
 
         this.initializeEventListeners();
         this.initializeI18n();
+    }
+
+    // Detect if device uses touch as primary input
+    detectTouchDevice() {
+        return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     }
 
     async initializeI18n() {
@@ -785,13 +792,65 @@ class SkullKingGame {
                 cardElement.classList.add('unplayable');
             }
 
-            cardElement.addEventListener('click', () => {
+            cardElement.addEventListener('click', (e) => {
                 console.log('[card click] Card clicked:', cardId);
-                this.playCard(cardId);
+                this.handleCardClick(cardId, cardElement, e);
             });
             handContainer.appendChild(cardElement);
         });
+
+        // Check if hand is scrollable on touch devices
+        if (this.isTouchDevice && hand.length > 5) {
+            handContainer.classList.add('scrollable');
+        } else {
+            handContainer.classList.remove('scrollable');
+        }
+
         console.log('[updateHand] Done rendering hand');
+    }
+
+    // Handle card click with tap-to-confirm on touch devices
+    handleCardClick(cardId, cardElement, event) {
+        // Desktop: play immediately
+        if (!this.isTouchDevice) {
+            this.playCard(cardId);
+            return;
+        }
+
+        // Touch device: tap-to-confirm behavior
+        if (this.selectedCardId === cardId) {
+            // Second tap - play the card
+            this.clearCardSelection();
+            this.playCard(cardId);
+        } else {
+            // First tap - select the card
+            this.selectCard(cardId, cardElement);
+        }
+    }
+
+    // Select a card (for tap-to-confirm)
+    selectCard(cardId, cardElement) {
+        this.clearCardSelection();
+        this.selectedCardId = cardId;
+        cardElement.classList.add('touch-selected');
+        this.playSound('click');
+
+        // Clear selection after 3 seconds if no second tap
+        this.selectionTimeout = setTimeout(() => {
+            this.clearCardSelection();
+        }, 3000);
+    }
+
+    // Clear current card selection
+    clearCardSelection() {
+        if (this.selectionTimeout) {
+            clearTimeout(this.selectionTimeout);
+            this.selectionTimeout = null;
+        }
+        this.selectedCardId = null;
+        document.querySelectorAll('.hand-cards .card.touch-selected').forEach(el => {
+            el.classList.remove('touch-selected');
+        });
     }
 
     // Get the suit of a card ID

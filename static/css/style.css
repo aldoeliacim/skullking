@@ -3282,6 +3282,112 @@ input[type="text"]:focus,
         min-width: 50px;
         min-height: 50px;
     }
+
+    /* Touch-friendly card sizing */
+    .hand-cards .card {
+        min-width: 60px;
+        min-height: 84px;
+    }
+
+    /* Card selection state for tap-to-confirm */
+    .hand-cards .card.touch-selected {
+        transform: translateY(-20px) scale(1.08);
+        box-shadow: 0 0 20px rgba(245, 197, 24, 0.6), 0 8px 25px rgba(0, 0, 0, 0.4);
+        z-index: 100;
+    }
+
+    .hand-cards .card.touch-selected::after {
+        content: '▲ TAP TO PLAY';
+        position: absolute;
+        bottom: -24px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: var(--accent-gold);
+        white-space: nowrap;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        animation: pulse-glow 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+
+    /* Prevent double-tap zoom on interactive elements */
+    .card,
+    .btn,
+    .bid-btn,
+    .topbar-btn {
+        touch-action: manipulation;
+    }
+
+    /* Better tap feedback with ripple effect */
+    .btn,
+    .bid-btn,
+    .topbar-btn {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn::after,
+    .bid-btn::after,
+    .topbar-btn::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition: width 0.3s ease, height 0.3s ease;
+    }
+
+    .btn:active::after,
+    .bid-btn:active::after,
+    .topbar-btn:active::after {
+        width: 200%;
+        height: 200%;
+    }
+
+    /* Larger tap targets for bid buttons */
+    .bid-grid {
+        gap: 12px;
+    }
+
+    .bid-btn {
+        min-width: 56px;
+        min-height: 56px;
+        font-size: 1.2rem;
+    }
+
+    /* Swipe scrolling for card hand */
+    .hand-cards {
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        padding: 10px 20px 30px;
+    }
+
+    .hand-cards .card {
+        scroll-snap-align: center;
+    }
+
+    /* Show scroll hint */
+    .hand-cards.scrollable::before {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 40px;
+        background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.3));
+        pointer-events: none;
+        z-index: 5;
+    }
 }
 
 /* High contrast / accessibility */
