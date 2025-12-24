@@ -175,10 +175,10 @@ class SkullKingEnvMasked(gym.Env):
         return mask
 
     def reset(
-        self, seed: int | None = None, _options: dict[str, Any] | None = None
+        self, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[np.ndarray, dict[str, Any]]:
         """Reset environment."""
-        super().reset(seed=seed)
+        super().reset(seed=seed, options=options)
 
         # Create new game
         self.game = Game(id="env_game", slug="env-game")

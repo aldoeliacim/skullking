@@ -23,7 +23,7 @@ from stable_baselines3.common.callbacks import (
     EvalCallback,
 )
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from app.gym_env.skullking_env_masked import SkullKingEnvMasked
 
@@ -139,11 +139,12 @@ def train_masked_ppo(
 
     # Create vectorized environment with action masking
     # Start with random easy opponents (Phase 1)
+    # Use DummyVecEnv for stability (SubprocVecEnv can have issues on some systems)
     print(f"Creating {n_envs} parallel masked environments...")
     vec_env = make_vec_env(
         lambda: create_masked_env("random", "easy"),
         n_envs=n_envs,
-        vec_env_cls=SubprocVecEnv,
+        vec_env_cls=DummyVecEnv,
     )
 
     # Create evaluation environment
