@@ -304,16 +304,17 @@ function handleMessage(
     case 'DEAL': {
       const cardIds = content.cards as (string | number)[];
       const cards = cardIds.map((id) => parseCard(id));
+      // Reset player tricks for new round - get players BEFORE setting state
+      const resetPlayers = get().players.map((p) => ({ ...p, tricks_won: 0, bid: null }));
+      // Single atomic update for all state changes
       set({
         hand: cards,
         currentRound: content.round as number,
         currentTrick: 0,
         trickCards: [],
         bids: {},
+        players: resetPlayers,
       });
-      // Reset player tricks for new round
-      const players = get().players.map((p) => ({ ...p, tricks_won: 0, bid: null }));
-      set({ players });
       get().addLog(`Round ${content.round} - Cards dealt`);
       break;
     }
@@ -377,16 +378,19 @@ function handleMessage(
         card_id: cardIdStr,
         tigress_choice: content.tigress_choice as 'pirate' | 'escape' | undefined,
       };
-      set({ trickCards: [...get().trickCards, trickCard] });
 
-      // Remove played card from hand
-      const hand = get().hand.filter((c) => c.id !== cardIdStr);
-      set({ hand });
+      // Get current state BEFORE updating
+      const currentTrickCards = get().trickCards;
+      const currentHand = get().hand;
+      const isFirstCard = currentTrickCards.length === 0;
 
-      // Update lead suit if first card
-      if (get().trickCards.length === 1 && content.lead_suit) {
-        set({ leadSuit: content.lead_suit as string });
-      }
+      // Single atomic update for all state changes
+      set({
+        trickCards: [...currentTrickCards, trickCard],
+        hand: currentHand.filter((c) => c.id !== cardIdStr),
+        // Update lead suit only if first card in trick
+        ...(isFirstCard && content.lead_suit ? { leadSuit: content.lead_suit as string } : {}),
+      });
       break;
     }
 
