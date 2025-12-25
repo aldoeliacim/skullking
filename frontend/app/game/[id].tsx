@@ -275,7 +275,7 @@ export default function GameScreen(): React.JSX.Element {
       </View>
 
       {/* Modals */}
-      <BiddingModal visible={showBidding} maxBid={currentRound} onBid={handleBid} />
+      <BiddingModal visible={showBidding} maxBid={currentRound} hand={hand} onBid={handleBid} />
 
       <TigressModal visible={showTigressModal} onChoice={handleTigressChoice} />
     </SafeAreaView>

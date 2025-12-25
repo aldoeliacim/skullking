@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withSequence,
   FadeIn,
   FadeOut,
   SlideInDown,
 } from 'react-native-reanimated';
+import type { Card as CardType } from '../stores/gameStore';
 import { borderRadius, colors, screen, shadows, spacing, typography } from '../styles/theme';
+import { Card } from './Card';
 
 interface BiddingModalProps {
   visible: boolean;
   maxBid: number;
+  hand: CardType[];
   onBid: (bid: number) => void;
 }
 
@@ -57,7 +59,12 @@ function BidButton({ value, selected, onPress, delay }: BidButtonProps): React.J
   );
 }
 
-export function BiddingModal({ visible, maxBid, onBid }: BiddingModalProps): React.JSX.Element {
+export function BiddingModal({
+  visible,
+  maxBid,
+  hand,
+  onBid,
+}: BiddingModalProps): React.JSX.Element {
   const { t } = useTranslation();
   const [selectedBid, setSelectedBid] = useState<number | null>(null);
 
@@ -89,6 +96,19 @@ export function BiddingModal({ visible, maxBid, onBid }: BiddingModalProps): Rea
         <Animated.View entering={SlideInDown.springify().damping(15)} style={styles.modal}>
           <Text style={styles.title}>{t('game.makeYourBid')}</Text>
           <Text style={styles.subtitle}>{t('game.bidQuestion')}</Text>
+
+          {/* Hand Preview */}
+          {hand.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.handPreview}
+            >
+              {hand.map((card, index) => (
+                <Card key={card.id} card={card} size="small" disabled animationDelay={index * 30} />
+              ))}
+            </ScrollView>
+          )}
 
           <View style={styles.bidGrid}>
             {bidOptions.map((bid, index) => (
@@ -155,7 +175,14 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  handPreview: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.md,
   },
   bidGrid: {
     flexDirection: 'row',
