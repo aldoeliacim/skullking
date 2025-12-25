@@ -32,7 +32,7 @@ async def create_game(_request: CreateGameRequest) -> CreateGameResponse:
     """
     # Generate game ID and slug
     game_id = str(uuid.uuid4())
-    slug = f"game-{game_id[:8]}"
+    slug = game_id[:8].upper()
 
     # Create game instance
     game = Game(
