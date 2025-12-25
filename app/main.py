@@ -7,6 +7,7 @@ import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
@@ -21,6 +22,7 @@ from app.config import settings
 from app.repositories.game_repository import GameRepository
 from app.services.log_service import LogService
 from app.services.publisher_service import PublisherService
+from app.services.snapshot_service import SnapshotService
 
 # Configure logging for the app (must be after imports but before app usage)
 logging.basicConfig(
@@ -34,6 +36,29 @@ logging.getLogger("app").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+async def handle_redis_game_event(event_type: str, game_id: str, data: dict[str, Any]) -> None:
+    """Handle game events received from Redis pub/sub.
+
+    This is called when another instance broadcasts a game event.
+    We use it to keep game state synchronized across instances.
+
+    Args:
+        event_type: Type of event
+        game_id: Game identifier
+        data: Event payload
+    """
+    logger.debug(
+        "Received Redis event: %s for game %s (data keys: %s)",
+        event_type,
+        game_id,
+        list(data.keys()),
+    )
+
+    # For now, we just log cross-instance events
+    # In a full implementation, you would update local game state here
+    # based on events from other instances
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events.
@@ -41,6 +66,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Handles:
     - Database connection initialization
     - Redis connection setup
+    - Game restoration from MongoDB
+    - Periodic snapshot service
     - WebSocket manager background task
     - Cleanup on shutdown
     """
@@ -60,12 +87,43 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning("MongoDB not available, running without persistence")
         app.state.game_repository = None
 
+    # Set services on websocket manager for persistence and pub/sub
+    websocket_manager.set_services(
+        game_repository=app.state.game_repository,
+        publisher_service=app.state.publisher_service,
+    )
+
+    # Initialize snapshot service
+    app.state.snapshot_service = SnapshotService(
+        connection_manager=websocket_manager,
+        game_repository=app.state.game_repository,
+    )
+
+    # Restore games from MongoDB on startup
+    if app.state.game_repository:
+        restored = await app.state.snapshot_service.restore_games()
+        if restored > 0:
+            logger.info("Restored %d games from MongoDB on startup", restored)
+
+    # Start snapshot service for periodic saves
+    await app.state.snapshot_service.start()
+
+    # Setup Redis pub/sub for cross-instance events
+    if app.state.publisher_service.is_connected:
+        await app.state.publisher_service.subscribe("game_events:*", handle_redis_game_event)
+        await app.state.publisher_service.start_subscriber()
+
     # Start WebSocket manager background task
     websocket_task = asyncio.create_task(websocket_manager.run())
 
     yield
 
     # Shutdown
+
+    # Final snapshot before shutdown
+    if app.state.snapshot_service:
+        await app.state.snapshot_service.snapshot_all_games()
+        await app.state.snapshot_service.stop()
 
     # Cancel WebSocket manager task
     websocket_task.cancel()
