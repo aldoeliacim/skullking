@@ -24,22 +24,32 @@ const cardImages: Record<string, ImageSourcePropType> = {
   // We'll use placeholder for now - images would be loaded from assets
 };
 
-// Suit colors
+// Suit colors - map backend types to colors
 const suitColors: Record<string, string> = {
   blue: colors.suitBlue,
   yellow: colors.suitYellow,
   green: colors.suitGreen,
   purple: colors.suitPurple,
   black: colors.suitBlack,
+  // Backend suit types
+  parrot: colors.suitGreen, // Green suit
+  map: colors.suitYellow, // Yellow suit
+  chest: colors.suitPurple, // Purple suit
+  roger: colors.suitBlack, // Black/trump suit
 };
 
-// Suit symbols
+// Suit symbols - map backend types to symbols
 const suitSymbols: Record<string, string> = {
   blue: '🏴‍☠️',
   yellow: '⚓',
   green: '🗡️',
   purple: '🔮',
   black: '💀',
+  // Backend suit types
+  parrot: '🦜', // Parrot
+  map: '🗺️', // Map
+  chest: '📦', // Chest
+  roger: '🏴‍☠️', // Jolly Roger
 };
 
 // Special card emojis

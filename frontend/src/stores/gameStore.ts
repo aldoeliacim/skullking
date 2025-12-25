@@ -301,7 +301,8 @@ function handleMessage(
     }
 
     case 'DEAL': {
-      const cards = (content.cards as string[]).map((id) => parseCard(id));
+      const cardIds = content.cards as (string | number)[];
+      const cards = cardIds.map((id) => parseCard(id));
       set({
         hand: cards,
         currentRound: content.round as number,
@@ -367,12 +368,18 @@ function handleMessage(
     }
 
     case 'PICKED': {
+      // Convert card_id to string (backend sends integer)
+      const cardIdStr = String(content.card_id);
       const trickCard: TrickCard = {
         player_id: content.player_id as string,
-        card_id: content.card_id as string,
+        card_id: cardIdStr,
         tigress_choice: content.tigress_choice as 'pirate' | 'escape' | undefined,
       };
       set({ trickCards: [...get().trickCards, trickCard] });
+
+      // Remove played card from hand
+      const hand = get().hand.filter((c) => c.id !== cardIdStr);
+      set({ hand });
 
       // Update lead suit if first card
       if (get().trickCards.length === 1 && content.lead_suit) {
@@ -459,47 +466,55 @@ function handleMessage(
 }
 
 // Parse card ID to card object
-function parseCard(cardId: string): Card {
+// Backend sends integer IDs based on CardId enum
+function parseCard(cardIdInput: string | number): Card {
+  const numId = typeof cardIdInput === 'number' ? cardIdInput : parseInt(cardIdInput, 10);
+  const cardId = String(numId);
   const card: Card = { id: cardId };
 
-  // Parse card type from ID
-  if (
-    cardId.startsWith('blue_') ||
-    cardId.startsWith('yellow_') ||
-    cardId.startsWith('green_') ||
-    cardId.startsWith('purple_')
-  ) {
-    const parts = cardId.split('_');
-    card.suit = parts[0] ?? '';
-    card.number = parseInt(parts[1] ?? '0', 10);
-    card.type = 'standard';
-  } else if (cardId.startsWith('black_')) {
-    const parts = cardId.split('_');
-    card.suit = 'black';
-    card.number = parseInt(parts[1] ?? '0', 10);
-    card.type = 'black';
-  } else if (cardId.startsWith('escape')) {
-    card.type = 'escape';
-    card.name = 'Escape';
-  } else if (cardId.startsWith('pirate')) {
-    card.type = 'pirate';
-    card.name = getPirateName(cardId);
-  } else if (cardId === 'skull_king') {
+  // Map integer IDs to card types based on backend CardId enum
+  if (numId === 1) {
     card.type = 'skull_king';
     card.name = 'Skull King';
-  } else if (cardId.startsWith('mermaid')) {
-    card.type = 'mermaid';
-    card.name = 'Mermaid';
-  } else if (cardId === 'tigress') {
-    card.type = 'tigress';
-    card.name = 'Scary Mary';
-  } else if (cardId === 'kraken') {
-    card.type = 'kraken';
-    card.name = 'Kraken';
-  } else if (cardId === 'white_whale') {
+  } else if (numId === 2) {
     card.type = 'white_whale';
     card.name = 'White Whale';
-  } else if (cardId.startsWith('loot')) {
+  } else if (numId === 3) {
+    card.type = 'kraken';
+    card.name = 'Kraken';
+  } else if (numId >= 4 && numId <= 5) {
+    card.type = 'mermaid';
+    card.name = `Mermaid ${numId - 3}`;
+  } else if (numId >= 6 && numId <= 10) {
+    card.type = 'pirate';
+    card.name = getPirateName(numId);
+  } else if (numId >= 11 && numId <= 24) {
+    // Roger (trump/black suit) 1-14
+    card.suit = 'roger';
+    card.number = numId - 10;
+    card.type = 'suit';
+  } else if (numId >= 25 && numId <= 38) {
+    // Parrot (green) 1-14
+    card.suit = 'parrot';
+    card.number = numId - 24;
+    card.type = 'suit';
+  } else if (numId >= 39 && numId <= 52) {
+    // Map (yellow) 1-14
+    card.suit = 'map';
+    card.number = numId - 38;
+    card.type = 'suit';
+  } else if (numId >= 53 && numId <= 66) {
+    // Chest (purple) 1-14
+    card.suit = 'chest';
+    card.number = numId - 52;
+    card.type = 'suit';
+  } else if (numId >= 67 && numId <= 71) {
+    card.type = 'escape';
+    card.name = 'Escape';
+  } else if (numId === 72) {
+    card.type = 'tigress';
+    card.name = 'Scary Mary';
+  } else if (numId >= 73 && numId <= 74) {
     card.type = 'loot';
     card.name = 'Loot';
   }
@@ -507,17 +522,17 @@ function parseCard(cardId: string): Card {
   return card;
 }
 
-function getPirateName(cardId: string): string {
-  const names: Record<string, string> = {
-    pirate_1: 'Harry the Giant',
-    pirate_2: 'Tortuga Jack',
-    pirate_3: 'Bendt the Bandit',
-    pirate_4: 'Bahij the Bandit',
-    pirate_5: "Rosie D'Laney",
-    pirate_6: 'Juanita Jade',
-    pirate_rascal_1: 'Rascal of Roatan',
+function getPirateName(cardId: string | number): string {
+  // Backend pirate IDs: 6-10 map to pirates 1-5
+  const numId = typeof cardId === 'number' ? cardId : parseInt(cardId, 10);
+  const pirateNames: Record<number, string> = {
+    6: 'Harry the Giant',
+    7: 'Tortuga Jack',
+    8: 'Bendt the Bandit',
+    9: 'Bahij the Bandit',
+    10: "Rosie D'Laney",
   };
-  return names[cardId] || 'Pirate';
+  return pirateNames[numId] || 'Pirate';
 }
 
 export default useGameStore;
