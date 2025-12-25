@@ -6,16 +6,13 @@ Training history and results for the MaskablePPO agent.
 
 ---
 
-## V6 (Planned) - Loot Alliances & Enhanced Observations
+## V6 (December 25, 2024) - Loot Alliances & Enhanced Observations
 
-**Status:** Ready to Train
+**Status:** Completed ✅
 
 ### Motivation
 
-V5 model doesn't understand loot alliance mechanics (new feature: +20 bonus when both allied players make their bids). Need to add alliance observations so the agent can:
-1. Recognize when it holds loot cards
-2. Track active alliances (supports multiple alliances)
-3. Consider alliance bonus in bidding/play strategy
+V5 model doesn't understand loot alliance mechanics (+20 bonus when both allied players make their bids). Added alliance observations so the agent can recognize and leverage loot card alliances.
 
 ### Changes from V5
 
@@ -25,42 +22,128 @@ V5 model doesn't understand loot alliance mechanics (new feature: +20 bonus when
 |-----------------|------|-------------|
 | Has loot card | 1 | Binary: agent has loot in hand |
 | Loot card count | 1 | Normalized count (0, 0.5, 1.0) |
-| Alliance status | 4 | Binary mask: allied with players (multi-alliance support) |
-| Ally bid accuracy | 1 | Average (tricks_won - bid) / round_num across all allies |
+| Alliance status | 4 | Binary mask: allied with players (multi-alliance) |
+| Ally bid accuracy | 1 | Average (tricks_won - bid) / round_num across allies |
 | Alliance potential | 1 | Sum of potential bonuses (0.2 per ally on track) |
 
 **Reward Shaping Enhancements:**
 
-1. **Alliance bonus in round reward** (CRITICAL FIX):
-   - +2.0 per successful alliance at round end (normalized from +20)
-   - Only awarded when BOTH agent and ally make their bids
-   - Supports multiple alliances (could be +4.0 with 2 allies)
-
-2. Round reward now: base bid accuracy (-5 to +5) + alliance bonus (0 to +4)
-
-**Multi-Alliance Support:**
-
-- A player can have multiple allies (e.g., winning tricks with loot cards from multiple players)
-- Alliance status uses binary mask (not one-hot) to track all allies
-- Ally accuracy averaged across all allies
-- Alliance potential sums bonuses from all on-track allies
+- Alliance bonus: +2.0 per successful alliance at round end
+- Multi-alliance support (could be +4.0 with 2 allies)
 
 ### Configuration
 
 | Parameter | Value |
 |-----------|-------|
-| Timesteps | 10,000,000 |
-| Observation dims | 190 |
-| Parallel envs | 32 |
+| Timesteps | 10,092,544 |
+| Training time | 2h 20m |
+| Throughput | ~1,188 fps |
+| Parallel envs | 32 (DummyVecEnv) |
 | Learning rate | 3e-4 |
+| Batch size | 1024 |
 | Network | [256, 256] |
 
-### Expected Improvements
+### Results
 
-- Model understands loot card strategic value
-- Learns alliance formation is valuable (+20 each when both win)
-- Better card play to win tricks containing loot cards
-- Supports multiple simultaneous alliances
+| Metric | Value |
+|--------|-------|
+| Final reward (mean) | 79.4 |
+| Explained variance | 0.901 |
+| Value loss | 23.9 |
+| Entropy loss | -0.314 |
+| Clip fraction | 0.0915 |
+| KL divergence | 0.0113 |
+
+**Evaluation (21 episodes, mixed opponents):**
+
+| Timestep | Avg Reward | Std Dev |
+|----------|------------|---------|
+| 10.06M | 78.73 | ±8.22 |
+| 10.07M | 80.92 | ±7.48 |
+| 10.08M | 82.27 | ±12.47 |
+| 10.09M | 84.81 | ±10.23 |
+| Final | 81.35 | ±9.49 |
+
+### Analysis
+
+**Strengths:**
+- Stable training (KL ~0.011, explained variance >0.9)
+- Consistent with V5 performance (79-85 range)
+- Alliance observations integrated successfully
+
+**Observations:**
+- Performance similar to V5 despite new observations
+- Alliance situations may be too rare to significantly impact training
+- Or +2.0 reward signal needs to be stronger
+
+**Bottleneck Identified:**
+- GPU utilization only 31% (starved for data)
+- CPU-bound environment stepping (single-threaded DummyVecEnv)
+- FPS ~1,188 could be 3-4x higher with SubprocVecEnv
+
+### Model Files
+
+- `models/masked_ppo/masked_ppo_final.zip` (2.8 MB)
+- `models/masked_ppo/best_model/best_model.zip`
+
+---
+
+## V7 (Planned) - Performance Optimization
+
+**Status:** Ready to Train
+
+### Motivation
+
+V6 training bottleneck analysis showed 31% GPU utilization with ~1,188 FPS. V7 implements performance optimizations for 3-4x faster training.
+
+### Changes from V6
+
+**Training Infrastructure:**
+
+| Feature | V6 | V7 |
+|---------|----|----|
+| Vec env | DummyVecEnv | SubprocVecEnv |
+| Parallel envs | 32 | 128 |
+| Batch size | 1024 | 4096 |
+| torch.compile | ❌ | ✅ |
+
+**Expected Performance:**
+
+| Metric | V6 | V7 (Expected) |
+|--------|-----|---------------|
+| FPS | ~1,188 | ~4,000 |
+| GPU util | 31% | 70-80% |
+| Training time (10M) | 2h 20m | ~45 min |
+
+### Configuration
+
+```bash
+uv run python -m app.training.train_ppo train --timesteps 10000000
+# Uses: 128 envs, batch 4096, SubprocVecEnv, torch.compile
+```
+
+---
+
+## V8 (Planned) - Hierarchical RL
+
+**Status:** Design Phase
+
+### Motivation
+
+Current flat policy handles both bidding and card-playing. Hierarchical RL separates these into specialized policies:
+
+1. **Manager Policy (Bidding)**: Decides bid based on hand strength
+2. **Worker Policy (Card-Playing)**: Achieves bid target through card selection
+
+### Expected Benefits
+
+| Metric | Current | Hierarchical (Expected) |
+|--------|---------|------------------------|
+| Credit assignment | Difficult | Clear separation |
+| Bid accuracy | ~60% | ~80% |
+| Sample efficiency | Baseline | 2-3x improvement |
+
+See `ADVANCED_RL_TECHNIQUES.md` Section 2 for implementation details.
 
 ---
 

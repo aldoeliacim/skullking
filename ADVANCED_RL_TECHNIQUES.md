@@ -2325,73 +2325,77 @@ class TheoryOfMind(nn.Module):
 | Bid goal observation | ✅ Done | V5 | Helps card-play credit assignment |
 | Mixed opponent evaluation | ✅ Done | V5 | 21 eps across 3 opponent types |
 | Self-play training | ✅ Done | V5 | Activates at 2M steps |
-| **Loot alliance obs** | 🔄 V6 | V6 | +8 dims for alliance mechanics |
-| Hierarchical RL | ❌ Planned | Future | Manager/Worker policies |
-| Transformer Architecture | ❌ Planned | Future | Attention over cards |
+| **Loot alliance obs** | ✅ Done | V6 | +8 dims for alliance mechanics |
+| **Alliance reward** | ✅ Done | V6 | +2.0 per successful alliance |
+| **SubprocVecEnv** | ✅ Ready | V7 | Multi-core parallelism |
+| **torch.compile** | ✅ Ready | V7 | Optimized forward passes |
+| Hierarchical RL | 📋 Planned | V8 | Manager/Worker policies |
+| Transformer Architecture | 📋 Planned | V9 | Attention over cards |
 
-### 10.2 Priority Order (Updated)
+### 10.2 Priority Order (Updated December 25, 2024)
 
 Based on expected impact vs implementation complexity:
 
-| Priority | Technique | Impact | Complexity | Time Est. |
-|----------|-----------|--------|------------|-----------|
-| **1** | **Loot Alliance Observations** | Medium | Low | 0.5 day |
-| 2 | **Hierarchical RL** | High | Medium | 1-2 days |
-| 3 | **Transformer Architecture** | High | Medium | 1-2 days |
-| 4 | **Round-as-Episode** | Medium | Low | 0.5 day |
-| 5 | **Intrinsic Motivation** | Medium | Low | 0.5 day |
-| 6 | **Population Training** | High | High | 2-3 days |
-| 7 | **MCTS + RL** | Very High | High | 3-5 days |
-| 8 | **Deep CFR** | High | Very High | 5-7 days |
-| 9 | **Opponent Modeling** | Medium | Medium | 1-2 days |
+| Priority | Technique | Impact | Complexity | Status |
+|----------|-----------|--------|------------|--------|
+| ~~1~~ | ~~Loot Alliance Observations~~ | Medium | Low | ✅ V6 Done |
+| ~~2~~ | ~~Performance Optimization~~ | High | Low | ✅ V7 Ready |
+| **3** | **Hierarchical RL** | High | Medium | 📋 V8 Planned |
+| **4** | **Transformer Architecture** | High | Medium | 📋 V9 Planned |
+| 5 | Round-as-Episode | Medium | Low | Backlog |
+| 6 | Intrinsic Motivation (RND) | Medium | Low | Backlog |
+| 7 | Population Training | High | High | Backlog |
+| 8 | MCTS + RL | Very High | High | Backlog |
+| 9 | Deep CFR | High | Very High | Backlog |
+| 10 | Opponent Modeling | Medium | Medium | Backlog |
 
-### 10.3 V6 Implementation Plan
+### 10.3 Version History
 
 ```text
-V6: Loot Alliance Awareness (0.5-1 day)
-├── Add alliance tracking to gym environment
-│   ├── _encode_loot_status() - has loot, count
-│   ├── _encode_alliance_state() - who allied with
-│   └── _encode_alliance_potential() - expected bonus
-├── Update observation space: 182 → 190 dims
-├── Add alliance-aware reward shaping
-│   └── +0.5 on alliance formation
-├── Train 10M steps with new observations
-└── Evaluate alliance utilization
+V6: Loot Alliance Awareness [COMPLETED Dec 25, 2024]
+├── ✅ _encode_loot_status() - has loot, count
+├── ✅ _encode_alliance_state() - binary mask for multi-alliance
+├── ✅ _encode_alliance_potential() - expected bonus
+├── ✅ Observation space: 182 → 190 dims
+├── ✅ Alliance reward: +2.0 per successful alliance
+├── ✅ Train 10M steps (2h 20m, 1188 FPS)
+└── Results: 79.4 mean reward (similar to V5)
+    └── Analysis: Alliance situations rare, may need stronger signal
+
+V7: Performance Optimization [READY]
+├── ✅ SubprocVecEnv (multi-core parallelism)
+├── ✅ 128 parallel environments (up from 32)
+├── ✅ Batch size 4096 (up from 1024)
+├── ✅ torch.compile (optimized forward passes)
+└── Expected: 3-4x speedup (~4000 FPS, 45 min for 10M)
 ```
 
-### 10.4 Future Phases
+### 10.4 Roadmap
 
 ```text
-Phase 1: Quick Wins [DONE in V5]
-├── ✅ Add round number to observations (V5)
-├── ❌ Implement round-as-episode option (deferred)
-├── ❌ Add RND curiosity bonus (deferred)
-└── ✅ Mixed opponent evaluation (V5)
+Phase 1: Foundation [DONE]
+├── ✅ V1-V4: Basic MaskablePPO, reward normalization, curriculum
+├── ✅ V5: Round encoding, bid goal, mixed evaluation, self-play
+└── ✅ V6: Alliance observations and rewards
 
-Phase 2: V6 Alliance Awareness [NEXT]
-├── Add loot card detection
-├── Track active alliances
-├── Alliance bonus prediction
-└── Train and evaluate
+Phase 2: Performance [IN PROGRESS]
+├── ✅ V7 config ready (SubprocVecEnv, torch.compile)
+└── 🔄 Run V7 training to validate speedup
 
-Phase 3: Hierarchical (Future)
-├── Implement ManagerEnv and WorkerEnv
-├── Train policies separately
-├── Joint fine-tuning
-└── Compare to baseline
+Phase 3: Architecture [NEXT]
+├── 📋 V8: Hierarchical RL (Manager/Worker policies)
+│   ├── Manager: Bidding decisions (10 per game)
+│   ├── Worker: Card-play decisions (14 per game avg)
+│   └── Expected: 2-3x sample efficiency, 80% bid accuracy
+└── 📋 V9: Transformer Architecture
+    ├── CardTransformer with attention over hand
+    ├── Variable-length input handling
+    └── Attention visualization for interpretability
 
-Phase 4: Architecture Upgrade (Future)
-├── Implement CardTransformer
-├── Integrate with MaskablePPO
-├── Train and compare
-└── Attention visualization
-
-Phase 5: Advanced Training (Future)
-├── Population-based training
-├── League matchmaking
-├── Extended self-play
-└── Final evaluation
+Phase 4: Advanced [FUTURE]
+├── Population-based training with ELO matchmaking
+├── Information-set MCTS for planning
+└── Opponent modeling for adaptive play
 ```
 
 ### 10.3 Evaluation Metrics
