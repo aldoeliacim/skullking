@@ -353,18 +353,19 @@ function handleMessage(
     }
 
     case 'START_PICKING': {
+      // Check if this is a new trick BEFORE updating currentTrick
+      const newTrick = content.trick as number;
+      const oldTrick = get().currentTrick;
+      const isNewTrick = newTrick > oldTrick || newTrick === 1;
+
       set({
         phase: 'PICKING',
         pickingPlayerId: content.picking_player_id as string,
-        currentTrick: content.trick as number,
+        currentTrick: newTrick,
         leadSuit: (content.lead_suit as string) || null,
+        // Clear trick cards if new trick
+        ...(isNewTrick ? { trickCards: [], trickWinner: null } : {}),
       });
-
-      // Clear trick cards if new trick
-      const newTrick = content.trick as number;
-      if (newTrick > get().currentTrick || newTrick === 1) {
-        set({ trickCards: [], trickWinner: null });
-      }
       break;
     }
 
