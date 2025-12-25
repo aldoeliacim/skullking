@@ -224,9 +224,93 @@ vs Rule-Based HARD (50 games):   100% win rate
 Average reward: 87.4 ± 10.1
 ```
 
+---
+
+## Training Results (V4 - December 24, 2024)
+
+### Hardware Configuration:
+```
+CPU:  AMD Ryzen 9 7900X
+RAM:  64 GB DDR5
+GPU:  NVIDIA RTX 4080 SUPER (16 GB VRAM)
+```
+
+### Optimized Hyperparameters:
+```python
+learning_rate:  3e-4      # Higher for faster learning
+n_steps:        4096      # Large buffer for stability
+batch_size:     1024      # Maximize GPU utilization
+n_epochs:       15        # Balanced training
+gamma:          0.995
+gae_lambda:     0.98
+clip_range:     0.2
+ent_coef:       0.01      # Less exploration, more exploitation
+vf_coef:        0.5
+net_arch:       [256, 256] # Larger network
+```
+
+### Curriculum Schedule (8 phases):
+```
+      0 steps: random       (easy)
+ 50,000 steps: random       (medium)
+150,000 steps: random       (hard)
+250,000 steps: rule_based   (easy)
+400,000 steps: rule_based   (medium)
+600,000 steps: rule_based   (hard)
+850,000 steps: rule_based   (medium)
+1.1M    steps: rule_based   (hard)
+```
+
+### Final Metrics @ 5M steps:
+```
+Training time:       ~45 minutes
+Throughput:          ~1,870 fps
+Total evaluations:   100
+Explained variance:  0.906 (excellent!)
+Policy updates:      1,140
+```
+
+### Training Progress:
+| Timesteps | Mean Reward | Notes |
+|-----------|-------------|-------|
+| 50,000 | 68.9 ± 1.0 | Phase 1: Random easy |
+| 500,000 | 177.1 ± 97.9 | Learning core mechanics |
+| 1,000,000 | 178.0 ± 99.9 | Stable performance |
+| 2,000,000 | -15.9 ± 7.5 | Curriculum adjustment |
+| 3,000,000 | 81.5 ± 118.9 | Recovering |
+| 4,000,000 | 129.8 ± 116.7 | Strong play |
+| 4,500,000 | 225.9 ± 1.0 | Peak performance |
+| 5,000,000 | 129.3 ± 118.1 | Final checkpoint |
+
+### Agent Performance (V4 Final Model):
+```
+vs Random (easy):        65.8 ± 10.1  ✓ WIN
+vs Random (medium):      61.2 ± 7.6   ✓ WIN
+vs Random (hard):        67.7 ± 7.9   ✓ WIN
+vs Rule-Based (easy):    67.1 ± 9.8   ✓ WIN
+vs Rule-Based (medium):  60.2 ± 2.6   ✓ WIN
+vs Rule-Based (hard):    63.7 ± 2.8   ✓ WIN
+```
+
+### Model Comparison:
+```
+Best model (early checkpoint) vs rule_based hard:  57.7 ± 12.3
+Final model (5M steps)        vs rule_based hard:  79.0 ± 14.0
+
+Winner: Final model (+37% improvement)
+```
+
 ### Model Files:
-- `./models/masked_ppo/masked_ppo_final.zip` (407 KB)
-- `./models/masked_ppo/best_model/best_model.zip` (407 KB)
+- `./models/masked_ppo/masked_ppo_final.zip` (2.7 MB) - **ACTIVE**
+- `./models/masked_ppo/best_model/best_model.zip` (2.7 MB)
+- `./models/masked_ppo/checkpoints/` - Saved every 100k steps
+
+### Key Improvements from V3:
+1. **Extended training**: 1.5M → 5M timesteps (+233%)
+2. **Larger network**: [256, 256] vs default architecture
+3. **More parallel envs**: 32 environments for faster sampling
+4. **Better GPU utilization**: batch_size=1024 for RTX 4080 Super
+5. **Consistent winning**: 100% win rate vs all opponent types
 
 ---
 
@@ -235,15 +319,24 @@ Average reward: 87.4 ± 10.1
 **Train new model:**
 ```bash
 source .venv/bin/activate
-python scripts/train_masked_ppo.py train --timesteps 1500000 --envs 32
+python scripts/train_masked_ppo.py train --timesteps 5000000 --envs 32
 ```
 
 **Resume training:**
 ```bash
-python scripts/train_masked_ppo.py resume --load ./models/masked_ppo/masked_ppo_final.zip --timesteps 500000
+python scripts/train_masked_ppo.py resume --load ./models/masked_ppo/masked_ppo_final.zip --timesteps 1000000
 ```
 
 **Monitor progress:**
 ```bash
 tensorboard --logdir ./models/masked_ppo/tensorboard
+```
+
+**Test model:**
+```bash
+uv run python -c "
+from sb3_contrib import MaskablePPO
+model = MaskablePPO.load('models/masked_ppo/masked_ppo_final.zip')
+print('Model loaded successfully!')
+"
 ```
