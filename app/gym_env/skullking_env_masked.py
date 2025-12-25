@@ -155,7 +155,10 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         # - Bid pressure (1): (needed - remaining) / needed
         # - Position advantage (1): how often we play last
         # - Trump strength (2): our best vs seen, our avg vs seen
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(171,), dtype=np.float32)
+        # V5 QUICK WINS (+11 dims):
+        # - Round one-hot (10): explicit round representation for round-specific learning
+        # - Bid goal (1): explicit target during card play (helps credit assignment)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(182,), dtype=np.float32)
 
         # Action space: 0-10 (bids or card indices)
         self.max_action_size = 11
@@ -863,9 +866,9 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         return self.CARD_STRENGTH_DEFAULT
 
     def _get_observation(self) -> np.ndarray:
-        """COMPACT OBSERVATIONS: 171 dims."""
+        """COMPACT OBSERVATIONS: 182 dims (V5 enhanced)."""
         if self.game is None:
-            return np.zeros((171,), dtype=np.float32)
+            return np.zeros((182,), dtype=np.float32)
 
         obs = []
         agent_player = self.game.get_player(self.agent_player_id)
@@ -897,6 +900,10 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         obs.append(self._calculate_bid_pressure())
         obs.append(self._calculate_position_advantage())
         obs.extend(self._encode_trump_strength())
+
+        # 14-15. V5 QUICK WINS (+11 dims)
+        obs.extend(self._encode_round_onehot(current_round))
+        obs.append(self._encode_bid_goal(agent_player))
 
         return np.array(obs, dtype=np.float32)
 
@@ -1002,6 +1009,29 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         """Encode round progression (1 dim)."""
         if current_round:
             return len(current_round.tricks) / max(current_round.number, 1)
+        return 0.0
+
+    def _encode_round_onehot(self, current_round: Round | None) -> list[float]:
+        """Encode round number as one-hot (10 dims).
+
+        V5 Quick Win: Explicit round representation enables round-specific
+        learning without requiring separate policies per round.
+        """
+        onehot = [0.0] * 10
+        if current_round:
+            round_idx = min(current_round.number - 1, 9)  # 0-indexed, capped at 9
+            onehot[round_idx] = 1.0
+        return onehot
+
+    def _encode_bid_goal(self, agent_player: Player | None) -> float:
+        """Encode current bid as explicit goal (1 dim).
+
+        V5 Quick Win: During card play, the agent needs to know its target.
+        This makes the bid an explicit "goal" observation, improving credit
+        assignment for the card-playing decisions.
+        """
+        if agent_player and agent_player.bid is not None:
+            return agent_player.bid / 10.0  # Normalized to [0, 1]
         return 0.0
 
     def _encode_card_compact(self, card: Card) -> list[float]:

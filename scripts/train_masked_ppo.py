@@ -331,7 +331,7 @@ def train_masked_ppo(
         eval_env,
         opponent_configs=opponent_configs,
         n_eval_episodes=21,  # 7 episodes per opponent type
-        eval_freq=50_000 // n_envs,
+        eval_freq=200_000 // n_envs,  # Evaluate every 200k steps (was 50k)
         best_model_save_path=f"{save_dir}/best_model",
         log_path=f"{save_dir}/eval_logs",
         deterministic=True,
