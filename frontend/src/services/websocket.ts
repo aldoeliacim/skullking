@@ -194,7 +194,8 @@ class WebSocketClient {
   }
 
   playCard(cardId: string, tigressChoice?: 'pirate' | 'escape'): boolean {
-    const content: Record<string, unknown> = { card_id: cardId };
+    // Backend expects card_id as integer
+    const content: Record<string, unknown> = { card_id: parseInt(cardId, 10) };
     if (tigressChoice) {
       content.tigress_choice = tigressChoice;
     }

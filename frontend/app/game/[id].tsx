@@ -1,7 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  type ScrollView as ScrollViewType,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -28,6 +35,7 @@ export default function GameScreen(): React.JSX.Element {
 
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [showTigressModal, setShowTigressModal] = useState(false);
+  const logScrollRef = useRef<ScrollViewType>(null);
 
   const {
     connectionState,
@@ -103,6 +111,13 @@ export default function GameScreen(): React.JSX.Element {
     }
     return undefined;
   }, [trickWinner, clearTrickWinner]);
+
+  // Auto-scroll log to end when new logs arrive
+  useEffect(() => {
+    if (logs.length > 0 && logScrollRef.current) {
+      logScrollRef.current.scrollToEnd({ animated: true });
+    }
+  }, [logs]);
 
   const handleCardPress = useCallback(
     (card: CardType) => {
@@ -266,6 +281,7 @@ export default function GameScreen(): React.JSX.Element {
       {/* Game Log (collapsed by default) */}
       <View style={styles.logSection}>
         <ScrollView
+          ref={logScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.logContent}
