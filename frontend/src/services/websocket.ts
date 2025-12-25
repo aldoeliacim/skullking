@@ -17,6 +17,7 @@ export type MessageType =
   | 'START_PICKING'
   | 'PICKED'
   | 'NEXT_TRICK'
+  | 'VALID_CARDS'
   | 'ANNOUNCE_TRICK_WINNER'
   | 'ANNOUNCE_SCORES'
   | 'END_GAME'

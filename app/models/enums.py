@@ -34,6 +34,7 @@ class Command(str, Enum):
     REPORT_ERROR = "REPORT_ERROR"
     STATISTICS_FETCHED = "STATISTICS_FETCHED"
     GAME_STATE = "GAME_STATE"  # Full state sync
+    VALID_CARDS = "VALID_CARDS"  # Valid cards player can play (suit following)
 
     # Pirate ability commands (sent to players)
     ABILITY_TRIGGERED = "ABILITY_TRIGGERED"  # Notify player of triggered ability

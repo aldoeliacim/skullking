@@ -1,5 +1,6 @@
 """Reinforcement Learning bot interface."""
 
+import logging
 import random
 from collections.abc import Callable
 from typing import Any
@@ -23,6 +24,8 @@ from app.constants import (
 from app.models.card import Card, CardId, get_card
 from app.models.enums import GameState
 from app.models.game import Game
+
+logger = logging.getLogger(__name__)
 
 
 class RLBot(BaseBot):
@@ -121,23 +124,113 @@ class RLBot(BaseBot):
         # Build observation for card picking phase
         observation = self._build_pick_observation(game, hand, cards_in_trick)
 
-        # Get model prediction
-        # predict() returns (action, states) tuple in stable-baselines3
-        result = self.model.predict(observation, deterministic=True)
+        # Try deterministic prediction first
+        card = self._try_model_prediction(observation, hand, playable, deterministic=True)
+        if card is not None:
+            return card
+
+        # Model chose invalid card - log warning with details for debugging
+        logger.warning(
+            "[RL_BOT_INVALID_CHOICE] Model chose invalid card! "
+            "hand=%s, valid_cards=%s, cards_in_trick=%s. "
+            "This indicates a bug in action masking or model training.",
+            [c.value for c in hand],
+            [c.value for c in playable],
+            [c.value for c in cards_in_trick],
+        )
+
+        # Try stochastic sampling - might pick a different valid card
+        card = self._retry_with_stochastic(observation, hand, playable)
+        if card is not None:
+            return card
+
+        # All retries failed - use heuristic fallback
+        logger.error(
+            "[RL_BOT_FALLBACK] All inference attempts failed! "
+            "Using heuristic fallback. playable=%s",
+            [c.value for c in playable],
+        )
+        return self._heuristic_pick(playable, cards_in_trick)
+
+    def _try_model_prediction(
+        self,
+        observation: np.ndarray,
+        hand: list[CardId],
+        playable: list[CardId],
+        *,
+        deterministic: bool = True,
+    ) -> CardId | None:
+        """Try to get a valid card from model prediction."""
+        if self.model is None:
+            return None
+        result = self.model.predict(observation, deterministic=deterministic)
         action = result[0] if isinstance(result, tuple) else result
+        card_index = self._extract_action_index(action)
 
-        # Action should be index into valid cards
+        if 0 <= card_index < len(hand):
+            chosen_card = hand[card_index]
+            if chosen_card in playable:
+                return chosen_card
+        return None
+
+    def _extract_action_index(self, action: Any) -> int:
+        """Extract integer index from model action output."""
         if isinstance(action, np.ndarray):
-            card_index = int(action.item()) if action.ndim == 0 else int(action[0])
-        elif isinstance(action, list):
-            card_index = int(action[0])
-        else:
-            card_index = int(action)
+            return int(action.item()) if action.ndim == 0 else int(action[0])
+        if isinstance(action, list):
+            return int(action[0])
+        return int(action)
 
-        # Ensure valid index
-        card_index = max(0, min(len(playable) - 1, card_index))
+    def _retry_with_stochastic(
+        self, observation: np.ndarray, hand: list[CardId], playable: list[CardId]
+    ) -> CardId | None:
+        """Retry prediction with stochastic sampling."""
+        if self.model is None:
+            return None
+        for retry in range(3):
+            card = self._try_model_prediction(observation, hand, playable, deterministic=False)
+            if card is not None:
+                logger.info("[RL_BOT_RETRY_SUCCESS] Stochastic retry %d succeeded", retry + 1)
+                return card
+        return None
 
-        return playable[card_index]
+    def _heuristic_pick(
+        self, playable: list[CardId], cards_in_trick: list[CardId]
+    ) -> CardId:
+        """Pick a card using simple heuristics when model fails.
+
+        Strategy: If leading, play a medium card. If following, play lowest valid.
+        """
+        if not cards_in_trick:
+            # Leading - play a medium strength card
+            sorted_cards = sorted(playable, key=self._card_strength)
+            mid_idx = len(sorted_cards) // 2
+            return sorted_cards[mid_idx]
+        # Following - play lowest valid card to minimize risk
+        return min(playable, key=self._card_strength)
+
+    def _card_strength(self, card_id: CardId) -> int:
+        """Estimate card strength for heuristic picking."""
+        card = get_card(card_id)
+        # Map card types to strength values
+        strength_map = {
+            "king": 1000,
+            "pirate": 900,
+            "mermaid": 850,
+            "kraken": 800,
+            "whale": 800,
+            "tigress": 100,
+            "escape": 0,
+            "loot": 0,
+        }
+        card_type = card.card_type.value
+        if card_type in strength_map:
+            return strength_map[card_type]
+        # Suit cards - roger (trump) is strongest
+        number = card.get_number() or 0
+        if card_type == "roger":
+            return 500 + number
+        return number
 
     def _build_bid_observation(
         self, game: Game, hand: list[CardId], _round_number: int

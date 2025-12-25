@@ -106,7 +106,8 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         self.observation_space = spaces.Box(low=-1, high=1, shape=(171,), dtype=np.float32)
 
         # Action space: 0-10 (bids or card indices)
-        self.action_space = spaces.Discrete(11)
+        self.max_action_size = 11
+        self.action_space = spaces.Discrete(self.max_action_size)
 
         # Game state
         self.game: Game | None = None
@@ -142,47 +143,60 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
 
         This enables MaskablePPO to only sample from valid actions.
         """
-        mask = np.zeros(11, dtype=np.int8)
+        mask = np.zeros(self.max_action_size, dtype=np.int8)
 
         if not self.game:
-            mask[0] = 1  # Default: allow action 0
+            mask[0] = 1
             return mask
 
         if self.game.state == GameState.BIDDING:
-            # Valid bids: 0 to current_round.number
-            current_round = self.game.get_current_round()
-            if current_round:
-                max_bid = min(current_round.number, 10)
-                mask[: max_bid + 1] = 1
-            else:
-                mask[0] = 1
-
+            self._mask_bidding_actions(mask)
         elif self.game.state == GameState.PICKING:
-            # Valid cards: 0 to len(hand)-1, but ONLY if it's agent's turn
-            current_round = self.game.get_current_round()
-            current_trick = current_round.get_current_trick() if current_round else None
-
-            # Check if it's the agent's turn
-            if current_trick and current_trick.picking_player_id == self.agent_player_id:
-                agent_player = self.game.get_player(self.agent_player_id)
-                if agent_player:
-                    hand_size = min(len(agent_player.hand), 10)
-                    if hand_size > 0:
-                        mask[:hand_size] = 1
-                    else:
-                        mask[0] = 1
-                else:
-                    mask[0] = 1
-            else:
-                # Not agent's turn - no valid actions (bots will play)
-                # But we need at least one valid action for the policy
-                mask[0] = 1  # Dummy action (will be handled by step)
-
+            self._mask_picking_actions(mask)
         else:
-            # Default state: allow action 0
             mask[0] = 1
 
         return mask
+
+    def _mask_bidding_actions(self, mask: np.ndarray) -> None:
+        """Set mask for valid bidding actions."""
+        current_round = self.game.get_current_round() if self.game else None
+        if current_round:
+            max_bid = min(current_round.number, self.max_action_size - 1)
+            mask[: max_bid + 1] = 1
+        else:
+            mask[0] = 1
+
+    def _mask_picking_actions(self, mask: np.ndarray) -> None:
+        """Set mask for valid card picking actions with suit-following rules."""
+        if not self.game:
+            mask[0] = 1
+            return
+
+        current_round = self.game.get_current_round()
+        current_trick = current_round.get_current_trick() if current_round else None
+
+        if not current_trick or current_trick.picking_player_id != self.agent_player_id:
+            mask[0] = 1  # Not agent's turn, dummy action
+            return
+
+        agent_player = self.game.get_player(self.agent_player_id)
+        if not agent_player or not agent_player.hand:
+            mask[0] = 1
+            return
+
+        # Get valid cards based on suit-following rules
+        cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+        valid_cards = current_trick.get_valid_cards(agent_player.hand, cards_in_trick)
+
+        # Map valid card IDs to hand indices (max 10 actions)
+        for i, card_id in enumerate(agent_player.hand[: self.max_action_size - 1]):
+            if card_id in valid_cards:
+                mask[i] = 1
+
+        # Ensure at least one action is valid
+        if mask.sum() == 0:
+            mask[0] = 1
 
     def reset(
         self, seed: int | None = None, options: dict[str, Any] | None = None
@@ -354,10 +368,20 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         return True
 
     def _handle_card_playing(self, action: int, agent_player: Player) -> bool:
-        """Handle card playing phase."""
+        """Handle card playing phase with suit-following validation."""
         card_index = action
         if 0 <= card_index < len(agent_player.hand):
             card_to_play = agent_player.hand[card_index]
+
+            # Validate suit-following rules
+            current_round = self._game.get_current_round()
+            current_trick = current_round.get_current_trick() if current_round else None
+            if current_trick:
+                cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+                valid_cards = current_trick.get_valid_cards(agent_player.hand, cards_in_trick)
+                if card_to_play not in valid_cards:
+                    return False  # Invalid move - must follow suit
+
             return self._play_card(self.agent_player_id, card_to_play)
         return False
 

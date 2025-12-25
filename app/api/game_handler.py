@@ -371,6 +371,15 @@ class GameHandler:
         if current_round is None or current_trick is None:
             return
 
+        # Validate suit-following rules
+        cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+        valid_cards = current_trick.get_valid_cards(player.hand, cards_in_trick)
+        if card_id not in valid_cards:
+            await self._send_error(
+                game.id, player_id, "Must follow suit if you have cards of that suit"
+            )
+            return
+
         if not await self._execute_pick(game, player, current_trick, card_id, tigress_choice):
             await self._send_error(game.id, player_id, "Already played in this trick")
             return
@@ -541,6 +550,19 @@ class GameHandler:
             game.id,
         )
 
+        # Send valid cards to the picking player
+        if starter_player:
+            valid_cards = trick.get_valid_cards(starter_player.hand, [])
+            await self.manager.send_personal_message(
+                ServerMessage(
+                    command=Command.VALID_CARDS,
+                    game_id=game.id,
+                    content={"valid_cards": [c.value for c in valid_cards]},
+                ),
+                game.id,
+                starter_player.id,
+            )
+
     async def _advance_to_next_player(
         self, game: Game, _current_round: "Round", trick: Trick
     ) -> None:
@@ -565,6 +587,19 @@ class GameHandler:
                     content={"picking_player_id": next_player.id},
                 ),
                 game.id,
+            )
+
+            # Send valid cards to the next picking player
+            cards_in_trick = [pc.card_id for pc in trick.picked_cards]
+            valid_cards = trick.get_valid_cards(next_player.hand, cards_in_trick)
+            await self.manager.send_personal_message(
+                ServerMessage(
+                    command=Command.VALID_CARDS,
+                    game_id=game.id,
+                    content={"valid_cards": [c.value for c in valid_cards]},
+                ),
+                game.id,
+                next_player.id,
             )
 
     async def _complete_trick(self, game: Game, current_round: "Round", trick: Trick) -> None:

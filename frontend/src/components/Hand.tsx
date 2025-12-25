@@ -2,15 +2,16 @@ import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
-import type { Card as CardType } from '../stores/gameStore';
+import type { Card as CardType, TrickCard } from '../stores/gameStore';
 import { cardDimensions, colors, screen, spacing, typography } from '../styles/theme';
+import { getValidCardIds } from '../utils/cardUtils';
 import { Card } from './Card';
 
 interface HandProps {
   cards: CardType[];
   onCardPress?: (card: CardType) => void;
   selectedCardId?: string | null;
-  validCardIds?: string[];
+  trickCards?: TrickCard[];
   disabled?: boolean;
   showLabel?: boolean;
   style?: ViewStyle;
@@ -20,12 +21,18 @@ export function Hand({
   cards,
   onCardPress,
   selectedCardId,
-  validCardIds,
+  trickCards = [],
   disabled = false,
   showLabel = true,
   style,
 }: HandProps): React.JSX.Element {
   const { t } = useTranslation();
+
+  // Calculate valid cards dynamically based on current trick
+  const validCardIds = useMemo(
+    () => (disabled ? [] : getValidCardIds(cards, trickCards)),
+    [cards, trickCards, disabled],
+  );
 
   // Calculate card overlap based on number of cards and screen width
   const cardLayout = useMemo(() => {
@@ -55,7 +62,7 @@ export function Hand({
         return;
       }
       // Check if card is valid to play
-      if (validCardIds && !validCardIds.includes(card.id)) {
+      if (!validCardIds.includes(card.id)) {
         return;
       }
       onCardPress?.(card);
@@ -65,9 +72,6 @@ export function Hand({
 
   const isCardValid = useCallback(
     (cardId: string): boolean => {
-      if (!validCardIds) {
-        return true;
-      }
       return validCardIds.includes(cardId);
     },
     [validCardIds],

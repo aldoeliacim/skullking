@@ -158,13 +158,6 @@ export default function GameScreen(): React.JSX.Element {
     router.replace('/');
   }, [router]);
 
-  // Get valid cards to play
-  const getValidCards = useCallback((): string[] => {
-    // For simplicity, return all cards as valid
-    // In a full implementation, this would check suit following rules
-    return hand.map((c) => c.id);
-  }, [hand]);
-
   // Render game over screen
   if (phase === 'ENDED') {
     const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
@@ -270,7 +263,7 @@ export default function GameScreen(): React.JSX.Element {
           <Hand
             cards={hand}
             onCardPress={handleCardPress}
-            validCardIds={isMyTurn ? getValidCards() : []}
+            trickCards={isMyTurn ? trickCards : []}
             disabled={!isMyTurn}
           />
         </Animated.View>

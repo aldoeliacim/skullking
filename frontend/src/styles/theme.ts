@@ -201,14 +201,14 @@ export const zIndex = {
   toast: 60,
 } as const;
 
-// Card dimensions (responsive)
+// Card dimensions (responsive) - sized for easy visibility and touch
 export const cardDimensions = {
-  width: moderateScale(60),
-  height: moderateScale(84),
-  widthLarge: moderateScale(80),
-  heightLarge: moderateScale(112),
-  widthSmall: moderateScale(45),
-  heightSmall: moderateScale(63),
+  width: moderateScale(90),
+  height: moderateScale(126),
+  widthLarge: moderateScale(120),
+  heightLarge: moderateScale(168),
+  widthSmall: moderateScale(70),
+  heightSmall: moderateScale(98),
 } as const;
 
 // Screen dimensions

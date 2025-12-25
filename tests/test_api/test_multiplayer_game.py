@@ -67,8 +67,11 @@ class TestFullGameFlow:
         current_round = game.get_current_round()
         for i in range(3):
             player = game.get_player(f"player-{i}")
-            card = player.hand[0]
             current_round.tricks[-1].picking_player_id = f"player-{i}"
+            current_trick = current_round.tricks[-1]
+            cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+            valid_cards = current_trick.get_valid_cards(player.hand, cards_in_trick)
+            card = valid_cards[0] if valid_cards else player.hand[0]
             await game_handler.handle_command(game, f"player-{i}", "PICK", {"card_id": card.value})
 
         # Round 1 should be complete, now in round 2
@@ -104,8 +107,11 @@ class TestFullGameFlow:
                 for i in range(2):
                     player = game.get_player(f"player-{i}")
                     if player.hand:
-                        card = player.hand[0]
                         current_round.tricks[-1].picking_player_id = f"player-{i}"
+                        current_trick = current_round.tricks[-1]
+                        cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+                        valid_cards = current_trick.get_valid_cards(player.hand, cards_in_trick)
+                        card = valid_cards[0] if valid_cards else player.hand[0]
                         pick_content = {"card_id": card.value}
                         # Tigress (card_id 72) requires a choice
                         if card.value == 72:
@@ -129,8 +135,11 @@ class TestFullGameFlow:
         current_round = game.get_current_round()
         for i in range(2):
             player = game.get_player(f"player-{i}")
-            card = player.hand[0]
             current_round.tricks[-1].picking_player_id = f"player-{i}"
+            current_trick = current_round.tricks[-1]
+            cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+            valid_cards = current_trick.get_valid_cards(player.hand, cards_in_trick)
+            card = valid_cards[0] if valid_cards else player.hand[0]
             await game_handler.handle_command(game, f"player-{i}", "PICK", {"card_id": card.value})
 
         # One player won, one didn't - but both bid 0
@@ -171,8 +180,12 @@ class TestFullGameFlow:
                 for i in range(2):
                     player = game.get_player(f"player-{i}")
                     if player.hand:
-                        card = player.hand[0]
                         current_round.tricks[-1].picking_player_id = f"player-{i}"
+                        current_trick = current_round.tricks[-1]
+                        # Get valid cards according to suit-following rules
+                        cards_in_trick = [pc.card_id for pc in current_trick.picked_cards]
+                        valid_cards = current_trick.get_valid_cards(player.hand, cards_in_trick)
+                        card = valid_cards[0] if valid_cards else player.hand[0]
                         pick_content = {"card_id": card.value}
                         # Tigress (card_id 72) requires a choice
                         if card.value == 72:
