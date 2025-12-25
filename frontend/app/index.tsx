@@ -171,7 +171,7 @@ export default function HomeScreen(): React.JSX.Element {
               }}
               autoCapitalize="characters"
               autoCorrect={false}
-              maxLength={8}
+              maxLength={4}
             />
 
             <View style={styles.buttonRow}>

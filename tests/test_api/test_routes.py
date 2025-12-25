@@ -41,9 +41,9 @@ class TestCreateGame:
         assert "game_id" in data
         assert "slug" in data
         assert data["message"] == "Game created successfully"
-        # Slug is first 8 chars of UUID uppercased
-        assert len(data["slug"]) == 8
-        assert data["slug"] == data["game_id"][:8].upper()
+        # Slug is first 4 hex chars of UUID uppercased
+        assert len(data["slug"]) == 4
+        assert data["slug"] == data["game_id"][:4].upper()
 
     def test_create_game_adds_to_manager(self, client):
         """Created game should be accessible via websocket manager."""

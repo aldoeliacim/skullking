@@ -359,8 +359,22 @@ class ConnectionManager:
             self.disconnect_spectator(game_id, spectator_id)
 
     def get_game(self, game_id: str) -> Game | None:
-        """Get game by ID."""
-        return self.games.get(game_id)
+        """Get game by ID or slug.
+
+        First tries direct lookup by game_id (UUID).
+        If not found, searches by slug (4-char hex code).
+        """
+        # Direct lookup by UUID
+        if game_id in self.games:
+            return self.games[game_id]
+
+        # Search by slug (case-insensitive)
+        game_id_upper = game_id.upper()
+        for game in self.games.values():
+            if game.slug.upper() == game_id_upper:
+                return game
+
+        return None
 
     def add_game(self, game: Game) -> None:
         """Add game to manager."""

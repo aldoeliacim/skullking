@@ -50,7 +50,7 @@ export default function LobbyScreen(): React.JSX.Element {
   } = useGameStore();
 
   const gameId = params.id || '';
-  const gameCode = params.slug || gameId.substring(0, 8).toUpperCase();
+  const gameCode = params.slug || gameId.substring(0, 4).toUpperCase();
   // Check if current player is the host (first non-bot player, or matches our playerId)
   const firstHumanPlayer = players.find((p) => !p.is_bot);
   const isHost = firstHumanPlayer?.id === playerId || players[0]?.id === playerId;

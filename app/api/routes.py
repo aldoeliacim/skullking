@@ -30,9 +30,9 @@ async def create_game(_request: CreateGameRequest) -> CreateGameResponse:
     In the full implementation, this would fetch lobby details
     from an external service.
     """
-    # Generate game ID and slug
+    # Generate game ID and 4-digit hex slug
     game_id = str(uuid.uuid4())
-    slug = game_id[:8].upper()
+    slug = game_id[:4].upper()  # 4 hex chars (65,536 possible values)
 
     # Create game instance
     game = Game(
@@ -63,12 +63,15 @@ async def join_game(
         username: Player display name
 
     """
-    # Get game
+    # Get game (can be by UUID or slug)
     game = websocket_manager.get_game(game_id)
 
     if not game:
         await websocket.close(code=4004, reason="Game not found")
         return
+
+    # Use the actual game UUID for all operations (in case we joined via slug)
+    actual_game_id = game.id
 
     # Create or get player
     player = game.get_player(player_id)
@@ -78,7 +81,7 @@ async def join_game(
         player = Player(
             id=player_id,
             username=username,
-            game_id=game_id,
+            game_id=actual_game_id,
             is_connected=True,
         )
 
@@ -86,14 +89,14 @@ async def join_game(
             await websocket.close(code=4003, reason="Game is full")
             return
 
-    # Connect WebSocket
-    await websocket_manager.connect(websocket, game_id, player_id)
+    # Connect WebSocket using actual game UUID
+    await websocket_manager.connect(websocket, actual_game_id, player_id)
     player.is_connected = True
 
     # Send initial game state
     init_message = ServerMessage(
         command=Command.INIT,
-        game_id=game_id,
+        game_id=actual_game_id,
         content={
             "game": {
                 "id": game.id,
@@ -114,20 +117,20 @@ async def join_game(
         },
     )
 
-    await websocket_manager.send_personal_message(init_message, game_id, player_id)
+    await websocket_manager.send_personal_message(init_message, actual_game_id, player_id)
 
     # Notify other players
     joined_message = ServerMessage(
         command=Command.JOINED,
-        game_id=game_id,
+        game_id=actual_game_id,
         content={"player_id": player_id, "username": username},
         excluded_id=player_id,
     )
 
-    await websocket_manager.broadcast_to_game(joined_message, game_id, player_id)
+    await websocket_manager.broadcast_to_game(joined_message, actual_game_id, player_id)
 
     # Handle incoming messages
-    await websocket_manager.handle_player_message(websocket, game_id, player_id)
+    await websocket_manager.handle_player_message(websocket, actual_game_id, player_id)
 
 
 @router.websocket("/games/spectate")
@@ -149,15 +152,18 @@ async def spectate_game(
         username: Spectator display name
 
     """
-    # Get game
+    # Get game (can be by UUID or slug)
     game = websocket_manager.get_game(game_id)
 
     if not game:
         await websocket.close(code=4004, reason="Game not found")
         return
 
+    # Use the actual game UUID for all operations
+    actual_game_id = game.id
+
     # Connect as spectator
-    await websocket_manager.connect_spectator(websocket, game_id, spectator_id)
+    await websocket_manager.connect_spectator(websocket, actual_game_id, spectator_id)
 
     # Build current game state for spectator (without private info like hands)
     current_round = game.get_current_round()
@@ -181,7 +187,7 @@ async def spectate_game(
             }
             for p in game.players
         ],
-        "spectator_count": websocket_manager.get_spectator_count(game_id),
+        "spectator_count": websocket_manager.get_spectator_count(actual_game_id),
     }
 
     # Add trick info if in progress
@@ -198,7 +204,7 @@ async def spectate_game(
     # Send initial state
     init_message = ServerMessage(
         command=Command.INIT,
-        game_id=game_id,
+        game_id=actual_game_id,
         content={"game": spectator_state, "is_spectator": True},
     )
     await websocket.send_json(init_message.to_dict())
@@ -206,17 +212,17 @@ async def spectate_game(
     # Notify players that a spectator joined
     spectator_joined_message = ServerMessage(
         command=Command.SPECTATOR_JOINED,
-        game_id=game_id,
+        game_id=actual_game_id,
         content={
             "spectator_id": spectator_id,
             "username": username,
-            "spectator_count": websocket_manager.get_spectator_count(game_id),
+            "spectator_count": websocket_manager.get_spectator_count(actual_game_id),
         },
     )
-    await websocket_manager.broadcast_to_game(spectator_joined_message, game_id)
+    await websocket_manager.broadcast_to_game(spectator_joined_message, actual_game_id)
 
     # Handle spectator connection (mostly just keeping it alive)
-    await websocket_manager.handle_spectator_message(websocket, game_id, spectator_id)
+    await websocket_manager.handle_spectator_message(websocket, actual_game_id, spectator_id)
 
 
 @router.get("/games/cards")
