@@ -10,7 +10,7 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import type { Card as CardType, Player, TrickCard } from '../stores/gameStore';
+import { type Card as CardType, type Player, type TrickCard, parseCard } from '../stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
 import { Card } from './Card';
 
@@ -21,46 +21,6 @@ interface TrickAreaProps {
   winnerId?: string | null;
   winnerName?: string | null;
   style?: ViewStyle;
-}
-
-// Parse card ID to card object (same as in gameStore)
-function parseCard(cardId: string): CardType {
-  const card: CardType = { id: cardId };
-
-  if (
-    cardId.startsWith('blue_') ||
-    cardId.startsWith('yellow_') ||
-    cardId.startsWith('green_') ||
-    cardId.startsWith('purple_')
-  ) {
-    const parts = cardId.split('_');
-    card.suit = parts[0] ?? '';
-    card.number = parseInt(parts[1] ?? '0', 10);
-    card.type = 'standard';
-  } else if (cardId.startsWith('black_')) {
-    const parts = cardId.split('_');
-    card.suit = 'black';
-    card.number = parseInt(parts[1] ?? '0', 10);
-    card.type = 'black';
-  } else if (cardId.startsWith('escape')) {
-    card.type = 'escape';
-  } else if (cardId.startsWith('pirate')) {
-    card.type = 'pirate';
-  } else if (cardId === 'skull_king') {
-    card.type = 'skull_king';
-  } else if (cardId.startsWith('mermaid')) {
-    card.type = 'mermaid';
-  } else if (cardId === 'tigress') {
-    card.type = 'tigress';
-  } else if (cardId === 'kraken') {
-    card.type = 'kraken';
-  } else if (cardId === 'white_whale') {
-    card.type = 'white_whale';
-  } else if (cardId.startsWith('loot')) {
-    card.type = 'loot';
-  }
-
-  return card;
 }
 
 interface TrickCardDisplayProps {
