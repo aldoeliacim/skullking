@@ -14,6 +14,8 @@ from app.api.game_handler import GameHandler
 if TYPE_CHECKING:
     from app.api.responses import ServerMessage
     from app.models.game import Game
+    from app.repositories.game_repository import GameRepository
+    from app.services.publisher_service import PublisherService
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,23 @@ class ConnectionManager:
         self.message_queue: asyncio.Queue[ServerMessage] = asyncio.Queue()
         self.games: dict[str, Game] = {}
         self.game_handler: GameHandler
+        # External services (set via set_services)
+        self._game_repository: GameRepository | None = None
+        self._publisher_service: PublisherService | None = None
+
+    def set_services(
+        self,
+        game_repository: GameRepository | None,
+        publisher_service: PublisherService | None,
+    ) -> None:
+        """Set external services for persistence and pub/sub.
+
+        Args:
+            game_repository: MongoDB repository for game persistence
+            publisher_service: Redis pub/sub service
+        """
+        self._game_repository = game_repository
+        self._publisher_service = publisher_service
 
     def set_game_handler(self, game_handler: GameHandler) -> None:
         """Set the game handler after initialization to avoid circular imports.
@@ -50,6 +69,8 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket, game_id: str, player_id: str) -> None:
         """Accept a new WebSocket connection for a player.
+
+        If the game is not in memory, attempts to restore it from MongoDB.
 
         Args:
             websocket: WebSocket connection
@@ -65,9 +86,36 @@ class ConnectionManager:
         self.active_connections[game_id][player_id] = websocket
         logger.info("Player %s connected to game %s", player_id, game_id)
 
+        # Try to restore game from MongoDB if not in memory
+        if game_id not in self.games:
+            await self._try_restore_game(game_id)
+
         # Send current game state if game exists
         if game_id in self.games:
             await self.game_handler.send_game_state(self.games[game_id], player_id)
+
+    async def _try_restore_game(self, game_id: str) -> bool:
+        """Try to restore a game from MongoDB.
+
+        Args:
+            game_id: Game identifier
+
+        Returns:
+            True if game was restored
+        """
+        if not self._game_repository:
+            return False
+
+        try:
+            game = await self._game_repository.find_by_id(game_id)
+            if game:
+                self.games[game_id] = game
+                logger.info("Restored game %s from MongoDB on reconnection", game_id)
+                return True
+        except Exception:
+            logger.exception("Error restoring game %s from MongoDB", game_id)
+
+        return False
 
     async def connect_spectator(
         self, websocket: WebSocket, game_id: str, spectator_id: str
