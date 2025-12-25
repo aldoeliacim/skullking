@@ -503,6 +503,12 @@ class SkullKingGame {
                 this.gameState = this.gameState || {};
                 this.gameState.state = 'BIDDING';
                 this.gameState.current_round = message.content.round;
+                // Reset trick state for new round
+                this.gameState.current_trick = 0;
+                this.gameState.trick_cards = [];
+                // Hide any lingering winner label from previous round
+                const winnerLabelBid = document.getElementById('trick-winner');
+                if (winnerLabelBid) winnerLabelBid.classList.add('hidden');
                 // First update game screen so cards are visible
                 this.updateGameScreen();
                 // Then show bidding UI
