@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown } from 'react-native-reanimated';
-import type { AbilityData, Card as CardType } from '../stores/gameStore';
+import { type AbilityData, type Card as CardType, parseCard } from '../stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
 import { Card } from './Card';
 
@@ -119,7 +119,7 @@ export function AbilityModal({
   const renderDrawDiscard = (): React.JSX.Element => {
     const drawnCards = (data?.drawn_cards as number[]) || [];
     const mustDiscard = (data?.must_discard as number) || 2;
-    const parsedCards: CardType[] = drawnCards.map((id) => ({ id: String(id) }));
+    const parsedCards: CardType[] = drawnCards.map((id) => parseCard(id));
 
     return (
       <>
@@ -220,7 +220,7 @@ export function AbilityModal({
 
   const renderViewDeck = (): React.JSX.Element => {
     const undealtCards = (data?.undealt_cards as number[]) || [];
-    const parsedCards: CardType[] = undealtCards.map((id) => ({ id: String(id) }));
+    const parsedCards: CardType[] = undealtCards.map((id) => parseCard(id));
 
     return (
       <>

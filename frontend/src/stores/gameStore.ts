@@ -467,7 +467,7 @@ function handleMessage(
 
 // Parse card ID to card object
 // Backend sends integer IDs based on CardId enum
-function parseCard(cardIdInput: string | number): Card {
+export function parseCard(cardIdInput: string | number): Card {
   const numId = typeof cardIdInput === 'number' ? cardIdInput : parseInt(cardIdInput, 10);
   const cardId = String(numId);
   const card: Card = { id: cardId };
