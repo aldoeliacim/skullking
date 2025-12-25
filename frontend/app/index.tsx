@@ -13,8 +13,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input } from '../src/components';
-import { type LanguageCode, changeLanguage, getCurrentLanguage } from '../src/i18n';
+import { Button, Input, SettingsButton } from '../src/components';
 import { api } from '../src/services/api';
 import { colors, spacing, typography } from '../src/styles/theme';
 
@@ -28,7 +27,6 @@ export default function HomeScreen(): React.JSX.Element {
   const [gameCode, setGameCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentLang, setCurrentLang] = useState<LanguageCode>(getCurrentLanguage());
 
   // Load saved player name on mount
   React.useEffect(() => {
@@ -116,14 +114,11 @@ export default function HomeScreen(): React.JSX.Element {
     });
   }, [gameCode, router, t]);
 
-  const toggleLanguage = useCallback(async () => {
-    const newLang = currentLang === 'en' ? 'es' : 'en';
-    await changeLanguage(newLang);
-    setCurrentLang(newLang);
-  }, [currentLang]);
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* Settings gear button - top right */}
+      <SettingsButton style={styles.settingsButton} />
+
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -219,12 +214,6 @@ export default function HomeScreen(): React.JSX.Element {
               variant="ghost"
               size="sm"
             />
-            <Button
-              title={currentLang === 'en' ? '🇪🇸 Español' : '🇺🇸 English'}
-              onPress={toggleLanguage}
-              variant="ghost"
-              size="sm"
-            />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -236,6 +225,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 10,
   },
   keyboardView: {
     flex: 1,
@@ -250,18 +245,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing['3xl'],
   },
   emoji: {
-    fontSize: 64,
+    fontSize: 72,
     marginBottom: spacing.md,
   },
   title: {
-    fontSize: typography.fontSize['4xl'],
-    fontWeight: typography.fontWeight.extrabold,
-    color: colors.text,
+    fontSize: typography.fontSize['5xl'],
+    fontWeight: typography.fontWeight.bold,
+    fontFamily: typography.fontFamilyDisplay,
+    color: colors.accentGold,
     textAlign: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 2,
   },
   subtitle: {
     fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily,
+    fontStyle: 'italic',
     color: colors.textMuted,
     textAlign: 'center',
   },

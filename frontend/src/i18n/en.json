@@ -175,5 +175,13 @@
   },
   "modal": {
     "tapToDismiss": "Tap outside to close"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "sound": "Sound",
+    "vibration": "Vibration",
+    "on": "On",
+    "off": "Off"
   }
 }

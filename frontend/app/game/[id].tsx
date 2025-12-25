@@ -16,6 +16,7 @@ import {
   Button,
   Hand,
   Scoreboard,
+  SettingsButton,
   TigressModal,
   TrickArea,
 } from '../../src/components';
@@ -166,6 +167,7 @@ export default function GameScreen(): React.JSX.Element {
 
     return (
       <SafeAreaView style={styles.container}>
+        <SettingsButton style={styles.settingsButton} />
         <Animated.View entering={FadeIn.duration(500)} style={styles.gameOver}>
           <Text style={styles.gameOverEmoji}>{isWinner ? '🏆' : '🏴‍☠️'}</Text>
           <Text style={styles.gameOverTitle}>{t('results.title')}</Text>
@@ -205,6 +207,10 @@ export default function GameScreen(): React.JSX.Element {
             {t('game.round')} {currentRound}/10
           </Text>
           {isSpectator && <Text style={styles.spectatorBadge}>👁️ Spectator</Text>}
+        </View>
+
+        <View style={styles.headerCenter}>
+          <SettingsButton />
         </View>
 
         <View style={styles.headerRight}>
@@ -305,6 +311,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  settingsButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 10,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -315,18 +327,27 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerLeft: {
+    flex: 1,
     gap: spacing.xs,
   },
+  headerCenter: {
+    paddingHorizontal: spacing.sm,
+  },
   roundText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text,
+    fontFamily: typography.fontFamilyDisplay,
+    color: colors.accentGold,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   spectatorBadge: {
     fontSize: typography.fontSize.xs,
     color: colors.warning,
   },
   headerRight: {
+    flex: 1,
     alignItems: 'flex-end',
   },
   playerStats: {
@@ -401,14 +422,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   gameOverTitle: {
-    fontSize: typography.fontSize['4xl'],
-    fontWeight: typography.fontWeight.extrabold,
-    color: colors.text,
+    fontSize: typography.fontSize['5xl'],
+    fontWeight: typography.fontWeight.bold,
+    fontFamily: typography.fontFamilyDisplay,
+    color: colors.accentGold,
     marginBottom: spacing.sm,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
   },
   gameOverSubtitle: {
     fontSize: typography.fontSize.xl,
-    color: colors.accentGold,
+    fontFamily: typography.fontFamily,
+    color: colors.text,
     marginBottom: spacing['3xl'],
   },
   finalScores: {

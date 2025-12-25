@@ -175,5 +175,13 @@
   },
   "modal": {
     "tapToDismiss": "Toca fuera para cerrar"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "sound": "Sonido",
+    "vibration": "Vibración",
+    "on": "Sí",
+    "off": "No"
   }
 }

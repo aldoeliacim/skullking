@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '../../src/components';
+import { Button, SettingsButton } from '../../src/components';
 import { useGameStore } from '../../src/stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../../src/styles/theme';
 
@@ -131,6 +131,9 @@ export default function LobbyScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* Settings button */}
+      <SettingsButton style={styles.settingsButton} />
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <Animated.View entering={FadeInUp.duration(400)} style={styles.header}>
@@ -313,6 +316,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  settingsButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 10,
+  },
   scrollContent: {
     padding: spacing.lg,
   },
@@ -325,7 +334,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize['2xl'],
     fontWeight: typography.fontWeight.bold,
-    color: colors.text,
+    fontFamily: typography.fontFamilyDisplay,
+    color: colors.accentGold,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -377,9 +390,13 @@ const styles = StyleSheet.create({
   codeText: {
     fontSize: typography.fontSize['3xl'],
     fontWeight: typography.fontWeight.bold,
+    fontFamily: typography.fontFamilyDisplay,
     color: colors.accentGold,
-    letterSpacing: 4,
+    letterSpacing: 6,
     marginRight: spacing.md,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   copyButton: {
     fontSize: typography.fontSize.sm,

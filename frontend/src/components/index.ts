@@ -7,3 +7,4 @@ export { Scoreboard } from './Scoreboard';
 export { BiddingModal } from './BiddingModal';
 export { TigressModal } from './TigressModal';
 export { AbilityModal } from './AbilityModal';
+export { SettingsButton } from './SettingsButton';
