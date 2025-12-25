@@ -21,7 +21,7 @@
 
 Our current implementation treats a **full game as one episode**:
 
-```
+```text
 Episode (1 full game ≈ 55 steps):
 ├── Round 1:  1 bid  +  1 trick  =  2 agent actions
 ├── Round 2:  1 bid  +  2 tricks =  3 agent actions
@@ -101,7 +101,7 @@ final_ranking_reward  = -5 to +10  # Placement bonus
 
 Hierarchical RL decomposes complex tasks into a hierarchy of simpler sub-tasks. For Skull King, this maps naturally to the game structure:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    MANAGER POLICY (πₘ)                       │
 │  ────────────────────────────────────────────────────────── │
@@ -135,6 +135,7 @@ Based on the **Options Framework** (Sutton, Precup & Singh, 1999):
   - β = termination condition (when option ends)
 
 For Skull King:
+
 - **Bidding Option**: I = {BIDDING phase}, π = bid policy, β = bid placed
 - **Playing Option**: I = {PICKING phase}, π = card policy, β = round complete
 
@@ -321,7 +322,7 @@ def hindsight_relabel(trajectory, actual_tricks_won):
 
 Instead of treating a full game as one episode, treat each **round as a separate episode**. Use meta-learning to transfer knowledge across rounds with different card counts.
 
-```
+```text
 Game reframed as 10 related but distinct MDPs:
 
 ┌─────────────┐  ┌─────────────┐       ┌──────────────┐
@@ -558,13 +559,14 @@ def progressive_round_training():
 ### 4.1 Concept
 
 Replace the MLP policy network with a **Transformer** architecture that can:
+
 1. Handle variable-length inputs (hands of 1-10 cards)
 2. Capture card-to-card relationships via attention
 3. Maintain history of the game through memory
 
 ### 4.2 Why Transformers for Card Games
 
-```
+```text
 Traditional MLP approach:
 ┌─────────────────────────────────────────────┐
 │  Fixed-size input: [card1, card2, ..., pad] │
@@ -914,11 +916,13 @@ CFR is a game-theoretic algorithm that finds Nash equilibrium strategies for imp
 ### 5.2 Why CFR for Skull King
 
 Skull King has **imperfect information**:
+
 - Players don't see each other's hands
 - Future cards are unknown
 - Bidding reveals partial information about hands
 
 CFR excels at games where:
+
 - Information asymmetry is important
 - Bluffing/deception can be valuable
 - Opponent modeling matters
@@ -1240,7 +1244,7 @@ class MultiPlayerCFR(CFRAgent):
 
 Add **intrinsic rewards** that encourage exploration beyond extrinsic game rewards:
 
-```
+```text
 Total Reward = Extrinsic (game score) + β × Intrinsic (curiosity/novelty)
 ```
 
@@ -1506,7 +1510,7 @@ class ScheduledCuriosity:
 
 Train a population of diverse agents that compete against each other, similar to AlphaStar:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                      AGENT POPULATION                        │
 │                                                              │
@@ -1785,7 +1789,7 @@ class PBTTraining(LeagueTraining):
 
 Combine neural network evaluation with tree search planning:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     MCTS + NEURAL NET                        │
 │                                                              │
@@ -2117,7 +2121,7 @@ class InformationSetMCTS(AlphaZeroAgent):
 
 Explicitly model opponent strategies to adapt play:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                   OPPONENT MODELING                          │
 │                                                              │
@@ -2312,7 +2316,7 @@ Based on expected impact vs implementation complexity:
 
 ### 10.2 Recommended Implementation Order
 
-```
+```text
 Phase 1: Quick Wins (1-2 days)
 ├── Add round number to observations
 ├── Implement round-as-episode option
@@ -2369,7 +2373,7 @@ def comprehensive_evaluation(agent):
 
 ### 10.4 File Structure
 
-```
+```text
 skullking/
 ├── app/
 │   └── gym_env/
