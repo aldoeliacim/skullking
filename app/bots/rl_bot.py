@@ -289,7 +289,10 @@ class RLBot(BaseBot):
     def _encode_hand_strength_breakdown(self, hand: list[CardId]) -> list[float]:
         """Encode hand strength breakdown (4 dims)."""
         high_standard = self._count_card_type(
-            hand, lambda c: c.is_standard_suit() and c.number and c.number >= HIGH_CARD_THRESHOLD
+            hand,
+            lambda c: c.is_standard_suit()
+            and c.number is not None
+            and c.number >= HIGH_CARD_THRESHOLD,
         )
         return [
             self._count_card_type(hand, lambda c: c.is_pirate()) / 5.0,
@@ -301,7 +304,7 @@ class RLBot(BaseBot):
     def _encode_round_progression(self, current_round: Any) -> float:
         """Encode round progression (1 dim)."""
         if current_round:
-            return len(current_round.tricks) / max(current_round.number, 1)
+            return float(len(current_round.tricks)) / float(max(current_round.number, 1))
         return 0.0
 
     def _encode_card_compact(self, card: Card) -> list[float]:
@@ -426,9 +429,9 @@ class RLBot(BaseBot):
 
         return max(0, round(base_strength))
 
-    def _count_cards_by_suit(self, hand: list[CardId]) -> dict:
+    def _count_cards_by_suit(self, hand: list[CardId]) -> dict[str, int]:
         """Count cards by suit."""
-        suit_counts: dict = {}
+        suit_counts: dict[str, int] = {}
         for card_id in hand:
             card = get_card(card_id)
             if card.is_standard_suit() and hasattr(card, "card_type"):
@@ -502,7 +505,11 @@ class RLBot(BaseBot):
 
     def _is_high_standard_card(self, card: Card) -> bool:
         """Check if card is a high-value standard suit card."""
-        return card.is_standard_suit() and card.number and card.number >= HIGH_CARD_THRESHOLD
+        return (
+            card.is_standard_suit()
+            and card.number is not None
+            and card.number >= HIGH_CARD_THRESHOLD
+        )
 
     def _calculate_bid_pressure(self, game: Game) -> float:
         """Calculate bid pressure (1 dim)."""

@@ -20,7 +20,7 @@ class PublisherService:
 
     def __init__(self) -> None:
         """Initialize publisher service."""
-        self.redis_client: redis.Redis | None = None
+        self.redis_client: redis.Redis[str] | None = None
 
     async def connect(self) -> None:
         """Connect to Redis and verify connection."""
@@ -58,7 +58,7 @@ class PublisherService:
             message_json = json.dumps(message)
             await self.redis_client.publish(channel, message_json)
             logger.debug("Published message to channel %s", channel)
-        except (RedisError, json.JSONEncodeError):
+        except (RedisError, TypeError):
             logger.exception("Error publishing message")
             return False
         else:

@@ -1,6 +1,7 @@
 """Game repository for MongoDB persistence."""
 
 import logging
+from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.errors import PyMongoError
@@ -19,8 +20,8 @@ class GameRepository:
 
     def __init__(self) -> None:
         """Initialize repository."""
-        self.client: AsyncIOMotorClient | None = None
-        self.db: AsyncIOMotorDatabase | None = None
+        self.client: AsyncIOMotorClient[dict[str, Any]] | None = None
+        self.db: AsyncIOMotorDatabase[dict[str, Any]] | None = None
 
     async def connect(self) -> None:
         """Connect to MongoDB."""
@@ -86,7 +87,7 @@ class GameRepository:
         else:
             return True
 
-    async def find_by_id(self, game_id: str) -> dict | None:
+    async def find_by_id(self, game_id: str) -> dict[str, Any] | None:
         """Find game by ID.
 
         Args:
@@ -100,7 +101,8 @@ class GameRepository:
             return None
 
         try:
-            return await self.db.games.find_one({"_id": game_id})
+            result = await self.db.games.find_one({"_id": game_id})
+            return dict(result) if result else None
         except PyMongoError:
             logger.exception("Error finding game %s", game_id)
             return None
@@ -139,4 +141,4 @@ class GameRepository:
             logger.exception("Error updating game %s", game.id)
             return False
         else:
-            return result.modified_count > 0
+            return bool(result.modified_count > 0)

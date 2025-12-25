@@ -7,14 +7,14 @@ Key improvements:
 4. Better observation encoding for bid tracking
 """
 
-from typing import Any, ClassVar
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from app.bots import RandomBot, RuleBasedBot
-from app.bots.base_bot import BotDifficulty
+from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import CardId
 from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, GameState
 from app.models.game import Game
@@ -23,7 +23,7 @@ from app.models.round import Round
 from app.models.trick import Trick
 
 
-class SkullKingEnvEnhanced(gym.Env):
+class SkullKingEnvEnhanced(gym.Env["np.ndarray", int]):
     """Enhanced Gymnasium environment for Skull King with better reward shaping.
 
     Improvements over base environment:
@@ -33,7 +33,8 @@ class SkullKingEnvEnhanced(gym.Env):
     - Progressive opponent difficulty option
     """
 
-    metadata: ClassVar[dict[str, Any]] = {"render_modes": ["human", "ansi"], "render_fps": 1}
+    # Override as dict literal - gymnasium expects this pattern
+    metadata = {"render_modes": ["human", "ansi"], "render_fps": 1}  # noqa: RUF012
 
     # Constants
     MAX_INVALID_MOVES = 10
@@ -94,17 +95,30 @@ class SkullKingEnvEnhanced(gym.Env):
         # Game state
         self.game: Game | None = None
         self.agent_player_id: str = ""
-        self.bots: list[tuple[str, Any]] = []
+        self.bots: list[tuple[str, BaseBot]] = []
         self.invalid_move_count = 0
 
         # Enhanced tracking
         self.previous_score = 0
         self.previous_tricks_won = 0
 
+    @property
+    def _game(self) -> Game:
+        """Get the game, asserting it exists.
+
+        Use this in methods that should only be called after reset().
+        """
+        assert self.game is not None, "Game not initialized. Call reset() first."
+        return self.game
+
     def reset(
-        self, seed: int | None = None, _options: dict[str, Any] | None = None
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
     ) -> tuple[np.ndarray, dict[str, Any]]:
         """Reset environment."""
+        del options  # Unused
         super().reset(seed=seed)
 
         # Create new game
@@ -134,6 +148,7 @@ class SkullKingEnvEnhanced(gym.Env):
             )
             self.game.add_player(bot_player)
 
+            bot: BaseBot
             if self.opponent_bot_type == "random":
                 bot = RandomBot(bot_player.id)
             else:
@@ -174,30 +189,32 @@ class SkullKingEnvEnhanced(gym.Env):
 
     def _execute_enhanced_action(self, action: int, agent_player: Player) -> float:
         """Execute action and return enhanced reward."""
-        if self.game.state == GameState.BIDDING:
+        if self._game.state == GameState.BIDDING:
             return self._handle_enhanced_bidding(action, agent_player)
-        if self.game.state == GameState.PICKING:
+        if self._game.state == GameState.PICKING:
             return self._handle_enhanced_picking(action, agent_player)
         return 0.0
 
     def _handle_enhanced_bidding(self, action: int, agent_player: Player) -> float:
         """Handle bidding phase with enhanced rewards."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
+        if not current_round:
+            return 0.0
         bid = min(action, current_round.number)
         agent_player.bid = bid
         current_round.add_bid(self.agent_player_id, bid)
 
         # Have bots make their bids
         for bot_id, bot in self.bots:
-            bot_player = self.game.get_player(bot_id)
+            bot_player = self._game.get_player(bot_id)
             if bot_player and bot_player.bid is None:
-                bot_bid = bot.make_bid(self.game, current_round.number, bot_player.hand)
+                bot_bid = bot.make_bid(self._game, current_round.number, bot_player.hand)
                 bot_player.bid = bot_bid
                 current_round.add_bid(bot_id, bot_bid)
 
         # Transition to picking after all bids
         if self._all_players_bid():
-            self.game.state = GameState.PICKING
+            self._game.state = GameState.PICKING
             self._start_new_trick()
             self._bots_play_cards()
 
@@ -211,7 +228,9 @@ class SkullKingEnvEnhanced(gym.Env):
             return self.INVALID_MOVE_PENALTY
 
         card_to_play = agent_player.hand[card_index]
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
+        if not current_round:
+            return 0.0
         tricks_won_before = current_round.get_tricks_won(self.agent_player_id)
 
         success = self._play_card(self.agent_player_id, card_to_play)
@@ -261,13 +280,13 @@ class SkullKingEnvEnhanced(gym.Env):
             final_reward = self.TRUNCATION_PENALTY
 
         # Check if round ended (for bidding accuracy reward)
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if current_round and current_round.is_complete():
             final_reward += self._calculate_bidding_accuracy_reward(agent_player, current_round)
-            current_round.update_scores()
+            current_round.calculate_scores()
 
         # Check if game is over
-        if self.game.is_game_complete():
+        if self._game.is_game_complete():
             terminated = True
             final_reward += self._calculate_game_ranking_reward()
 
@@ -291,7 +310,7 @@ class SkullKingEnvEnhanced(gym.Env):
 
     def _calculate_game_ranking_reward(self) -> float:
         """Calculate final ranking reward."""
-        leaderboard = self.game.get_leaderboard()
+        leaderboard = self._game.get_leaderboard()
         agent_rank = next(
             i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id
         )
@@ -313,10 +332,11 @@ class SkullKingEnvEnhanced(gym.Env):
 
     def _get_observation(self) -> np.ndarray:  # noqa: C901
         """Build enhanced observation with bid tracking."""
+        obs_shape = (1226,)  # Pre-calculated observation shape
         if self.game is None:
-            return np.zeros(self.observation_space.shape, dtype=np.float32)
+            return np.zeros(obs_shape, dtype=np.float32)
 
-        obs = []
+        obs: list[float] = []
 
         agent_player = self.game.get_player(self.agent_player_id)
         current_round = self.game.get_current_round()
@@ -371,12 +391,11 @@ class SkullKingEnvEnhanced(gym.Env):
 
     def _get_info(self) -> dict[str, Any]:
         """Get additional information."""
-        info = {}
+        info: dict[str, Any] = {}
         if self.game:
             info["game_state"] = self.game.state.name
-            info["round_number"] = (
-                self.game.get_current_round().number if self.game.get_current_round() else 0
-            )
+            current_round = self.game.get_current_round()
+            info["round_number"] = current_round.number if current_round else 0
             agent_player = self.game.get_player(self.agent_player_id)
             if agent_player:
                 info["agent_score"] = agent_player.score
@@ -468,7 +487,7 @@ class SkullKingEnvEnhanced(gym.Env):
 
         current_round = self.game.get_current_round()
         if current_round:
-            current_round.update_scores()
+            current_round.calculate_scores()
 
         # Start next round or end game
         if len(self.game.rounds) < MAX_ROUNDS:
@@ -533,7 +552,7 @@ class SkullKingEnvEnhanced(gym.Env):
             if not bot_found:
                 break
 
-    def render(self) -> str | None:
+    def render(self) -> Any:
         """Render the environment."""
         if self.render_mode == "ansi":
             return self._render_ansi()
@@ -573,7 +592,7 @@ class SkullKingEnvEnhanced(gym.Env):
         for player in self.game.players:
             is_agent = "(Agent)" if player.id == self.agent_player_id else ""
             lines.append(
-                f"{player.name} {is_agent}: Score={player.score}, "
+                f"{player.username} {is_agent}: Score={player.score}, "
                 f"Bid={player.bid}, Tricks={player.tricks_won}"
             )
 

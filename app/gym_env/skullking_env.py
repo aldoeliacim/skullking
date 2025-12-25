@@ -4,13 +4,14 @@ This environment allows training reinforcement learning agents to play Skull Kin
 The agent controls one player, while other players can be controlled by bots or other agents.
 """
 
-from typing import Any, ClassVar
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from app.bots import RandomBot, RuleBasedBot
+from app.bots.base_bot import BaseBot
 from app.models.card import CardId, get_card
 from app.models.enums import MAX_ROUNDS, GameState
 from app.models.game import Game
@@ -19,7 +20,7 @@ from app.models.round import Round
 from app.models.trick import Trick
 
 
-class SkullKingEnv(gym.Env):
+class SkullKingEnv(gym.Env["np.ndarray", int]):
     """Gymnasium environment for Skull King.
 
     Observation Space:
@@ -45,7 +46,8 @@ class SkullKingEnv(gym.Env):
         - Invalid move threshold reached
     """
 
-    metadata: ClassVar[dict[str, Any]] = {"render_modes": ["human", "ansi"], "render_fps": 1}
+    # Override as dict literal - gymnasium expects this pattern
+    metadata = {"render_modes": ["human", "ansi"], "render_fps": 1}  # noqa: RUF012
 
     # Constants
     MIN_OPPONENTS = 1
@@ -89,7 +91,7 @@ class SkullKingEnv(gym.Env):
         # Game state
         self.game: Game | None = None
         self.agent_player_id = "agent_0"
-        self.bots: list[Any] = []
+        self.bots: list[tuple[str, BaseBot]] = []
         self.rng = np.random.default_rng()
 
         # Observation space: vectorized game state
@@ -116,19 +118,32 @@ class SkullKingEnv(gym.Env):
 
         self.invalid_move_count = 0
 
+    @property
+    def _game(self) -> Game:
+        """Get the game, asserting it exists.
+
+        Use this in methods that should only be called after reset().
+        """
+        assert self.game is not None, "Game not initialized. Call reset() first."
+        return self.game
+
     def reset(
-        self, seed: int | None = None, _options: dict[str, Any] | None = None
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
     ) -> tuple[np.ndarray, dict[str, Any]]:
         """Reset the environment for a new game.
 
         Args:
             seed: Random seed
-            _options: Additional options (unused)
+            options: Additional options (unused)
 
         Returns:
             Tuple of (observation, info)
 
         """
+        del options  # Unused
         super().reset(seed=seed)
 
         if seed is not None:
@@ -208,9 +223,9 @@ class SkullKingEnv(gym.Env):
         """Execute the agent's action and return reward."""
         reward = 0.0
 
-        if self.game.state == GameState.BIDDING:
+        if self._game.state == GameState.BIDDING:
             reward = self._handle_bidding_action(action, agent_player)
-        elif self.game.state == GameState.PICKING:
+        elif self._game.state == GameState.PICKING:
             reward = self._handle_picking_action(action, agent_player)
 
         return reward
@@ -218,7 +233,7 @@ class SkullKingEnv(gym.Env):
     def _handle_bidding_action(self, action: int, agent_player: Player) -> float:
         """Handle bidding phase action."""
         bid = action
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
 
         if current_round and 0 <= bid <= current_round.number:
             agent_player.bid = bid
@@ -230,7 +245,7 @@ class SkullKingEnv(gym.Env):
         self._bots_make_bids()
 
         if self._all_players_bid():
-            self.game.state = GameState.PICKING
+            self._game.state = GameState.PICKING
             self._start_new_trick()
 
         return 0.0
@@ -261,7 +276,7 @@ class SkullKingEnv(gym.Env):
             truncated = True
             final_reward = self.TRUNCATION_PENALTY
 
-        if self.game.is_game_complete():
+        if self._game.is_game_complete():
             terminated = True
             final_reward += self._calculate_final_ranking_reward()
 
@@ -269,7 +284,7 @@ class SkullKingEnv(gym.Env):
 
     def _calculate_final_ranking_reward(self) -> float:
         """Calculate reward based on final ranking."""
-        leaderboard = self.game.get_leaderboard()
+        leaderboard = self._game.get_leaderboard()
         agent_rank = next(
             i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id
         )
@@ -280,8 +295,9 @@ class SkullKingEnv(gym.Env):
 
     def _get_observation(self) -> np.ndarray:
         """Build observation vector from current game state."""
+        obs_size = 1226  # Pre-calculated observation size
         if self.game is None:
-            return np.zeros(self.observation_space.shape, dtype=np.float32)
+            return np.zeros((obs_size,), dtype=np.float32)
 
         agent_player = self.game.get_player(self.agent_player_id)
         current_round = self.game.get_current_round()
@@ -322,7 +338,7 @@ class SkullKingEnv(gym.Env):
         """Encode bids (8 players x 11 bids)."""
         bid_encoding = np.zeros((self.MAX_PLAYERS_COUNT, self.MAX_BID_OPTIONS), dtype=np.float32)
         if current_round:
-            for i, player in enumerate(self.game.players[: self.MAX_PLAYERS_COUNT]):
+            for i, player in enumerate(self._game.players[: self.MAX_PLAYERS_COUNT]):
                 if player.bid is not None:
                     bid_encoding[i, player.bid] = 1.0
         return bid_encoding.flatten()
@@ -330,7 +346,7 @@ class SkullKingEnv(gym.Env):
     def _encode_scores(self) -> np.ndarray:
         """Encode scores (normalized)."""
         scores = np.zeros(self.MAX_PLAYERS_COUNT, dtype=np.float32)
-        for i, player in enumerate(self.game.players[: self.MAX_PLAYERS_COUNT]):
+        for i, player in enumerate(self._game.players[: self.MAX_PLAYERS_COUNT]):
             scores[i] = player.score / self.SCORE_NORMALIZATION
         return scores
 
@@ -338,16 +354,16 @@ class SkullKingEnv(gym.Env):
         """Encode tricks won this round."""
         tricks_won = np.zeros(self.MAX_PLAYERS_COUNT, dtype=np.float32)
         if current_round:
-            for i, player in enumerate(self.game.players[: self.MAX_PLAYERS_COUNT]):
+            for i, player in enumerate(self._game.players[: self.MAX_PLAYERS_COUNT]):
                 tricks_won[i] = current_round.get_tricks_won(player.id) / self.TRICKS_NORMALIZATION
         return tricks_won
 
     def _encode_metadata(self, current_round: Round | None) -> np.ndarray:
         """Encode metadata."""
         metadata = np.zeros(10, dtype=np.float32)
-        metadata[0] = self.game.current_round_number / MAX_ROUNDS
-        metadata[1] = 1.0 if self.game.state == GameState.BIDDING else 0.0
-        metadata[2] = 1.0 if self.game.state == GameState.PICKING else 0.0
+        metadata[0] = self._game.current_round_number / MAX_ROUNDS
+        metadata[1] = 1.0 if self._game.state == GameState.BIDDING else 0.0
+        metadata[2] = 1.0 if self._game.state == GameState.PICKING else 0.0
         if current_round:
             metadata[3] = len(current_round.tricks) / self.TRICKS_NORMALIZATION
         return metadata
@@ -453,9 +469,15 @@ class SkullKingEnv(gym.Env):
         if not self._validate_card_play(player_id, card_id):
             return False
 
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
+        if not current_round:
+            return False
         current_trick = current_round.get_current_trick()
-        player = self.game.get_player(player_id)
+        if not current_trick:
+            return False
+        player = self._game.get_player(player_id)
+        if not player:
+            return False
 
         # Play the card
         player.remove_card(card_id)
@@ -492,7 +514,7 @@ class SkullKingEnv(gym.Env):
         """Process a completed trick."""
         current_trick.determine_winner()
         if current_trick.winner_player_id:
-            winner = self.game.get_player(current_trick.winner_player_id)
+            winner = self._game.get_player(current_trick.winner_player_id)
             if winner:
                 winner.tricks_won += 1
 
@@ -503,11 +525,15 @@ class SkullKingEnv(gym.Env):
 
     def _advance_to_next_player(self, player: Player) -> None:
         """Advance to the next player's turn."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
+        if not current_round:
+            return
         current_trick = current_round.get_current_trick()
+        if not current_trick:
+            return
 
         next_index = (player.index + 1) % self.num_players
-        current_trick.picking_player_id = self.game.players[next_index].id
+        current_trick.picking_player_id = self._game.players[next_index].id
 
         # If next player is bot, have them play
         if current_trick.picking_player_id != self.agent_player_id:
@@ -540,7 +566,7 @@ class SkullKingEnv(gym.Env):
             self.game.deal_cards()
             self.game.state = GameState.BIDDING
 
-    def render(self) -> str | None:
+    def render(self) -> Any:
         """Render the environment."""
         if self.render_mode is None:
             return None
@@ -548,7 +574,7 @@ class SkullKingEnv(gym.Env):
         if not self.game:
             return "No game in progress"
 
-        output = []
+        output: list[str] = []
         self._render_header(output)
         self._render_scores(output)
         self._render_round_info(output)
@@ -560,25 +586,25 @@ class SkullKingEnv(gym.Env):
     def _render_header(self, output: list[str]) -> None:
         """Render game header."""
         output.append(f"\n{'=' * 60}")
-        output.append(f"Skull King - Round {self.game.current_round_number}")
-        output.append(f"State: {self.game.state.value}")
+        output.append(f"Skull King - Round {self._game.current_round_number}")
+        output.append(f"State: {self._game.state.value}")
         output.append(f"{'=' * 60}")
 
     def _render_scores(self, output: list[str]) -> None:
         """Render player scores."""
         output.append("\nScores:")
-        for player in self.game.players:
+        for player in self._game.players:
             bot_str = " [BOT]" if player.is_bot else " [AGENT]"
             output.append(f"  {player.username}{bot_str}: {player.score}")
 
     def _render_round_info(self, output: list[str]) -> None:
         """Render current round information."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if not current_round:
             return
 
         output.append(f"\nRound {current_round.number} Bids:")
-        for player in self.game.players:
+        for player in self._game.players:
             bid_str = str(player.bid) if player.bid is not None else "?"
             tricks = current_round.get_tricks_won(player.id)
             output.append(f"  {player.username}: {bid_str} (won: {tricks})")
@@ -591,13 +617,13 @@ class SkullKingEnv(gym.Env):
         if current_trick and current_trick.picked_cards:
             output.append("\nCurrent Trick:")
             for picked_card in current_trick.picked_cards:
-                player = self.game.get_player(picked_card.player_id)
+                player = self._game.get_player(picked_card.player_id)
                 card = get_card(picked_card.card_id)
                 output.append(f"  {player.username if player else '?'}: {card}")
 
     def _render_agent_hand(self, output: list[str]) -> None:
         """Render agent's hand."""
-        agent_player = self.game.get_player(self.agent_player_id)
+        agent_player = self._game.get_player(self.agent_player_id)
         if agent_player and agent_player.hand:
             output.append("\nAgent's Hand:")
             for i, card_id in enumerate(agent_player.hand):

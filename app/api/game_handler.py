@@ -25,13 +25,16 @@ if TYPE_CHECKING:
     from app.models.round import Round
 
 # Optional RL imports - may not be available
+_MASKABLE_PPO_AVAILABLE = False
+_MaskablePPOClass: Any = None
+
 try:
     from sb3_contrib import MaskablePPO
 
+    _MaskablePPOClass = MaskablePPO
     _MASKABLE_PPO_AVAILABLE = True
 except ImportError:
-    MaskablePPO = None  # type: ignore[misc, assignment]
-    _MASKABLE_PPO_AVAILABLE = False
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +51,15 @@ def _get_rl_model_path() -> Path:
     return model_path
 
 
-def _load_rl_model() -> "MaskablePPO | None":
+def _load_rl_model() -> Any:
     """Load the trained RL model if available."""
-    if not _MASKABLE_PPO_AVAILABLE:
+    if not _MASKABLE_PPO_AVAILABLE or _MaskablePPOClass is None:
         return None
     if _rl_cache["model"] is None:
         model_path = _get_rl_model_path()
         if model_path.exists():
             try:
-                _rl_cache["model"] = MaskablePPO.load(str(model_path))
+                _rl_cache["model"] = _MaskablePPOClass.load(str(model_path))
                 logger.info("Loaded RL model from %s", model_path)
             except (OSError, ValueError, RuntimeError) as e:
                 logger.warning("Could not load RL model: %s", e)
@@ -238,9 +241,11 @@ class GameHandler:
 
         """
         card_id_raw = content.get("card_id")
+        if not isinstance(card_id_raw, int):
+            return None
         try:
             card_id = CardId(card_id_raw)
-        except (ValueError, TypeError):
+        except ValueError:
             return None
 
         if card_id not in player.hand:
@@ -302,6 +307,42 @@ class GameHandler:
         )
         return True
 
+    async def _send_pick_validation_error(
+        self,
+        game: Game,
+        player_id: str,
+        current_round: "Round | None",
+        current_trick: Trick | None,
+    ) -> None:
+        """Send appropriate error for pick validation failure."""
+        if game.state != GameState.PICKING:
+            await self._send_error(game.id, player_id, "Not in picking phase")
+        elif not current_round or not current_trick:
+            await self._send_error(game.id, player_id, "No active trick")
+        elif current_trick.picking_player_id != player_id:
+            await self._send_error(game.id, player_id, "Not your turn")
+        else:
+            await self._send_error(game.id, player_id, "Player not found")
+
+    async def _send_card_validation_error(
+        self, game: Game, player: Player, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Send appropriate error for card validation failure."""
+        card_id_raw = content.get("card_id")
+        if not isinstance(card_id_raw, int):
+            await self._send_error(game.id, player_id, "Invalid card ID")
+            return
+        try:
+            card_id = CardId(card_id_raw)
+            if card_id not in player.hand:
+                await self._send_error(game.id, player_id, "Card not in hand")
+            else:
+                await self._send_error(
+                    game.id, player_id, "Tigress requires choice: pirate or escape"
+                )
+        except ValueError:
+            await self._send_error(game.id, player_id, "Invalid card ID")
+
     async def _handle_pick(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """Handle PICK command from a player.
 
@@ -316,34 +357,20 @@ class GameHandler:
 
         player = self._validate_pick_request(game, player_id, current_round, current_trick)
         if not player:
-            if game.state != GameState.PICKING:
-                await self._send_error(game.id, player_id, "Not in picking phase")
-            elif not current_round or not current_trick:
-                await self._send_error(game.id, player_id, "No active trick")
-            elif current_trick.picking_player_id != player_id:
-                await self._send_error(game.id, player_id, "Not your turn")
-            else:
-                await self._send_error(game.id, player_id, "Player not found")
+            await self._send_pick_validation_error(game, player_id, current_round, current_trick)
             return
 
         card_data = self._parse_and_validate_card(player, content)
         if not card_data:
-            card_id_raw = content.get("card_id")
-            try:
-                card_id = CardId(card_id_raw)
-                if card_id not in player.hand:
-                    await self._send_error(game.id, player_id, "Card not in hand")
-                else:
-                    await self._send_error(
-                        game.id, player_id, "Tigress requires choice: pirate or escape"
-                    )
-            except (ValueError, TypeError):
-                await self._send_error(game.id, player_id, "Invalid card ID")
+            await self._send_card_validation_error(game, player, player_id, content)
             return
 
         card_id, tigress_choice = card_data
 
-        # current_round and current_trick are guaranteed to be non-None here due to validation
+        # current_round and current_trick guaranteed non-None by validation
+        if current_round is None or current_trick is None:
+            return
+
         if not await self._execute_pick(game, player, current_trick, card_id, tigress_choice):
             await self._send_error(game.id, player_id, "Already played in this trick")
             return
@@ -1035,6 +1062,7 @@ class GameHandler:
 
         # Create bot instance
         difficulty_enum = BotDifficulty[difficulty.upper()]
+        bot: BaseBot
         if bot_type == "rl" and _load_rl_model():
             # Use RL bot with trained model
             bot = RLBot(bot_id, model=_load_rl_model(), difficulty=difficulty_enum)
@@ -1091,9 +1119,7 @@ class GameHandler:
             game.id,
         )
 
-    async def _handle_remove_bot(
-        self, game: Game, player_id: str, content: dict[str, Any]
-    ) -> None:
+    async def _handle_remove_bot(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """Handle REMOVE_BOT command - removes an AI opponent from the game."""
         if game.state != GameState.PENDING:
             await self._send_error(game.id, player_id, "Cannot remove bot after game started")

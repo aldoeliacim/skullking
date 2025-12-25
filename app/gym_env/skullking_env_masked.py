@@ -6,14 +6,14 @@
 """
 
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from app.bots import RandomBot, RuleBasedBot
-from app.bots.base_bot import BotDifficulty
+from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import Card, CardId, get_card
 from app.models.enums import MAX_ROUNDS, GameState
 from app.models.game import Game
@@ -22,10 +22,11 @@ from app.models.round import Round
 from app.models.trick import TigressChoice, Trick
 
 
-class SkullKingEnvMasked(gym.Env):
+class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
     """Masked action environment with dense rewards and compact observations."""
 
-    metadata: ClassVar[dict[str, Any]] = {"render_modes": ["ansi"], "render_fps": 4}
+    # Override as dict literal - gymnasium expects this pattern
+    metadata = {"render_modes": ["ansi"], "render_fps": 4}  # noqa: RUF012
 
     # Constants for magic values
     CARD_STRENGTH_KING = 0.95
@@ -110,7 +111,7 @@ class SkullKingEnvMasked(gym.Env):
         # Game state
         self.game: Game | None = None
         self.agent_player_id: str = ""
-        self.bots: list[tuple[str, Any]] = []
+        self.bots: list[tuple[str, BaseBot]] = []
         self.invalid_move_count = 0
 
         # Enhanced tracking for dense rewards
@@ -126,6 +127,15 @@ class SkullKingEnvMasked(gym.Env):
             "hard": BotDifficulty.HARD,
         }
         return difficulty_map.get(difficulty.lower(), BotDifficulty.MEDIUM)
+
+    @property
+    def _game(self) -> Game:
+        """Get the game, asserting it exists.
+
+        Use this in methods that should only be called after reset().
+        """
+        assert self.game is not None, "Game not initialized. Call reset() first."
+        return self.game
 
     def action_masks(self) -> np.ndarray:
         """Return binary mask of valid actions.
@@ -207,6 +217,7 @@ class SkullKingEnvMasked(gym.Env):
             )
             self.game.add_player(bot_player)
 
+            bot: BaseBot
             if self.opponent_bot_type == "random":
                 bot = RandomBot(bot_player.id)
             else:
@@ -255,11 +266,11 @@ class SkullKingEnvMasked(gym.Env):
         success = False
         reward = 0.0
 
-        if self.game.state == GameState.BIDDING:
+        if self._game.state == GameState.BIDDING:
             success = self._handle_bidding(action, agent_player)
             if success:
                 reward += self._calculate_bid_quality_reward(action, agent_player)
-        elif self.game.state == GameState.PICKING:
+        elif self._game.state == GameState.PICKING:
             success = self._handle_card_playing(action, agent_player)
             if success:
                 reward += self._calculate_card_play_reward(action, agent_player)
@@ -286,7 +297,7 @@ class SkullKingEnvMasked(gym.Env):
             final_reward -= 5.0
 
         # Trick completion rewards
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if current_round and current_round.tricks:
             final_reward += self._process_trick_rewards(agent_player, current_round)
 
@@ -296,7 +307,7 @@ class SkullKingEnvMasked(gym.Env):
             current_round.calculate_scores()
 
         # Game completion rewards
-        if self.game.is_game_complete():
+        if self._game.is_game_complete():
             terminated = True
             final_reward += self._calculate_game_reward(agent_player)
 
@@ -318,7 +329,7 @@ class SkullKingEnvMasked(gym.Env):
 
     def _handle_bidding(self, action: int, agent_player: Player) -> bool:
         """Handle bidding phase."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if not current_round:
             return False
 
@@ -328,15 +339,15 @@ class SkullKingEnvMasked(gym.Env):
 
         # Have bots make their bids
         for bot_id, bot in self.bots:
-            bot_player = self.game.get_player(bot_id)
+            bot_player = self._game.get_player(bot_id)
             if bot_player and bot_player.bid is None:
-                bot_bid = bot.make_bid(self.game, current_round.number, bot_player.hand)
+                bot_bid = bot.make_bid(self._game, current_round.number, bot_player.hand)
                 bot_player.bid = bot_bid
                 current_round.add_bid(bot_id, bot_bid)
 
         # Transition to picking after all bids
         if self._all_players_bid():
-            self.game.state = GameState.PICKING
+            self._game.state = GameState.PICKING
             self._start_new_trick()
             # Bots will play in step() after this returns
 
@@ -353,7 +364,7 @@ class SkullKingEnvMasked(gym.Env):
     def _calculate_bid_quality_reward(self, bid: int, agent_player: Player) -> float:
         """DENSE REWARD: Reward reasonable bids based on hand strength."""
         hand_strength = self._estimate_hand_strength(agent_player.hand)
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if not current_round:
             return 0.0
 
@@ -370,7 +381,7 @@ class SkullKingEnvMasked(gym.Env):
 
     def _calculate_card_play_reward(self, card_index: int, agent_player: Player) -> float:
         """DENSE REWARD: Reward strategic card play."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if not current_round:
             return 0.0
 
@@ -403,7 +414,7 @@ class SkullKingEnvMasked(gym.Env):
 
     def _calculate_trick_reward(self, agent_player: Player, trick: Trick) -> float:
         """DENSE REWARD: Immediate feedback on trick outcomes."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if not current_round:
             return 0.0
 
@@ -488,7 +499,7 @@ class SkullKingEnvMasked(gym.Env):
 
     def _calculate_game_reward(self, _agent_player: Player) -> float:
         """Calculate final game reward (ranking) - NORMALIZED."""
-        leaderboard = self.game.get_leaderboard()
+        leaderboard = self._game.get_leaderboard()
         agent_rank = next(
             (i for i, p in enumerate(leaderboard) if p["player_id"] == self.agent_player_id), 3
         )
@@ -505,7 +516,7 @@ class SkullKingEnvMasked(gym.Env):
         card_objects = [get_card(cid) for cid in hand]
         base_strength = sum(self._evaluate_card_strength(c) for c in card_objects)
 
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         round_number = current_round.number if current_round else 1
 
         context_adjustment = self._calculate_context_adjustments(hand, card_objects, round_number)
@@ -554,9 +565,9 @@ class SkullKingEnvMasked(gym.Env):
 
         return adjustment
 
-    def _count_cards_by_suit(self, hand: list[CardId]) -> dict:
+    def _count_cards_by_suit(self, hand: list[CardId]) -> dict[str, int]:
         """Count cards by suit."""
-        suit_counts = {}
+        suit_counts: dict[str, int] = {}
         for card_id in hand:
             card = get_card(card_id)
             if card.is_standard_suit() and hasattr(card, "card_type"):
@@ -769,7 +780,7 @@ class SkullKingEnvMasked(gym.Env):
     def _get_observation(self) -> np.ndarray:
         """COMPACT OBSERVATIONS: 171 dims."""
         if self.game is None:
-            return np.zeros(self.observation_space.shape, dtype=np.float32)
+            return np.zeros((171,), dtype=np.float32)
 
         obs = []
         agent_player = self.game.get_player(self.agent_player_id)
@@ -813,7 +824,7 @@ class SkullKingEnvMasked(gym.Env):
             GameState.PICKING: 2,
             GameState.ENDED: 3,
         }
-        phase[state_map.get(self.game.state, 0)] = 1.0
+        phase[state_map.get(self._game.state, 0)] = 1.0
         return phase.tolist()
 
     def _encode_hand_compact(self, agent_player: Player | None) -> list[float]:
@@ -871,10 +882,10 @@ class SkullKingEnvMasked(gym.Env):
 
     def _encode_opponent_state(self) -> list[float]:
         """Encode opponent state (9 dims: 3 opponents x 3 features)."""
-        obs = []
+        obs: list[float] = []
         for i in range(1, 4):
-            if i < len(self.game.players):
-                opp = self.game.players[i]
+            if i < len(self._game.players):
+                opp = self._game.players[i]
                 obs.extend(
                     [
                         opp.bid / 10.0 if opp.bid is not None else 0.0,
@@ -962,7 +973,7 @@ class SkullKingEnvMasked(gym.Env):
 
     def _get_info(self) -> dict[str, Any]:
         """Get additional info."""
-        info = {}
+        info: dict[str, Any] = {}
         if self.game:
             info["game_state"] = self.game.state.value
             info["invalid_moves"] = self.invalid_move_count
@@ -1002,9 +1013,15 @@ class SkullKingEnvMasked(gym.Env):
         if not self._validate_play_card(player_id, card_id):
             return False
 
-        player = self.game.get_player(player_id)
-        current_round = self.game.get_current_round()
+        # After _validate_play_card, we know game, player, round, and trick exist
+        player = self._game.get_player(player_id)
+        current_round = self._game.get_current_round()
+        if not player or not current_round:
+            return False
+
         current_trick = current_round.get_current_trick()
+        if not current_trick:
+            return False
 
         tigress_choice = self._determine_tigress_choice(player, card_id, current_round)
 
@@ -1054,7 +1071,7 @@ class SkullKingEnvMasked(gym.Env):
         """Complete a trick and update game state."""
         current_trick.determine_winner()
         if current_trick.winner_player_id:
-            winner = self.game.get_player(current_trick.winner_player_id)
+            winner = self._game.get_player(current_trick.winner_player_id)
             if winner:
                 winner.tricks_won += 1
 
@@ -1065,25 +1082,26 @@ class SkullKingEnvMasked(gym.Env):
 
     def _advance_trick(self, player: Player) -> None:
         """Advance to next player in the trick."""
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
+        if not current_round:
+            return
         current_trick = current_round.get_current_trick()
+        if not current_trick:
+            return
         next_index = (player.index + 1) % self.num_players
-        current_trick.picking_player_id = self.game.players[next_index].id
+        current_trick.picking_player_id = self._game.players[next_index].id
 
     def _end_round(self) -> None:
-        if not self.game:
-            return
-
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if current_round:
             current_round.calculate_scores()
 
-        if len(self.game.rounds) < MAX_ROUNDS:
-            self.game.start_new_round()
-            self.game.deal_cards()  # CRITICAL: Deal cards!
-            self.game.state = GameState.BIDDING
+        if len(self._game.rounds) < MAX_ROUNDS:
+            self._game.start_new_round()
+            self._game.deal_cards()  # CRITICAL: Deal cards!
+            self._game.state = GameState.BIDDING
         else:
-            self.game.state = GameState.ENDED
+            self._game.state = GameState.ENDED
 
     def _bots_play_cards(self) -> None:
         """Have bots play their cards (iterative, with safety limit)."""
@@ -1099,8 +1117,12 @@ class SkullKingEnvMasked(gym.Env):
             if self._should_stop_bot_play():
                 break
 
-            current_round = self.game.get_current_round()
+            current_round = self._game.get_current_round()
+            if not current_round:
+                break
             current_trick = current_round.get_current_trick()
+            if not current_trick:
+                break
             picking_player_id = current_trick.picking_player_id
 
             if picking_player_id == self.agent_player_id:
@@ -1111,14 +1133,14 @@ class SkullKingEnvMasked(gym.Env):
 
     def _should_stop_bot_play(self) -> bool:
         """Check if bot play should stop."""
-        if self.game.state == GameState.ENDED:
+        if self._game.state == GameState.ENDED:
             return True
 
-        current_round = self.game.get_current_round()
+        current_round = self._game.get_current_round()
         if not current_round:
             return True
 
-        if self.game.state == GameState.BIDDING:
+        if self._game.state == GameState.BIDDING:
             return True
 
         current_trick = current_round.get_current_trick()
@@ -1128,12 +1150,12 @@ class SkullKingEnvMasked(gym.Env):
         """Execute a bot's card play."""
         for bot_id, bot in self.bots:
             if picking_player_id == bot_id:
-                player = self.game.get_player(bot_id)
+                player = self._game.get_player(bot_id)
                 if not player:
                     return False
 
                 card_to_play = bot.pick_card(
-                    self.game, player.hand, current_trick.get_all_card_ids()
+                    self._game, player.hand, current_trick.get_all_card_ids()
                 )
                 self._play_card(bot_id, card_to_play)
                 return True
@@ -1145,7 +1167,7 @@ class SkullKingEnvMasked(gym.Env):
         self.opponent_bot_type = opponent_type
         self.opponent_difficulty = self._parse_difficulty(difficulty)
 
-    def render(self) -> str | None:
+    def render(self) -> Any:
         """Render the environment."""
         if self.render_mode == "ansi":
             return self._render_ansi()

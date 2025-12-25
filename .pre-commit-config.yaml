@@ -14,6 +14,42 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-json
+      - id: check-toml
       - id: check-added-large-files
         args: ['--maxkb=2000']
       - id: check-merge-conflict
+      - id: debug-statements  # Catch Python debugger statements
+      - id: detect-private-key  # Catch accidentally committed private keys
+
+  # Python type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        args: [--config-file=pyproject.toml, --ignore-missing-imports]
+        additional_dependencies:
+          - types-redis
+          - pydantic
+          - pydantic-settings
+          - fastapi
+          - gymnasium
+          - numpy
+        # Exclude tests, scripts (non-production code)
+        exclude: ^(tests/|scripts/|\.venv/|run_game\.py|test_current_agent\.py)
+
+  # Secrets detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  # i18n completeness check (local script)
+  - repo: local
+    hooks:
+      - id: i18n-check
+        name: Check i18n translations are complete
+        entry: python scripts/check_i18n.py
+        language: python
+        files: frontend/src/i18n/.*\.json$
+        pass_filenames: false

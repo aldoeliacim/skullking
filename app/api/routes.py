@@ -163,7 +163,7 @@ async def spectate_game(
     current_round = game.get_current_round()
     trick = current_round.get_current_trick() if current_round else None
 
-    spectator_state = {
+    spectator_state: dict[str, Any] = {
         "id": game.id,
         "slug": game.slug,
         "state": game.state.value,

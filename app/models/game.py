@@ -2,6 +2,7 @@
 
 import random
 from dataclasses import dataclass, field
+from typing import Any
 
 from app.models.deck import Deck
 from app.models.enums import MAX_PLAYERS, MAX_ROUNDS, MIN_PLAYERS, GameState
@@ -128,7 +129,7 @@ class Game:
         """Check if all rounds are complete."""
         return self.current_round_number >= MAX_ROUNDS
 
-    def get_leaderboard(self) -> list[dict[str, any]]:
+    def get_leaderboard(self) -> list[dict[str, Any]]:
         """Get sorted leaderboard."""
         sorted_players = sorted(self.players, key=lambda p: p.score, reverse=True)
         return [

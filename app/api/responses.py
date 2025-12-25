@@ -7,6 +7,21 @@ from pydantic import BaseModel
 
 from app.models.enums import Command
 
+__all__ = [
+    "BidInfo",
+    "CardListResponse",
+    "Command",
+    "CreateGameRequest",
+    "CreateGameResponse",
+    "ErrorResponse",
+    "GameInfo",
+    "PlayerInfo",
+    "ScoreUpdate",
+    "ServerMessage",
+    "TableCard",
+    "TrickWinnerInfo",
+]
+
 
 class TableCard(BaseModel):
     """Card on the table with player info."""

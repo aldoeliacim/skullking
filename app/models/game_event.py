@@ -6,6 +6,7 @@ Captures all significant game events for later replay.
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 
 def _utc_now() -> datetime:
@@ -50,9 +51,9 @@ class GameEvent:
     round_number: int = 0
     trick_number: int | None = None
     player_id: str | None = None
-    data: dict = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage/transmission."""
         return {
             "game_id": self.game_id,
@@ -65,7 +66,7 @@ class GameEvent:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "GameEvent":
+    def from_dict(cls, data: dict[str, Any]) -> "GameEvent":
         """Create from dictionary."""
         return cls(
             game_id=data["game_id"],
@@ -87,13 +88,13 @@ class GameHistory:
     created_at: datetime
     ended_at: datetime
     duration_seconds: int
-    players: list[dict]  # Player info with final scores
+    players: list[dict[str, Any]]  # Player info with final scores
     winner_id: str
     winner_username: str
     total_rounds: int
     events: list[GameEvent] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "game_id": self.game_id,
@@ -109,7 +110,7 @@ class GameHistory:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "GameHistory":
+    def from_dict(cls, data: dict[str, Any]) -> "GameHistory":
         """Create from dictionary."""
         return cls(
             game_id=data["game_id"],
@@ -124,7 +125,7 @@ class GameHistory:
             events=[GameEvent.from_dict(e) for e in data.get("events", [])],
         )
 
-    def get_summary(self) -> dict:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary without full events (for listing)."""
         return {
             "game_id": self.game_id,

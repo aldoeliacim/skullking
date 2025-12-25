@@ -68,6 +68,7 @@ ignore = [
 "scripts/**/*.py" = ["T201", "INP001", "PTH", "PLR", "BLE001", "E501", "NPY002", "S", "ARG", "N806", "FBT", "C901", "RUF059", "TD", "FIX", "PLC0415", "SIM102"]  # Scripts
 "run_game.py" = ["PTH", "S104", "S110", "BLE001"]  # Simple runner script
 "test_current_agent.py" = ["BLE001", "NPY002", "S101"]  # Test script
+"app/gym_env/**/*.py" = ["S101", "TC001"]  # Gym envs: assert for validation, imports needed at runtime
 
 [tool.ruff.format]
 quote-style = "double"

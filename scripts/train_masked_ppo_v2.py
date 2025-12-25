@@ -9,7 +9,6 @@
 """
 
 import argparse
-import copy
 import os
 import sys
 from collections import deque
@@ -160,7 +159,9 @@ class ProgressCallback(BaseCallback):
                 self.ratings.append(avg_reward)
 
                 if self.verbose:
-                    trend = "📈" if len(self.ratings) > 1 and avg_reward > self.ratings[-2] else "📉"
+                    trend = (
+                        "📈" if len(self.ratings) > 1 and avg_reward > self.ratings[-2] else "📉"
+                    )
                     print(f"\n{trend} Progress @ {self.num_timesteps:,} steps:")
                     print(f"   Win rate: {win_rate:.1f}%")
                     print(f"   Avg reward: {avg_reward:.1f}")
@@ -341,7 +342,7 @@ def train_v2(
             tensorboard_log=f"{save_dir}/tensorboard",
             device=device,
             policy_kwargs={
-                "net_arch": dict(pi=[512, 256, 256], vf=[512, 256, 256]),
+                "net_arch": {"pi": [512, 256, 256], "vf": [512, 256, 256]},
             },
         )
 
@@ -402,26 +403,14 @@ def train_v2(
 
 def main():
     parser = argparse.ArgumentParser(description="Train MaskablePPO V2")
-    parser.add_argument(
-        "command", choices=["train", "resume"], help="Train new or resume"
-    )
-    parser.add_argument(
-        "--timesteps", type=int, default=5_000_000, help="Main training steps"
-    )
-    parser.add_argument(
-        "--fine-tune", type=int, default=500_000, help="Fine-tuning steps"
-    )
+    parser.add_argument("command", choices=["train", "resume"], help="Train new or resume")
+    parser.add_argument("--timesteps", type=int, default=5_000_000, help="Main training steps")
+    parser.add_argument("--fine-tune", type=int, default=500_000, help="Fine-tuning steps")
     parser.add_argument("--envs", type=int, default=32, help="Parallel environments")
     parser.add_argument("--load", type=str, help="Path to load existing model")
-    parser.add_argument(
-        "--no-frame-stack", action="store_true", help="Disable frame stacking"
-    )
-    parser.add_argument(
-        "--no-self-play", action="store_true", help="Disable self-play"
-    )
-    parser.add_argument(
-        "--no-mixed", action="store_true", help="Disable mixed opponents"
-    )
+    parser.add_argument("--no-frame-stack", action="store_true", help="Disable frame stacking")
+    parser.add_argument("--no-self-play", action="store_true", help="Disable self-play")
+    parser.add_argument("--no-mixed", action="store_true", help="Disable mixed opponents")
 
     args = parser.parse_args()
 

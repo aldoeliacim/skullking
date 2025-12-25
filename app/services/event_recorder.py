@@ -4,7 +4,7 @@ Used for replay and game history features.
 """
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.models.game_event import GameEvent, GameEventType, GameHistory
 
@@ -52,7 +52,7 @@ class EventRecorder:
         round_number: int = 0,
         trick_number: int | None = None,
         player_id: str | None = None,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         """Record a single game event."""
         if game_id not in self._events:
@@ -112,7 +112,7 @@ class EventRecorder:
         trick = current_round.get_current_trick()
         trick_num = trick.number if trick else 0
 
-        data = {"card_id": card_id}
+        data: dict[str, Any] = {"card_id": card_id}
         if tigress_choice:
             data["tigress_choice"] = tigress_choice
 
@@ -145,7 +145,7 @@ class EventRecorder:
             data={"winning_card_id": winning_card_id, "bonus_points": bonus_points},
         )
 
-    def record_round_end(self, game: "Game", scores: list[dict]) -> None:
+    def record_round_end(self, game: "Game", scores: list[dict[str, Any]]) -> None:
         """Record round completion with scores."""
         current_round = game.get_current_round()
         round_num = current_round.number if current_round else 0
@@ -157,7 +157,7 @@ class EventRecorder:
             data={"scores": scores},
         )
 
-    def record_scores(self, game: "Game", scores: list[dict]) -> None:
+    def record_scores(self, game: "Game", scores: list[dict[str, Any]]) -> None:
         """Record score announcement."""
         current_round = game.get_current_round()
         round_num = current_round.number if current_round else 0
@@ -188,7 +188,9 @@ class EventRecorder:
             for p in sorted(game.players, key=lambda x: x.score, reverse=True)
         ]
 
-        winner = players_final[0] if players_final else {"id": "", "username": "Unknown"}
+        winner: dict[str, Any] = (
+            players_final[0] if players_final else {"id": "", "username": "Unknown"}
+        )
 
         self.record_event(
             game_id=game_id,
@@ -213,8 +215,8 @@ class EventRecorder:
             ended_at=end_time,
             duration_seconds=duration,
             players=players_final,
-            winner_id=winner["id"],
-            winner_username=winner["username"],
+            winner_id=str(winner["id"]),
+            winner_username=str(winner["username"]),
             total_rounds=len(game.rounds),
             events=self._events[game_id],
         )
@@ -235,7 +237,7 @@ class EventRecorder:
         """Get all completed game histories."""
         return list(self._histories.values())
 
-    def get_recent_histories(self, limit: int = 10) -> list[dict]:
+    def get_recent_histories(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent game summaries."""
         histories = sorted(self._histories.values(), key=lambda h: h.ended_at, reverse=True)[:limit]
         return [h.get_summary() for h in histories]

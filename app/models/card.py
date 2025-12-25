@@ -349,20 +349,25 @@ def _update_trick_state(
         state.mermaid_lead = card
 
 
-def _resolve_beast_effect(state: _TrickState) -> CardId | None | bool:
-    """Apply beast effects. Return CardId/None for result, or False to continue."""
+def _resolve_beast_effect(state: _TrickState) -> tuple[bool, CardId | None]:
+    """Apply beast effects.
+
+    Returns:
+        (has_effect, winner_id) - If has_effect is False, continue normal resolution.
+        If has_effect is True, winner_id is the result (None means Kraken/no winner).
+    """
     if state.last_beast is None:
-        return False  # No beast, continue normal resolution
+        return (False, None)  # No beast, continue normal resolution
 
     if state.last_beast.is_whale():
         # White Whale: Highest suit card wins
-        return state.suit_lead.id if state.suit_lead else None
+        return (True, state.suit_lead.id if state.suit_lead else None)
 
     if state.last_beast.is_kraken():
         # Kraken: No one wins
-        return None
+        return (True, None)
 
-    return False
+    return (False, None)
 
 
 def _process_card_for_lead(
@@ -420,9 +425,9 @@ def determine_winner(
         _process_card_for_lead(state, card, card_id, tigress_choices)
 
     # Apply beast effects (Kraken/Whale override normal winner)
-    beast_result = _resolve_beast_effect(state)
-    if beast_result is not False:
-        return beast_result
+    has_beast_effect, beast_winner = _resolve_beast_effect(state)
+    if has_beast_effect:
+        return beast_winner
 
     # Three-way rule: Mermaid + Pirate + King = Mermaid wins
     if state.mermaid_lead and state.has_pirate and state.has_king:

@@ -91,7 +91,7 @@ class SelfPlayBot(BaseBot):
             expected_tricks += rng.uniform(-0.2, 0.2)
 
         bid = round(expected_tricks)
-        return max(0, min(round_number, bid))
+        return int(max(0, min(round_number, bid)))
 
     def pick_card(
         self,
@@ -139,7 +139,7 @@ class SelfPlayBot(BaseBot):
 
         # Add some randomness for variety
         if not self.deterministic:
-            offset = rng.integers(-1, 2)
+            offset = int(rng.integers(-1, 2))
             middle_index = max(0, min(len(strengths) - 1, middle_index + offset))
 
         return strengths[middle_index][0]

@@ -14,9 +14,10 @@ class RandomBot(BaseBot):
     and provides a simple opponent for testing.
     """
 
-    def __init__(self, player_id: str, _difficulty: BotDifficulty = BotDifficulty.RANDOM) -> None:
+    def __init__(self, player_id: str, difficulty: BotDifficulty = BotDifficulty.RANDOM) -> None:
         """Initialize random bot."""
         # Random bot ignores difficulty but accepts it for API compatibility
+        del difficulty  # Unused, but kept for API compatibility
         super().__init__(player_id, BotDifficulty.RANDOM)
 
     def make_bid(self, _game: Game, round_number: int, _hand: list[CardId]) -> int:
