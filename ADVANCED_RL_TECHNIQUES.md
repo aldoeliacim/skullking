@@ -35,9 +35,10 @@ Episode (1 full game ≈ 55 steps):
 
 **Note:** In a 4-player game, the agent plays approximately 1/4 of the tricks, so ~55/4 ≈ 14 trick actions plus 10 bids ≈ 24 actions per episode. However, the environment steps through all players, so from the environment's perspective it's ~55 steps.
 
-### 1.2 Current Observation Space (171 dimensions)
+### 1.2 Current Observation Space (V6: 190 dimensions)
 
 ```python
+# V5 observations (182 dims)
 observation = [
     game_phase,           # 4 dims (one-hot: PENDING/BIDDING/PICKING/ENDED)
     hand_encoding,        # 90 dims (10 cards × 9 features)
@@ -52,8 +53,25 @@ observation = [
     bid_pressure,         # 1 dim
     position_advantage,   # 1 dim
     trump_strength,       # 2 dims
+    round_onehot,         # 10 dims (V5: explicit round encoding)
+    bid_goal,             # 1 dim (V5: target during card play)
+]
+
+# V6 additions (+8 dims for loot alliances)
+observation += [
+    has_loot_card,        # 1 dim (binary: agent has loot in hand)
+    loot_card_count,      # 1 dim (normalized: 0, 0.5, or 1.0)
+    alliance_status,      # 4 dims (one-hot: allied with player 0/1/2/3)
+    ally_bid_accuracy,    # 1 dim ((ally_tricks - ally_bid) / round_num)
+    alliance_potential,   # 1 dim (expected bonus: 0 or 0.2)
 ]
 ```
+
+**V6 Alliance Observations Rationale:**
+- `has_loot_card`: Quick check if loot strategy is available
+- `alliance_status`: Who the agent is allied with (from previous loot plays)
+- `ally_bid_accuracy`: How likely ally is to make their bid (affects +20 bonus)
+- `alliance_potential`: Estimated value of alliance this round
 
 ### 1.3 Current Action Space
 
@@ -2299,46 +2317,80 @@ class TheoryOfMind(nn.Module):
 
 ## 10. Implementation Roadmap
 
-### 10.1 Priority Order
+### 10.1 Implementation Status
+
+| Technique | Status | Version | Notes |
+|-----------|--------|---------|-------|
+| Round one-hot encoding | ✅ Done | V5 | +10 dims for explicit round |
+| Bid goal observation | ✅ Done | V5 | Helps card-play credit assignment |
+| Mixed opponent evaluation | ✅ Done | V5 | 21 eps across 3 opponent types |
+| Self-play training | ✅ Done | V5 | Activates at 2M steps |
+| **Loot alliance obs** | 🔄 V6 | V6 | +8 dims for alliance mechanics |
+| Hierarchical RL | ❌ Planned | Future | Manager/Worker policies |
+| Transformer Architecture | ❌ Planned | Future | Attention over cards |
+
+### 10.2 Priority Order (Updated)
 
 Based on expected impact vs implementation complexity:
 
 | Priority | Technique | Impact | Complexity | Time Est. |
 |----------|-----------|--------|------------|-----------|
-| 1 | **Hierarchical RL** | High | Medium | 1-2 days |
-| 2 | **Transformer Architecture** | High | Medium | 1-2 days |
-| 3 | **Round-as-Episode** | Medium | Low | 0.5 day |
-| 4 | **Intrinsic Motivation** | Medium | Low | 0.5 day |
-| 5 | **Population Training** | High | High | 2-3 days |
-| 6 | **MCTS + RL** | Very High | High | 3-5 days |
-| 7 | **Deep CFR** | High | Very High | 5-7 days |
-| 8 | **Opponent Modeling** | Medium | Medium | 1-2 days |
+| **1** | **Loot Alliance Observations** | Medium | Low | 0.5 day |
+| 2 | **Hierarchical RL** | High | Medium | 1-2 days |
+| 3 | **Transformer Architecture** | High | Medium | 1-2 days |
+| 4 | **Round-as-Episode** | Medium | Low | 0.5 day |
+| 5 | **Intrinsic Motivation** | Medium | Low | 0.5 day |
+| 6 | **Population Training** | High | High | 2-3 days |
+| 7 | **MCTS + RL** | Very High | High | 3-5 days |
+| 8 | **Deep CFR** | High | Very High | 5-7 days |
+| 9 | **Opponent Modeling** | Medium | Medium | 1-2 days |
 
-### 10.2 Recommended Implementation Order
+### 10.3 V6 Implementation Plan
 
 ```text
-Phase 1: Quick Wins (1-2 days)
-├── Add round number to observations
-├── Implement round-as-episode option
-├── Add RND curiosity bonus
-└── Measure baseline improvements
+V6: Loot Alliance Awareness (0.5-1 day)
+├── Add alliance tracking to gym environment
+│   ├── _encode_loot_status() - has loot, count
+│   ├── _encode_alliance_state() - who allied with
+│   └── _encode_alliance_potential() - expected bonus
+├── Update observation space: 182 → 190 dims
+├── Add alliance-aware reward shaping
+│   └── +0.5 on alliance formation
+├── Train 10M steps with new observations
+└── Evaluate alliance utilization
+```
 
-Phase 2: Hierarchical (2-3 days)
+### 10.4 Future Phases
+
+```text
+Phase 1: Quick Wins [DONE in V5]
+├── ✅ Add round number to observations (V5)
+├── ❌ Implement round-as-episode option (deferred)
+├── ❌ Add RND curiosity bonus (deferred)
+└── ✅ Mixed opponent evaluation (V5)
+
+Phase 2: V6 Alliance Awareness [NEXT]
+├── Add loot card detection
+├── Track active alliances
+├── Alliance bonus prediction
+└── Train and evaluate
+
+Phase 3: Hierarchical (Future)
 ├── Implement ManagerEnv and WorkerEnv
 ├── Train policies separately
 ├── Joint fine-tuning
 └── Compare to baseline
 
-Phase 3: Architecture Upgrade (2-3 days)
+Phase 4: Architecture Upgrade (Future)
 ├── Implement CardTransformer
 ├── Integrate with MaskablePPO
 ├── Train and compare
 └── Attention visualization
 
-Phase 4: Advanced Training (1 week)
+Phase 5: Advanced Training (Future)
 ├── Population-based training
 ├── League matchmaking
-├── Self-play with past checkpoints
+├── Extended self-play
 └── Final evaluation
 ```
 

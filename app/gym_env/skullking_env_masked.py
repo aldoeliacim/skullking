@@ -158,7 +158,13 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         # V5 QUICK WINS (+11 dims):
         # - Round one-hot (10): explicit round representation for round-specific learning
         # - Bid goal (1): explicit target during card play (helps credit assignment)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(182,), dtype=np.float32)
+        # V6 LOOT ALLIANCE (+8 dims):
+        # - Has loot card (1): binary indicator
+        # - Loot card count (1): normalized 0-1
+        # - Alliance status (4): one-hot for allied player index
+        # - Ally bid accuracy (1): how well ally is doing on their bid
+        # - Alliance potential (1): expected bonus value
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(190,), dtype=np.float32)
 
         # Action space: 0-10 (bids or card indices)
         self.max_action_size = 11
@@ -866,9 +872,9 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         return self.CARD_STRENGTH_DEFAULT
 
     def _get_observation(self) -> np.ndarray:
-        """COMPACT OBSERVATIONS: 182 dims (V5 enhanced)."""
+        """COMPACT OBSERVATIONS: 190 dims (V6 with alliance awareness)."""
         if self.game is None:
-            return np.zeros((182,), dtype=np.float32)
+            return np.zeros((190,), dtype=np.float32)
 
         obs = []
         agent_player = self.game.get_player(self.agent_player_id)
@@ -904,6 +910,9 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         # 14-15. V5 QUICK WINS (+11 dims)
         obs.extend(self._encode_round_onehot(current_round))
         obs.append(self._encode_bid_goal(agent_player))
+
+        # 16. V6 LOOT ALLIANCE (+8 dims)
+        obs.extend(self._encode_loot_alliance_state(agent_player, current_round))
 
         return np.array(obs, dtype=np.float32)
 
@@ -1033,6 +1042,100 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         if agent_player and agent_player.bid is not None:
             return agent_player.bid / 10.0  # Normalized to [0, 1]
         return 0.0
+
+    def _encode_loot_alliance_state(
+        self, agent_player: Player | None, current_round: Round | None
+    ) -> list[float]:
+        """Encode loot card and alliance information (8 dims).
+
+        V6 Enhancement: Allow agent to understand loot alliance mechanics.
+        When a player plays a loot card, they form an alliance with the trick
+        winner. If both make their bids at round end, each gets +20 bonus.
+
+        Returns:
+            8 floats:
+            - has_loot (1): 1.0 if agent has loot in hand, else 0.0
+            - loot_count (1): normalized count (0, 0.5, or 1.0)
+            - alliance_status (4): one-hot for which player we're allied with
+            - ally_bid_accuracy (1): how well ally is tracking their bid
+            - alliance_potential (1): expected bonus value (0 or 0.2)
+        """
+        obs = []
+
+        # Check if agent has loot cards in hand
+        loot_card_ids = {CardId.LOOT1, CardId.LOOT2}
+        loot_count = 0
+        if agent_player:
+            loot_count = sum(1 for card_id in agent_player.hand if card_id in loot_card_ids)
+
+        # Has loot (1 dim)
+        obs.append(1.0 if loot_count > 0 else 0.0)
+
+        # Loot count normalized (1 dim): 0, 0.5, or 1.0
+        obs.append(loot_count / 2.0)
+
+        # Alliance status (4 dims): one-hot for allied player index
+        alliance_onehot = [0.0, 0.0, 0.0, 0.0]
+        ally_player = None
+
+        if current_round and current_round.loot_alliances and self.game:
+            # Check if agent is in any alliance (as loot player or ally)
+            for loot_player_id, ally_player_id in current_round.loot_alliances.items():
+                if loot_player_id == self.agent_player_id:
+                    # Agent played loot, find ally's index
+                    ally_player = self.game.get_player(ally_player_id)
+                    if ally_player:
+                        ally_idx = self.game.players.index(ally_player)
+                        if 0 <= ally_idx < 4:
+                            alliance_onehot[ally_idx] = 1.0
+                    break
+                elif ally_player_id == self.agent_player_id:
+                    # Agent is the ally (won trick with loot)
+                    loot_player = self.game.get_player(loot_player_id)
+                    if loot_player:
+                        ally_player = loot_player
+                        ally_idx = self.game.players.index(loot_player)
+                        if 0 <= ally_idx < 4:
+                            alliance_onehot[ally_idx] = 1.0
+                    break
+
+        obs.extend(alliance_onehot)
+
+        # Ally bid accuracy (1 dim): how well ally is doing
+        ally_accuracy = 0.0
+        if ally_player and current_round and ally_player.bid is not None:
+            tricks_won = current_round.get_tricks_won(ally_player.id)
+            bid = ally_player.bid
+            # Positive if ahead, negative if behind
+            if current_round.number > 0:
+                ally_accuracy = (tricks_won - bid) / current_round.number
+                ally_accuracy = max(-1.0, min(1.0, ally_accuracy))  # Clamp to [-1, 1]
+        obs.append(ally_accuracy)
+
+        # Alliance potential (1 dim): expected bonus value
+        # High if we have alliance and ally is on track for their bid
+        alliance_potential = 0.0
+        if ally_player and ally_player.bid is not None and agent_player:
+            # Check if ally is likely to make their bid
+            if current_round:
+                ally_tricks_won = current_round.get_tricks_won(ally_player.id)
+                tricks_remaining = current_round.number - len(current_round.tricks)
+                ally_needed = ally_player.bid - ally_tricks_won
+
+                # Ally on track if needed <= remaining
+                ally_on_track = ally_needed <= tricks_remaining and ally_needed >= 0
+
+                # Agent on track
+                agent_tricks_won = current_round.get_tricks_won(self.agent_player_id)
+                agent_needed = (agent_player.bid or 0) - agent_tricks_won
+                agent_on_track = agent_needed <= tricks_remaining and agent_needed >= 0
+
+                if ally_on_track and agent_on_track:
+                    alliance_potential = 0.2  # Represents +20 bonus normalized
+
+        obs.append(alliance_potential)
+
+        return obs
 
     def _encode_card_compact(self, card: Card) -> list[float]:
         """Encode card with 9 features. Handles all 74 cards including expansion."""

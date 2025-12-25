@@ -6,15 +6,67 @@ Training history and results for the MaskablePPO agent.
 
 ---
 
-## V5 (December 25, 2024) - In Progress
+## V6 (Planned) - Loot Alliances & Enhanced Observations
 
-**Status:** Training (10M timesteps)
+**Status:** Planned
+
+### Motivation
+
+V5 model doesn't understand loot alliance mechanics (new feature: +20 bonus when both allied players make their bids). Need to add alliance observations so the agent can:
+1. Recognize when it holds loot cards
+2. Track active alliances
+3. Consider alliance bonus in bidding strategy
+
+### Changes from V5
+
+**Observation Space: 182 → 190 dims (+8 dims)**
+
+| New Observation | Dims | Description |
+|-----------------|------|-------------|
+| Has loot card | 1 | Binary: agent has loot in hand |
+| Loot card count | 1 | Number of loot cards in hand (0-2) |
+| Alliance status | 4 | One-hot: allied with player 0/1/2/3 |
+| Ally bid accuracy | 1 | Ally's (tricks_won - bid) / round_num |
+| Alliance potential | 1 | Expected alliance bonus (0 or 0.2) |
+
+**Training Enhancements:**
+
+1. Alliance-aware reward shaping:
+   - +0.5 bonus when forming alliance via loot card
+   - Alliance bonus properly attributed at round end
+
+2. Extended self-play: activate at 1M steps (earlier than V5)
+
+3. Curriculum includes alliance scenarios
+
+### Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Timesteps | 10,000,000 |
+| Observation dims | 190 |
+| Parallel envs | 32 |
+| Learning rate | 3e-4 |
+| Network | [256, 256] |
+
+### Expected Improvements
+
+- Model understands loot card strategic value
+- Better bidding when holding loot (adjust for potential +20)
+- Learns to play loot with likely winners
+
+---
+
+## V5 (December 25, 2024) - Completed
+
+**Status:** Completed ✅
 
 ### Changes from V4
 
 - Extended training: 5M → 10M timesteps
 - Mixed opponent evaluation: 21 episodes across easy/medium/hard
 - Self-play callback: activates at 2M steps, updates every 200k
+- Observation space: 171 → 182 dims (round one-hot, bid goal)
 - Action mask verification logging
 
 ### Configuration
@@ -22,6 +74,8 @@ Training history and results for the MaskablePPO agent.
 | Parameter | Value |
 |-----------|-------|
 | Timesteps | 10,000,000 |
+| Training time | 2h 24m |
+| Throughput | ~1,155 fps |
 | Parallel envs | 32 |
 | Learning rate | 3e-4 |
 | Batch size | 1024 |
@@ -29,7 +83,41 @@ Training history and results for the MaskablePPO agent.
 
 ### Results
 
-*Training in progress...*
+| Metric | Value |
+|--------|-------|
+| Final reward (mean) | 79.9 - 81.8 |
+| Explained variance | 0.902 - 0.904 |
+| Value loss | 22.6 - 23.3 |
+| Entropy loss | -0.316 to -0.32 |
+| Clip fraction | 0.089 - 0.091 |
+
+**Evaluation (21 episodes, mixed opponents):**
+
+| Phase | Avg Reward | Std Dev |
+|-------|------------|---------|
+| Pre-selfplay (9.9M) | 78-83 | ±8-12 |
+| Post-selfplay (10M+) | 77-85 | ±7-13 |
+
+### Analysis
+
+**Strengths:**
+- Excellent value learning (explained variance >0.9)
+- Stable training (low KL divergence ~0.011)
+- Consistent performance across opponent types
+
+**Observations:**
+- Self-play activated at 10M with 4.6M checkpoint
+- Reward variance ±8-13 is acceptable
+- No overfitting to specific opponent types
+
+**Limitations:**
+- No awareness of loot alliance mechanics
+- Cannot optimize for +20 alliance bonus
+
+### Model Files
+
+- `models/masked_ppo/masked_ppo_final.zip`
+- `models/masked_ppo/best_model/best_model.zip`
 
 ---
 
