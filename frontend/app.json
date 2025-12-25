@@ -26,8 +26,16 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single",
-      "favicon": "./assets/favicon.png"
+      "output": "static",
+      "favicon": "./assets/favicon.png",
+      "name": "Skull King",
+      "shortName": "SkullKing",
+      "description": "Skull King card game - play with friends online",
+      "themeColor": "#1a1a2e",
+      "backgroundColor": "#1a1a2e",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/"
     },
     "plugins": ["expo-router", "expo-font"],
     "experiments": {
