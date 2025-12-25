@@ -54,8 +54,6 @@ export interface GameState {
   hand: Card[];
   trickCards: TrickCard[];
   pickingPlayerId: string | null;
-  bids: Record<string, number>;
-  leadSuit: string | null;
 
   // UI state
   showBidding: boolean;
@@ -93,8 +91,6 @@ const initialState = {
   hand: [],
   trickCards: [],
   pickingPlayerId: null,
-  bids: {},
-  leadSuit: null,
   showBidding: false,
   showResults: false,
   showAbility: false,
@@ -102,6 +98,9 @@ const initialState = {
   trickWinner: null,
   logs: [],
 };
+
+// Module-level storage for cleanup function (avoids hacky state mutation)
+let cleanupFn: (() => void) | null = null;
 
 export const useGameStore = create<GameState>((set, get) => ({
   ...initialState,
@@ -138,19 +137,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Connect
     websocket.connect(gameId, playerId, isSpectator, playerName);
 
-    // Store unsubscribe functions for cleanup
-    // @ts-expect-error - storing for cleanup
-    get()._cleanup = () => {
+    // Store cleanup function at module level
+    cleanupFn = () => {
       unsubscribeConnection();
       unsubscribeMessage();
     };
   },
 
   disconnect: () => {
-    // @ts-expect-error - cleanup function
-    const cleanup = get()._cleanup;
-    if (cleanup) {
-      cleanup();
+    if (cleanupFn) {
+      cleanupFn();
+      cleanupFn = null;
     }
     websocket.disconnect();
     set(initialState);
@@ -239,7 +236,7 @@ function handleMessage(
     }
 
     case 'INIT': {
-      // Initial game state on connect
+      // Initial game state on connect - use all data from backend
       const game = content.game as {
         id: string;
         slug: string;
@@ -251,6 +248,8 @@ function handleMessage(
           index: number;
           is_bot: boolean;
           is_connected: boolean;
+          bid?: number | null;
+          tricks_won?: number;
         }>;
       };
       if (game) {
@@ -259,8 +258,8 @@ function handleMessage(
           username: p.username,
           is_bot: p.is_bot,
           score: p.score,
-          bid: null,
-          tricks_won: 0,
+          bid: p.bid ?? null,
+          tricks_won: p.tricks_won ?? 0,
         }));
         set({ players });
       }
@@ -268,7 +267,7 @@ function handleMessage(
     }
 
     case 'GAME_STATE': {
-      // Full game state update
+      // Full game state update - use all data from backend for reconnection support
       const stateContent = content as {
         id?: string;
         slug?: string;
@@ -280,6 +279,8 @@ function handleMessage(
           index: number;
           is_bot: boolean;
           is_connected: boolean;
+          bid?: number | null;
+          tricks_won?: number;
         }>;
       };
       if (stateContent.players) {
@@ -288,8 +289,8 @@ function handleMessage(
           username: p.username,
           is_bot: p.is_bot,
           score: p.score,
-          bid: null,
-          tricks_won: 0,
+          bid: p.bid ?? null,
+          tricks_won: p.tricks_won ?? 0,
         }));
         set({ players });
       }
@@ -313,7 +314,6 @@ function handleMessage(
         currentRound: content.round as number,
         currentTrick: 0,
         trickCards: [],
-        bids: {},
         players: resetPlayers,
       });
       get().addLog(`Round ${content.round} - Cards dealt`);
@@ -332,24 +332,26 @@ function handleMessage(
     }
 
     case 'BADE': {
-      const bids = { ...get().bids, [content.player_id as string]: content.bid as number };
-      const players = get().players.map((p) =>
-        p.id === content.player_id ? { ...p, bid: content.bid as number } : p,
-      );
-      set({ bids, players });
+      // Update player's bid (no separate bids object needed - player.bid is the source of truth)
+      const playerId = content.player_id as string;
+      const bidValue = content.bid as number;
+      const players = get().players.map((p) => (p.id === playerId ? { ...p, bid: bidValue } : p));
+      set({ players });
 
-      const player = get().players.find((p) => p.id === content.player_id);
-      get().addLog(`${player?.username || 'Player'} bid ${content.bid}`);
+      const player = players.find((p) => p.id === playerId);
+      get().addLog(`${player?.username || 'Player'} bid ${bidValue}`);
       break;
     }
 
     case 'END_BIDDING': {
+      // Ensure all player bids are synced from backend (in case any were missed)
       const bidsArray = content.bids as Array<{ player_id: string; bid: number }>;
-      const bids: Record<string, number> = {};
-      bidsArray.forEach((b) => {
-        bids[b.player_id] = b.bid;
+      const currentPlayers = get().players;
+      const players = currentPlayers.map((p) => {
+        const bidInfo = bidsArray.find((b) => b.player_id === p.id);
+        return bidInfo ? { ...p, bid: bidInfo.bid } : p;
       });
-      set({ bids, phase: 'PICKING', showBidding: false });
+      set({ players, phase: 'PICKING', showBidding: false });
       get().addLog('All bids placed - playing begins');
       break;
     }
@@ -362,7 +364,6 @@ function handleMessage(
         phase: 'PICKING',
         pickingPlayerId: content.picking_player_id as string,
         currentTrick: content.trick as number,
-        leadSuit: (content.lead_suit as string) || null,
         trickCards: [],
         trickWinner: null,
       });
@@ -381,14 +382,11 @@ function handleMessage(
       // Get current state BEFORE updating
       const currentTrickCards = get().trickCards;
       const currentHand = get().hand;
-      const isFirstCard = currentTrickCards.length === 0;
 
       // Single atomic update for all state changes
       set({
         trickCards: [...currentTrickCards, trickCard],
         hand: currentHand.filter((c) => c.id !== cardIdStr),
-        // Update lead suit only if first card in trick
-        ...(isFirstCard && content.lead_suit ? { leadSuit: content.lead_suit as string } : {}),
       });
       break;
     }

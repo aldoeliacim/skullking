@@ -46,7 +46,6 @@ export default function GameScreen(): React.JSX.Element {
     hand,
     trickCards,
     pickingPlayerId,
-    bids: _bids,
     showBidding,
     showAbility,
     abilityData,

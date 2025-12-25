@@ -143,7 +143,9 @@ export function validateGameState(state: GameState, messageType: string): Valida
  * Log validation errors to console in development mode.
  */
 export function logValidationErrors(errors: ValidationError[]): void {
-  if (errors.length === 0) return;
+  if (errors.length === 0) {
+    return;
+  }
 
   console.group(`[StateValidator] ${errors.length} invariant violation(s) detected`);
   errors.forEach((error) => {
