@@ -1,0 +1,179 @@
+{
+  "app": {
+    "title": "Skull King",
+    "name": "Skull King",
+    "subtitle": "Un juego de bazas pirata"
+  },
+  "login": {
+    "yourName": "Tu Nombre",
+    "enterName": "Capitan...",
+    "createGame": "Crear Partida",
+    "or": "o unirse a una existente",
+    "gameCode": "Codigo de Partida",
+    "enterGameId": "Ingresa el codigo...",
+    "joinGame": "Unirse",
+    "spectateGame": "Ver Partida",
+    "browseGames": "Buscar Partidas Activas",
+    "viewHistory": "Historial",
+    "errorEnterName": "Por favor ingresa tu nombre",
+    "errorEnterGameId": "Por favor ingresa un codigo",
+    "errorCreateFailed": "Error al crear partida",
+    "errorConnection": "Error de conexion"
+  },
+  "history": {
+    "title": "Historial de Partidas",
+    "loading": "Cargando...",
+    "noGames": "No hay partidas completadas aun",
+    "error": "Error al cargar historial"
+  },
+  "browse": {
+    "title": "Partidas Activas",
+    "loading": "Cargando...",
+    "noGames": "No hay partidas activas ahora",
+    "error": "Error al cargar partidas",
+    "refresh": "Actualizar",
+    "watch": "Ver",
+    "statePending": "En Sala",
+    "stateBidding": "Apostando",
+    "statePlaying": "Jugando"
+  },
+  "lobby": {
+    "title": "Sala de Espera",
+    "shareCode": "Comparte este codigo:",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "players": "Jugadores",
+    "you": "Tu",
+    "bot": "Bot",
+    "host": "Host",
+    "gameSettings": "Configuracion",
+    "addOpponents": "Agregar Oponentes",
+    "botType": "Tipo de Bot",
+    "botRL": "IA (Red Neuronal)",
+    "botRuleBased": "Basado en Reglas",
+    "botRandom": "Aleatorio",
+    "difficulty": "Dificultad",
+    "easy": "Facil",
+    "medium": "Medio",
+    "hard": "Dificil",
+    "addBot": "Agregar Bot",
+    "quickSetup": "Config. Rapida",
+    "fillWithBots": "Llenar con Bots IA",
+    "clearBots": "Quitar Todos los Bots",
+    "leave": "Salir",
+    "startGame": "Iniciar Partida",
+    "needPlayers": "Se necesitan al menos 2 jugadores",
+    "waitingForHost": "Esperando al host...",
+    "errorConnectionLost": "Conexion perdida",
+    "errorOccurred": "Ocurrio un error"
+  },
+  "game": {
+    "round": "Ronda",
+    "waiting": "Esperando...",
+    "yourScore": "Tu Puntaje:",
+    "currentTrick": "Baza Actual",
+    "yourHand": "Tu Mano",
+    "makeYourBid": "Haz tu Apuesta",
+    "bidQuestion": "Cuantas bazas ganaras?",
+    "gameLog": "Registro",
+    "biddingPhase": "Fase de Apuestas",
+    "playingTricks": "Jugando Bazas",
+    "gameOver": "Fin del Juego",
+    "inProgress": "En Progreso",
+    "score": "Puntos",
+    "bid": "Apuesta",
+    "tricks": "Bazas",
+    "card": "carta",
+    "cards": "cartas",
+    "wonTrick": "gano la baza!",
+    "cardsVisibleBelow": "Tus cartas estan visibles abajo",
+    "yourBid": "Tu Apuesta:",
+    "tricksWon": "Bazas Ganadas:",
+    "yourTurn": "Tu Turno!",
+    "tigressChoice": "Tigresa",
+    "tigressQuestion": "Jugar como Pirata o Huida?",
+    "tigressPirate": "Pirata",
+    "tigressPirateDesc": "Ganar bazas, vence palos",
+    "tigressEscape": "Huida",
+    "tigressEscapeDesc": "Perder a proposito",
+    "continue": "Continuar",
+    "waitingForPlayers": "Esperando jugadores...",
+    "ready": "listo",
+    "scoreboard": "Marcador",
+    "rules": "Reglas"
+  },
+  "results": {
+    "title": "Fin del Juego!",
+    "finalScores": "Puntuacion Final",
+    "rank": "#",
+    "player": "Jugador",
+    "score": "Puntos",
+    "playAgain": "Jugar de Nuevo",
+    "youWon": "Ganaste!",
+    "wins": "Gana!"
+  },
+  "log": {
+    "playerJoined": "{username} se unio a la partida",
+    "playerLeft": "{username} abandono la partida",
+    "spectatorJoined": "{username} esta observando ({count} espectadores)",
+    "spectatorLeft": "Un espectador se fue ({count} espectadores)",
+    "gameStarted": "Partida iniciada con {count} jugadores",
+    "cardsDealt": "Ronda {round} - Cartas repartidas",
+    "playerBid": "{player} aposto {bid}",
+    "biddingComplete": "Todas las apuestas hechas - comienza el juego",
+    "trickWon": "{winner} gano la baza",
+    "roundComplete": "Ronda {round} completa",
+    "gameWon": "{winner} gano el juego!",
+    "abilityResolved": "Habilidad {ability} resuelta",
+    "abilityTriggered": "Se activo la habilidad de {pirate}!",
+    "playerReady": "{player} esta listo para continuar"
+  },
+  "ability": {
+    "rosie": {
+      "name": "Rosie",
+      "description": "Elige quien empezara la siguiente baza:"
+    },
+    "bendt": {
+      "name": "Bendt el Bandido",
+      "description": "Robaste 2 cartas. Selecciona 2 cartas para descartar:",
+      "drawnCards": "Cartas robadas:",
+      "yourHand": "Tu mano:",
+      "confirmDiscard": "Confirmar Descarte"
+    },
+    "roatan": {
+      "name": "Roatan",
+      "description": "Elige tu apuesta extra:",
+      "noBet": "Sin Apuesta",
+      "hint": "Si ganas esta baza y cumples tu apuesta, obtienes el bono. De lo contrario, pierdes los puntos!"
+    },
+    "jade": {
+      "name": "Jade",
+      "description": "Estas cartas no fueron repartidas esta ronda:",
+      "gotIt": "Entendido!"
+    },
+    "harry": {
+      "name": "Harry el Gigante",
+      "description": "Ajusta tu apuesta en +1 o -1:",
+      "noChange": "Sin cambio"
+    }
+  },
+  "scoreboard": {
+    "title": "Marcador",
+    "player": "Jugador",
+    "score": "Puntos",
+    "bid": "Apuesta",
+    "tricks": "Bazas"
+  },
+  "continue": {
+    "title": "Baza Completa",
+    "message": "Listo para continuar?",
+    "button": "Continuar",
+    "waiting": "Esperando a otros jugadores..."
+  },
+  "rules": {
+    "advancedTitle": "Reglas Avanzadas"
+  },
+  "modal": {
+    "tapToDismiss": "Toca fuera para cerrar"
+  }
+}

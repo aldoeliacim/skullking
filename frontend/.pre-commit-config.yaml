@@ -1,0 +1,43 @@
+repos:
+  - repo: local
+    hooks:
+      - id: oxlint
+        name: oxlint
+        entry: bun run lint:check
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+      - id: biome-format
+        name: biome format
+        entry: bun run format:check
+        language: system
+        files: \.(ts|tsx|json)$
+        pass_filenames: false
+
+      - id: typecheck
+        name: typescript check
+        entry: bun run typecheck
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+      - id: check-merge-conflict
+
+  - repo: https://github.com/renovatebot/pre-commit-hooks
+    rev: 39.78.1
+    hooks:
+      - id: renovate-config-validator
+        files: renovate\.json5?$
+
+default_install_hook_types: [pre-commit, pre-push]

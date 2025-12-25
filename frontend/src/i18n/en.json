@@ -1,0 +1,179 @@
+{
+  "app": {
+    "title": "Skull King",
+    "name": "Skull King",
+    "subtitle": "A trick-taking pirate card game"
+  },
+  "login": {
+    "yourName": "Your Name",
+    "enterName": "Captain...",
+    "createGame": "Create Game",
+    "or": "or join existing",
+    "gameCode": "Game Code",
+    "enterGameId": "Enter code...",
+    "joinGame": "Join Game",
+    "spectateGame": "Watch Game",
+    "browseGames": "Browse Active Games",
+    "viewHistory": "History",
+    "errorEnterName": "Please enter your name",
+    "errorEnterGameId": "Please enter a game code",
+    "errorCreateFailed": "Failed to create game",
+    "errorConnection": "Connection failed"
+  },
+  "history": {
+    "title": "Game History",
+    "loading": "Loading...",
+    "noGames": "No completed games yet",
+    "error": "Failed to load history"
+  },
+  "browse": {
+    "title": "Active Games",
+    "loading": "Loading...",
+    "noGames": "No active games right now",
+    "error": "Failed to load games",
+    "refresh": "Refresh",
+    "watch": "Watch",
+    "statePending": "In Lobby",
+    "stateBidding": "Bidding",
+    "statePlaying": "Playing"
+  },
+  "lobby": {
+    "title": "Game Lobby",
+    "shareCode": "Share this code:",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "players": "Players",
+    "you": "You",
+    "bot": "Bot",
+    "host": "Host",
+    "gameSettings": "Game Settings",
+    "addOpponents": "Add Opponents",
+    "botType": "Bot Type",
+    "botRL": "AI (Neural Network)",
+    "botRuleBased": "Rule-Based",
+    "botRandom": "Random",
+    "difficulty": "Difficulty",
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard",
+    "addBot": "Add Bot",
+    "quickSetup": "Quick Setup",
+    "fillWithBots": "Fill with AI Bots",
+    "clearBots": "Remove All Bots",
+    "leave": "Leave",
+    "startGame": "Start Game",
+    "needPlayers": "Need at least 2 players to start",
+    "waitingForHost": "Waiting for host...",
+    "errorConnectionLost": "Connection lost",
+    "errorOccurred": "An error occurred"
+  },
+  "game": {
+    "round": "Round",
+    "waiting": "Waiting...",
+    "yourScore": "Your Score:",
+    "currentTrick": "Current Trick",
+    "yourHand": "Your Hand",
+    "makeYourBid": "Make Your Bid",
+    "bidQuestion": "How many tricks will you win?",
+    "gameLog": "Game Log",
+    "biddingPhase": "Bidding Phase",
+    "playingTricks": "Playing Tricks",
+    "gameOver": "Game Over",
+    "inProgress": "In Progress",
+    "score": "Score",
+    "bid": "Bid",
+    "tricks": "Tricks",
+    "card": "card",
+    "cards": "cards",
+    "wonTrick": "won the trick!",
+    "cardsVisibleBelow": "Your cards are visible below",
+    "yourBid": "Your Bid:",
+    "tricksWon": "Tricks Won:",
+    "yourTurn": "Your Turn!",
+    "tigressChoice": "Scary Mary",
+    "tigressQuestion": "Play as Pirate or Escape?",
+    "tigressPirate": "Pirate",
+    "tigressPirateDesc": "Win tricks, beats suits",
+    "tigressEscape": "Escape",
+    "tigressEscapeDesc": "Lose on purpose",
+    "continue": "Continue",
+    "waitingForPlayers": "Waiting for players...",
+    "ready": "ready",
+    "scoreboard": "Scoreboard",
+    "rules": "Rules"
+  },
+  "results": {
+    "title": "Game Over!",
+    "finalScores": "Final Scores",
+    "rank": "#",
+    "player": "Player",
+    "score": "Score",
+    "playAgain": "Play Again",
+    "youWon": "You Won!",
+    "wins": "Wins!"
+  },
+  "log": {
+    "playerJoined": "{username} joined the game",
+    "playerLeft": "{username} left the game",
+    "spectatorJoined": "{username} is now watching ({count} spectators)",
+    "spectatorLeft": "A spectator left ({count} spectators)",
+    "gameStarted": "Game started with {count} players",
+    "cardsDealt": "Round {round} - Cards dealt",
+    "playerBid": "{player} bid {bid}",
+    "biddingComplete": "All bids placed - playing begins",
+    "trickWon": "{winner} won the trick",
+    "roundComplete": "Round {round} complete",
+    "gameWon": "{winner} won the game!",
+    "abilityResolved": "{ability} ability resolved",
+    "abilityTriggered": "{pirate}'s ability triggered!",
+    "playerReady": "{player} is ready to continue"
+  },
+  "ability": {
+    "rosie": {
+      "name": "Rosie",
+      "description": "Choose who will start the next trick:"
+    },
+    "bendt": {
+      "name": "Bendt the Bandit",
+      "description": "You drew 2 cards. Select 2 cards to discard:",
+      "drawnCards": "Drawn cards:",
+      "yourHand": "Your hand:",
+      "confirmDiscard": "Confirm Discard"
+    },
+    "roatan": {
+      "name": "Roatan",
+      "description": "Choose your extra bet amount:",
+      "noBet": "No Bet",
+      "hint": "If you win this trick and make your bid, you get the bonus. Otherwise, lose the points!"
+    },
+    "jade": {
+      "name": "Jade",
+      "description": "These cards were not dealt this round:",
+      "gotIt": "Got it!"
+    },
+    "harry": {
+      "name": "Harry the Giant",
+      "description": "Adjust your bid by +1 or -1:",
+      "noChange": "No change"
+    }
+  },
+  "scoreboard": {
+    "title": "Scoreboard",
+    "player": "Player",
+    "score": "Score",
+    "bid": "Bid",
+    "tricks": "Tricks"
+  },
+  "continue": {
+    "title": "Trick Complete",
+    "message": "Ready to continue?",
+    "button": "Continue",
+    "waiting": "Waiting for other players..."
+  },
+  "rules": {
+    "advancedTitle": "Advanced Rules"
+  },
+  "modal": {
+    "tapToDismiss": "Tap outside to close"
+  }
+}
