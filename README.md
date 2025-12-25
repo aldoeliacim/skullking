@@ -9,19 +9,22 @@ A modern Python implementation of the [Skull King](https://www.grandpabecksgames
 | Layer | Technology |
 |-------|------------|
 | **Backend** | Python 3.11+, FastAPI, WebSockets |
-| **Frontend** | Vanilla JS, CSS3, i18n |
-| **Database** | MongoDB (optional), Redis |
-| **AI/ML** | Gymnasium, Stable-Baselines3, sb3-contrib |
-| **DevOps** | Docker, Docker Compose, uv |
-| **Quality** | Ruff, Pre-commit, Pytest |
+| **Frontend** | React Native (Expo), TypeScript, Zustand |
+| **Database** | MongoDB, Redis (pub/sub) |
+| **AI/ML** | Gymnasium, Stable-Baselines3, MaskablePPO |
+| **DevOps** | Docker, Docker Compose, uv, Bun |
+| **Quality** | Ruff, Oxlint, Biome, Pytest, Pre-commit |
 
 ## Features
 
-- **Complete Rules**: All Skull King cards including pirates with abilities, Kraken, White Whale
-- **Multiplayer**: Real-time WebSocket gameplay for 2-8 players
-- **AI Bots**: RandomBot, RuleBasedBot, and trained RL agents
-- **Reinforcement Learning**: Gymnasium environment for training agents
+- **Complete Rules**: All 74 cards including Skull King, Pirates with abilities, Mermaids, Kraken, White Whale, Loot, and Escape cards
+- **Pirate Abilities**: Rosie (pick next leader), Bendt (draw 2/discard 2), Harry (adjust bid ±1), Jade (see undealt cards), Roatan (bonus bet)
+- **Loot Alliances**: Form alliances with trick winners for +20 bonus when both make their bids
+- **Multiplayer**: Real-time WebSocket gameplay for 2-8 players with spectator mode
+- **AI Bots**: Easy/Medium/Hard rule-based bots and trained neural network (MaskablePPO)
+- **Reinforcement Learning**: Gymnasium environment with action masking for training agents
 - **Internationalization**: English and Spanish support
+- **Cross-Platform**: Web, iOS, and Android via React Native (Expo)
 
 ## Quick Start
 
@@ -61,13 +64,15 @@ uv run pytest tests/ -v
 ### Card Hierarchy
 
 1. **Skull King** beats Pirates (+30 bonus each)
-2. **Pirates** beat Mermaids (+20 bonus)
-3. **Mermaids** beat Skull King (+40 bonus)
+2. **Pirates** (5 unique) beat Mermaids (+20 bonus)
+3. **Mermaids** (2) beat Skull King (+40 bonus)
 4. **Special**: Mermaid wins if Skull King + Pirate + Mermaid all present
 5. **Jolly Roger** (black trump) beats standard suits
 6. **Kraken**: No one wins the trick
-7. **White Whale**: Highest standard suit card wins
-8. **Escape**: Always loses
+7. **White Whale**: Highest standard suit card wins, destroys specials
+8. **Loot** (2): Acts as Escape, forms alliance with trick winner
+9. **Escape** (5): Always loses
+10. **Scary Mary**: Choose Pirate or Escape when played
 
 ### Scoring
 
@@ -78,19 +83,24 @@ uv run pytest tests/ -v
 | Zero | Correct | +10 x round number |
 | Zero | Wrong | -10 x round number |
 
+**Bonuses**: Skull King captures Pirate (+30), Pirate captures Mermaid (+20), Mermaid captures Skull King (+40), Loot alliance (+20 each if both make bids), 14 of trump suit (+10 per 14)
+
 ## Project Structure
 
 ```
 skullking/
 ├── app/
 │   ├── api/          # FastAPI routes, WebSocket, game handler
-│   ├── models/       # Game domain models
-│   ├── bots/         # AI bot implementations
-│   ├── gym_env/      # Gymnasium RL environment
-│   └── services/     # Business logic
-├── static/           # Frontend (JS, CSS, i18n)
-├── tests/            # Test suite
-└── scripts/          # Training and utility scripts
+│   ├── models/       # Game domain models (Card, Deck, Game, etc.)
+│   ├── bots/         # AI bots (RandomBot, RuleBasedBot, RLBot)
+│   ├── gym_env/      # Gymnasium RL environment with action masking
+│   ├── repositories/ # MongoDB data access layer
+│   └── services/     # Game serialization, persistence
+├── frontend/         # React Native (Expo) app - see frontend/README.md
+├── models/           # Trained RL model checkpoints
+├── scripts/          # Training and utility scripts
+├── static/           # Legacy web frontend (deprecated)
+└── tests/            # Pytest test suite (200+ tests)
 ```
 
 ## Training RL Agents

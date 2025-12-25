@@ -67,12 +67,16 @@ frontend/
 │   └── game/[id].tsx      # Game screen
 ├── src/
 │   ├── components/        # Reusable UI components
-│   │   ├── Button.tsx
-│   │   ├── Card.tsx
-│   │   ├── Hand.tsx
-│   │   ├── TrickArea.tsx
-│   │   ├── Scoreboard.tsx
-│   │   └── ...
+│   │   ├── AbilityModal.tsx    # Pirate ability resolution UI
+│   │   ├── BiddingModal.tsx    # Bid selection interface
+│   │   ├── Button.tsx          # Themed button component
+│   │   ├── Card.tsx            # Card display with animations
+│   │   ├── Hand.tsx            # Player hand with play validation
+│   │   ├── Input.tsx           # Themed text input
+│   │   ├── Scoreboard.tsx      # Live scores with alliance indicators
+│   │   ├── SettingsButton.tsx  # Language/sound settings
+│   │   ├── TigressModal.tsx    # Scary Mary choice dialog
+│   │   └── TrickArea.tsx       # Current trick display
 │   ├── hooks/             # Custom React hooks
 │   ├── i18n/              # Internationalization
 │   │   ├── en.json
@@ -98,9 +102,12 @@ frontend/
 
 - **Responsive Design**: Mobile-first with tablet/desktop support
 - **Animations**: Smooth card dealing, playing, and scoring animations
+- **Pirate Abilities**: Interactive modals for Rosie, Bendt, Harry, Jade, Roatan abilities
+- **Loot Alliances**: Visual indicators showing player alliances and bonus tracking
 - **Internationalization**: English and Spanish support
 - **Real-time Updates**: WebSocket connection with automatic reconnection
-- **Offline Handling**: Graceful handling of connection issues
+- **Spectator Mode**: Watch games in progress
+- **Bot Selection**: Choose AI difficulty (Easy/Medium/Hard/Neural Network)
 - **Sound Effects**: Optional audio feedback
 
 ## Configuration

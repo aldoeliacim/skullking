@@ -53,7 +53,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": ["oxlint --fix", "biome check --write"],
-    "*.{json,md}": ["biome format --write"]
+    "*.json": ["biome format --write"]
   },
   "private": true
 }
