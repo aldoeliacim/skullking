@@ -108,6 +108,7 @@ class AbilityState:
         harry_armed: Player IDs who won with Harry (activate at round end)
         roatan_bets: Extra bets from Roatán (player_id -> amount)
         rosie_next_starter: Override for who starts next trick
+        bendt_drawn_cards: Cards drawn via Bendt's ability (removed from deck pool)
 
     """
 
@@ -115,6 +116,7 @@ class AbilityState:
     harry_armed: dict[str, bool] = field(default_factory=dict)
     roatan_bets: dict[str, int] = field(default_factory=dict)
     rosie_next_starter: str | None = None
+    bendt_drawn_cards: set[CardId] = field(default_factory=set)
 
     def trigger_ability(
         self, player_id: str, card_id: CardId, trick_number: int

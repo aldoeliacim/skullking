@@ -856,12 +856,28 @@ class GameHandler:
             await self._process_bot_actions(game)
 
     def _draw_cards_from_deck(self, game: Game, count: int) -> list[CardId]:
-        """Draw cards from the deck (undealt cards)."""
+        """Draw cards from the deck (undealt cards).
+
+        Drawn cards are tracked in ability_state.bendt_drawn_cards to prevent
+        the same cards being drawn multiple times if Bendt wins multiple tricks.
+        """
+        current_round = game.get_current_round()
+        if not current_round:
+            return []
+
         undealt = self._get_undealt_cards(game)
-        return undealt[:count]
+        drawn = undealt[:count]
+
+        # Track drawn cards so they can't be drawn again
+        current_round.ability_state.bendt_drawn_cards.update(drawn)
+
+        return drawn
 
     def _get_undealt_cards(self, game: Game) -> list[CardId]:
-        """Get cards that weren't dealt this round."""
+        """Get cards that weren't dealt this round.
+
+        Excludes cards already drawn via Bendt's ability.
+        """
         current_round = game.get_current_round()
         if not current_round:
             return []
@@ -871,8 +887,15 @@ class GameHandler:
         for cards in current_round.dealt_cards.values():
             dealt.update(cards)
 
-        # Return cards not in dealt set
-        return [card_id for card_id in game.deck.cards if card_id not in dealt]
+        # Exclude cards drawn via Bendt
+        bendt_drawn = current_round.ability_state.bendt_drawn_cards
+
+        # Return cards not in dealt set and not drawn by Bendt
+        return [
+            card_id
+            for card_id in game.deck.cards
+            if card_id not in dealt and card_id not in bendt_drawn
+        ]
 
     async def _complete_round(self, game: Game, current_round: "Round") -> None:
         """Complete a round and calculate scores."""
@@ -902,9 +925,26 @@ class GameHandler:
                         modifier = 0
                     current_round.ability_state.resolve_harry(player_id, modifier)
             else:
-                # Send prompt to human player - for now auto-resolve with 0
-                # In a full implementation, we'd wait for player input
-                current_round.ability_state.resolve_harry(player_id, 0)
+                # Send prompt to human player
+                tricks_won = current_round.get_tricks_won(player_id)
+                bid = player.bid if player and player.bid is not None else 0
+                await self.manager.send_personal_message(
+                    ServerMessage(
+                        command=Command.ABILITY_TRIGGERED,
+                        game_id=game.id,
+                        content={
+                            "ability_type": AbilityType.MODIFY_BID.value,
+                            "pirate_type": "harry",
+                            "current_bid": bid,
+                            "tricks_won": tricks_won,
+                            "options": [-1, 0, 1],
+                        },
+                    ),
+                    game.id,
+                    player_id,
+                )
+                logger.info("Waiting for player %s Harry ability resolution", player_id)
+                return  # Wait for RESOLVE_HARRY command
 
         current_round.calculate_scores()
 

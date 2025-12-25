@@ -239,3 +239,6 @@ class AbilityHandlers:
             return
 
         logger.info("Player %s modified bid by %d (Harry)", player_id, modifier)
+
+        # Continue round completion after Harry resolution
+        await self.game_flow.complete_round(game, current_round)
