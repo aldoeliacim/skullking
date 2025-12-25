@@ -648,18 +648,35 @@ class GameHandler:
 
         # Check for pirate ability trigger
         pending_ability: PendingAbility | None = None
+        is_last_trick = trick.number == current_round.number
         if winner_card_id and winner_player_id:
             ability_type = get_card_ability(winner_card_id)
             if ability_type:
-                pending_ability = current_round.ability_state.trigger_ability(
-                    winner_player_id, winner_card_id, trick.number
+                # Skip abilities that are useless on the last trick:
+                # - Rosie: No next trick to start
+                # - Bendt: No more tricks to play with drawn cards
+                # - Jade: No strategic value in viewing deck
+                # Roatán and Harry still matter (affect scoring)
+                skip_on_last = ability_type in (
+                    AbilityType.CHOOSE_STARTER,  # Rosie
+                    AbilityType.DRAW_DISCARD,  # Bendt
+                    AbilityType.VIEW_DECK,  # Jade
                 )
-                if pending_ability:
+                if is_last_trick and skip_on_last:
                     logger.info(
-                        "Pirate ability triggered: %s for player %s",
+                        "Skipping %s ability on last trick (no effect)",
                         ability_type.value,
-                        winner_player_id,
                     )
+                else:
+                    pending_ability = current_round.ability_state.trigger_ability(
+                        winner_player_id, winner_card_id, trick.number
+                    )
+                    if pending_ability:
+                        logger.info(
+                            "Pirate ability triggered: %s for player %s",
+                            ability_type.value,
+                            winner_player_id,
+                        )
 
         # Build announce content
         winner = game.get_player(winner_player_id) if winner_player_id else None
