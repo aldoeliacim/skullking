@@ -11,20 +11,21 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - \
-    && ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+# Install uv
+RUN pip install uv
 
-# Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+# Copy dependency files and README (required by poetry-core metadata)
+COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies (without dev dependencies for production)
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --no-root --only main
+# Install dependencies only (without dev dependencies)
+RUN uv sync --no-dev --frozen --no-install-project
 
 # Copy application code
 COPY app/ ./app/
 COPY scripts/ ./scripts/
+
+# Install the project itself
+RUN uv sync --no-dev --frozen
 
 # Copy trained models if available
 COPY models/ ./models/
@@ -37,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

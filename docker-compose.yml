@@ -1,11 +1,84 @@
-version: "3.8"
-
 services:
-  app:
-    build: .
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "${PORT:-8000}:8000"
+      - "${FRONTEND_PORT:-8000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - skullking-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "8000"
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - MONGODB_HOST=mongo
+      - MONGODB_PORT=27017
+      - MONGODB_DATABASE=skullking
+      - BROKER_REDIS_HOST=redis
+      - BROKER_REDIS_PORT=6379
     volumes:
-      - ./models:/app/models:ro  # Mount trained RL models
+      - ./models:/app/models:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    networks:
+      - skullking-network
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    expose:
+      - "27017"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    networks:
+      - skullking-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    expose:
+      - "6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    command: redis-server --appendonly yes
+    networks:
+      - skullking-network
+
+volumes:
+  mongo-data:
+  redis-data:
+
+networks:
+  skullking-network:
+    driver: bridge
