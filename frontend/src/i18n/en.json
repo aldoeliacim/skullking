@@ -93,6 +93,7 @@
     "yourBid": "Your Bid:",
     "tricksWon": "Tricks Won:",
     "yourTurn": "Your Turn!",
+    "alliedWith": "Allied with {{name}}",
     "tigressChoice": "Scary Mary",
     "tigressQuestion": "Play as Pirate or Escape?",
     "tigressPirate": "Pirate",

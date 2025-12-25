@@ -39,6 +39,12 @@ export interface AbilityData {
 
 export type GamePhase = 'PENDING' | 'BIDDING' | 'PICKING' | 'ENDED';
 
+// Alliance between loot player and trick winner
+export interface LootAlliance {
+  lootPlayerId: string;
+  allyPlayerId: string;
+}
+
 export interface GameState {
   // Connection
   connectionState: ConnectionState;
@@ -55,6 +61,7 @@ export interface GameState {
   hand: Card[];
   trickCards: TrickCard[];
   pickingPlayerId: string | null;
+  lootAlliances: LootAlliance[];
 
   // UI state
   showBidding: boolean;
@@ -92,6 +99,7 @@ const initialState = {
   hand: [],
   trickCards: [],
   pickingPlayerId: null,
+  lootAlliances: [] as LootAlliance[],
   showBidding: false,
   showResults: false,
   showAbility: false,
@@ -283,6 +291,9 @@ function handleMessage(
           bid?: number | null;
           tricks_won?: number;
         }>;
+        current_round?: {
+          loot_alliances?: Record<string, string>;
+        };
       };
       if (stateContent.players) {
         const players: Player[] = stateContent.players.map((p) => ({
@@ -294,6 +305,13 @@ function handleMessage(
           tricks_won: p.tricks_won ?? 0,
         }));
         set({ players });
+      }
+      // Parse loot alliances from current round
+      if (stateContent.current_round?.loot_alliances) {
+        const alliances = Object.entries(stateContent.current_round.loot_alliances).map(
+          ([lootPlayerId, allyPlayerId]) => ({ lootPlayerId, allyPlayerId }),
+        );
+        set({ lootAlliances: alliances });
       }
       break;
     }
@@ -316,6 +334,7 @@ function handleMessage(
         currentTrick: 0,
         trickCards: [],
         players: resetPlayers,
+        lootAlliances: [], // Reset alliances for new round
       });
       get().addLog(`Round ${content.round} - Cards dealt`);
       break;
@@ -409,6 +428,18 @@ function handleMessage(
       }
 
       const winner = get().players.find((p) => p.id === winnerId);
+      const currentTrickCards = get().trickCards;
+      const currentAlliances = get().lootAlliances;
+
+      // Detect loot cards and form alliances (card IDs 73, 74 are loot)
+      const LOOT_CARD_IDS = ['73', '74'];
+      const newAlliances: LootAlliance[] = [];
+      for (const tc of currentTrickCards) {
+        if (LOOT_CARD_IDS.includes(tc.card_id) && tc.player_id !== winnerId) {
+          // Loot player forms alliance with winner
+          newAlliances.push({ lootPlayerId: tc.player_id, allyPlayerId: winnerId });
+        }
+      }
 
       // Update tricks won
       const players = get().players.map((p) =>
@@ -420,7 +451,16 @@ function handleMessage(
           playerId: winnerId,
           playerName: winner?.username || (content.winner_name as string) || 'Unknown',
         },
+        lootAlliances: [...currentAlliances, ...newAlliances],
       });
+
+      // Log alliance formation
+      for (const alliance of newAlliances) {
+        const lootPlayer = get().players.find((p) => p.id === alliance.lootPlayerId);
+        get().addLog(
+          `${lootPlayer?.username || 'Player'} formed alliance with ${winner?.username || 'winner'}`,
+        );
+      }
 
       get().addLog(`${winner?.username || content.winner_name} won the trick`);
       break;

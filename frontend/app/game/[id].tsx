@@ -47,6 +47,7 @@ export default function GameScreen(): React.JSX.Element {
     hand,
     trickCards,
     pickingPlayerId,
+    lootAlliances,
     showBidding,
     showAbility,
     abilityData,
@@ -258,6 +259,7 @@ export default function GameScreen(): React.JSX.Element {
             players={players}
             currentPlayerId={playerId}
             currentRound={currentRound}
+            lootAlliances={lootAlliances}
             compact
           />
         </Animated.View>

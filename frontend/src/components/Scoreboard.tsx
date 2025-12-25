@@ -7,13 +7,14 @@ import Animated, {
   withSpring,
   withSequence,
 } from 'react-native-reanimated';
-import type { Player } from '../stores/gameStore';
+import type { LootAlliance, Player } from '../stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
 
 interface ScoreboardProps {
   players: Player[];
   currentPlayerId: string | null;
   currentRound: number;
+  lootAlliances?: LootAlliance[];
   style?: ViewStyle;
   compact?: boolean;
 }
@@ -24,6 +25,7 @@ interface PlayerRowProps {
   isCurrentPlayer: boolean;
   isCurrentTurn: boolean;
   compact: boolean;
+  allyName: string | undefined; // Name of allied player via loot
 }
 
 function PlayerRow({
@@ -32,6 +34,7 @@ function PlayerRow({
   isCurrentPlayer,
   isCurrentTurn,
   compact,
+  allyName,
 }: PlayerRowProps): React.JSX.Element {
   const { t } = useTranslation();
   const scale = useSharedValue(1);
@@ -71,6 +74,7 @@ function PlayerRow({
         styles.playerRow,
         isCurrentPlayer && styles.currentPlayerRow,
         isCurrentTurn && styles.currentTurnRow,
+        allyName && styles.alliedPlayerRow,
         compact && styles.playerRowCompact,
         animatedStyle,
       ]}
@@ -88,6 +92,11 @@ function PlayerRow({
           {player.is_bot && ' 🤖'}
           {isCurrentPlayer && ` (${t('lobby.you')})`}
         </Text>
+        {allyName && (
+          <Text style={styles.allianceText} numberOfLines={1}>
+            🤝 {t('game.alliedWith', { name: allyName })}
+          </Text>
+        )}
       </View>
 
       <View style={styles.statsContainer}>
@@ -116,6 +125,7 @@ export function Scoreboard({
   players,
   currentPlayerId,
   currentRound,
+  lootAlliances = [],
   style,
   compact = false,
 }: ScoreboardProps): React.JSX.Element {
@@ -123,6 +133,17 @@ export function Scoreboard({
 
   // Sort players by score (descending)
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+
+  // Build alliance map (player ID -> ally name)
+  const allianceMap = new Map<string, string>();
+  for (const alliance of lootAlliances) {
+    const lootPlayer = players.find((p) => p.id === alliance.lootPlayerId);
+    const allyPlayer = players.find((p) => p.id === alliance.allyPlayerId);
+    if (lootPlayer && allyPlayer) {
+      allianceMap.set(alliance.lootPlayerId, allyPlayer.username);
+      allianceMap.set(alliance.allyPlayerId, lootPlayer.username);
+    }
+  }
 
   return (
     <View style={[styles.container, compact && styles.containerCompact, style]}>
@@ -148,6 +169,7 @@ export function Scoreboard({
             isCurrentPlayer={player.id === currentPlayerId}
             isCurrentTurn={false}
             compact={compact}
+            allyName={allianceMap.get(player.id)}
           />
         ))}
       </ScrollView>
@@ -208,6 +230,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.accentGold,
   },
+  alliedPlayerRow: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accentTeal,
+  },
   rankContainer: {
     width: 24,
     alignItems: 'center',
@@ -228,6 +254,11 @@ const styles = StyleSheet.create({
   currentPlayerName: {
     fontWeight: typography.fontWeight.semibold,
     color: colors.primary,
+  },
+  allianceText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.accentTeal,
+    marginTop: 2,
   },
   statsContainer: {
     flexDirection: 'row',
