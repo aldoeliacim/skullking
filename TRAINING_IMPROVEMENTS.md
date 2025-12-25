@@ -340,3 +340,93 @@ model = MaskablePPO.load('models/masked_ppo/masked_ppo_final.zip')
 print('Model loaded successfully!')
 "
 ```
+
+---
+
+## V5 Analysis & Proposed Improvements (December 25, 2024)
+
+### Current V4 Training Analysis
+
+**Training completed:** 5M steps in ~34 minutes (RTX 4080 SUPER)
+
+**Final Metrics:**
+```
+Explained variance:  0.90 (excellent)
+Value loss:          22-23 (stable)
+Best eval reward:    229.80
+Final eval reward:   128.78 ± 118.79
+```
+
+**Key Observations:**
+
+1. **Bimodal performance distribution:**
+   - Winning games: 226-230 reward with very low variance (±3-5)
+   - Losing games: 30-130 reward with high variance (±95-120)
+   - Agent either dominates or struggles, rarely in between
+
+2. **Evaluation instability:**
+   - Only 5 episodes per evaluation is too few for stable estimates
+   - High variance (±118) indicates stochastic game outcomes dominate
+
+3. **Value function converged:**
+   - Explained variance 0.90+ indicates excellent value learning
+   - Value loss plateaued at ~22-23
+
+### Proposed V5 Improvements
+
+#### 1. Evaluation Improvements
+```python
+# Current: 5 episodes, high variance
+n_eval_episodes = 5
+
+# Proposed: 20+ episodes for stable estimates
+n_eval_episodes = 20
+```
+
+#### 2. Self-Play Curriculum
+After beating rule-based opponents, train against past versions:
+```python
+curriculum = [
+    # ... existing phases ...
+    (1_500_000, "self_play", "easy"),    # Past checkpoints
+    (2_000_000, "self_play", "medium"),  # Recent checkpoints
+    (2_500_000, "self_play", "hard"),    # Best checkpoints
+]
+```
+
+#### 3. Mixed Opponent Evaluation
+Evaluate against a pool of opponents for more robust metrics:
+```python
+eval_opponents = ["rule_based_easy", "rule_based_medium", "rule_based_hard"]
+# Rotate through opponents during evaluation
+```
+
+#### 4. Action Masking Verification
+Verify suit-following mask is correctly applied:
+```python
+# Add assertion in step() to verify mask matches game rules
+assert action in valid_actions, "Mask failed to prevent invalid action"
+```
+
+#### 5. Extended Training
+Value loss still decreasing - more training may help:
+```python
+total_timesteps = 10_000_000  # Double current training
+# Or use early stopping based on win rate plateau
+```
+
+#### 6. Population-Based Training (Advanced)
+Train multiple agents with different hyperparameters:
+```python
+population_size = 8
+hyperparameter_search = {
+    "learning_rate": [1e-4, 3e-4, 5e-4],
+    "ent_coef": [0.005, 0.01, 0.02],
+    "gamma": [0.99, 0.995, 0.999],
+}
+```
+
+### V5 Target Metrics
+- Win rate vs rule_based_hard: >80% (over 50 games)
+- Eval variance: <50 (currently ~118)
+- Consistent performance across opponent types
