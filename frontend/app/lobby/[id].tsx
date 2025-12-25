@@ -9,8 +9,17 @@ import { Button, SettingsButton } from '../../src/components';
 import { useGameStore } from '../../src/stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../../src/styles/theme';
 
-type BotType = 'rl' | 'rule_based' | 'random';
-type Difficulty = 'easy' | 'medium' | 'hard';
+// Bot presets - simplified from separate type + difficulty
+// Only rule-based bots actually use difficulty; RL and Random ignore it
+type BotPreset = 'ai' | 'rule_hard' | 'rule_medium' | 'rule_easy' | 'random';
+
+const BOT_PRESET_CONFIG: Record<BotPreset, { type: string; difficulty: string }> = {
+  ai: { type: 'rl', difficulty: 'hard' },
+  rule_hard: { type: 'rule_based', difficulty: 'hard' },
+  rule_medium: { type: 'rule_based', difficulty: 'medium' },
+  rule_easy: { type: 'rule_based', difficulty: 'easy' },
+  random: { type: 'random', difficulty: 'easy' },
+};
 
 export default function LobbyScreen(): React.JSX.Element {
   const { t } = useTranslation();
@@ -23,8 +32,7 @@ export default function LobbyScreen(): React.JSX.Element {
   }>();
 
   const [copied, setCopied] = useState(false);
-  const [selectedBotType, setSelectedBotType] = useState<BotType>('rl');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium');
+  const [selectedPreset, setSelectedPreset] = useState<BotPreset>('ai');
   const navigatingToGame = useRef(false);
 
   const {
@@ -41,8 +49,11 @@ export default function LobbyScreen(): React.JSX.Element {
 
   const gameId = params.id || '';
   const gameCode = params.slug || gameId.substring(0, 8).toUpperCase();
-  const isHost = params.playerId === 'host' || players[0]?.id === playerId;
+  // Check if current player is the host (first non-bot player, or matches our playerId)
+  const firstHumanPlayer = players.find((p) => !p.is_bot);
+  const isHost = firstHumanPlayer?.id === playerId || players[0]?.id === playerId;
   const canStart = players.length >= 2 && isHost;
+  const isConnected = connectionState === 'connected';
 
   // Generate stable player ID once
   const stablePlayerId = useRef(`player_${Date.now()}`);
@@ -83,13 +94,15 @@ export default function LobbyScreen(): React.JSX.Element {
   }, [gameCode]);
 
   const handleAddBot = useCallback(() => {
-    addBot(selectedBotType, selectedDifficulty);
-  }, [addBot, selectedBotType, selectedDifficulty]);
+    const config = BOT_PRESET_CONFIG[selectedPreset];
+    addBot(config.type, config.difficulty);
+  }, [addBot, selectedPreset]);
 
   const handleFillWithBots = useCallback(() => {
     const botsNeeded = Math.max(0, 4 - players.length);
+    const config = BOT_PRESET_CONFIG.ai; // Fill with AI bots
     for (let i = 0; i < botsNeeded; i++) {
-      setTimeout(() => addBot('rl', 'medium'), i * 100);
+      setTimeout(() => addBot(config.type, config.difficulty), i * 100);
     }
   }, [addBot, players.length]);
 
@@ -117,16 +130,13 @@ export default function LobbyScreen(): React.JSX.Element {
     }
   }, [canStart, startGame]);
 
-  const botTypes: Array<{ value: BotType; label: string }> = [
-    { value: 'rl', label: t('lobby.botRL') },
-    { value: 'rule_based', label: t('lobby.botRuleBased') },
-    { value: 'random', label: t('lobby.botRandom') },
-  ];
-
-  const difficulties: Array<{ value: Difficulty; label: string }> = [
-    { value: 'easy', label: t('lobby.easy') },
-    { value: 'medium', label: t('lobby.medium') },
-    { value: 'hard', label: t('lobby.hard') },
+  // Simplified bot presets - combines type and difficulty into meaningful options
+  const botPresets: Array<{ value: BotPreset; label: string; description: string }> = [
+    { value: 'ai', label: t('lobby.botAI'), description: t('lobby.botAIDesc') },
+    { value: 'rule_hard', label: t('lobby.botHard'), description: t('lobby.botHardDesc') },
+    { value: 'rule_medium', label: t('lobby.botMedium'), description: t('lobby.botMediumDesc') },
+    { value: 'rule_easy', label: t('lobby.botEasy'), description: t('lobby.botEasyDesc') },
+    { value: 'random', label: t('lobby.botRandom'), description: t('lobby.botRandomDesc') },
   ];
 
   return (
@@ -204,54 +214,37 @@ export default function LobbyScreen(): React.JSX.Element {
         </Animated.View>
 
         {/* Bot Settings (Host only) */}
-        {isHost && (
+        {isHost && isConnected && (
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
             <Text style={styles.sectionTitle}>{t('lobby.addOpponents')}</Text>
 
             <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>{t('lobby.botType')}</Text>
-              <View style={styles.optionButtons}>
-                {botTypes.map((bt) => (
+              <Text style={styles.settingLabel}>{t('lobby.selectOpponent')}</Text>
+              <View style={styles.presetButtons}>
+                {botPresets.map((preset) => (
                   <Pressable
-                    key={bt.value}
-                    onPress={() => setSelectedBotType(bt.value)}
+                    key={preset.value}
+                    onPress={() => setSelectedPreset(preset.value)}
                     style={[
-                      styles.optionButton,
-                      selectedBotType === bt.value && styles.optionButtonSelected,
+                      styles.presetButton,
+                      selectedPreset === preset.value && styles.presetButtonSelected,
                     ]}
                   >
                     <Text
                       style={[
-                        styles.optionButtonText,
-                        selectedBotType === bt.value && styles.optionButtonTextSelected,
+                        styles.presetButtonLabel,
+                        selectedPreset === preset.value && styles.presetButtonLabelSelected,
                       ]}
                     >
-                      {bt.label}
+                      {preset.label}
                     </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>{t('lobby.difficulty')}</Text>
-              <View style={styles.optionButtons}>
-                {difficulties.map((d) => (
-                  <Pressable
-                    key={d.value}
-                    onPress={() => setSelectedDifficulty(d.value)}
-                    style={[
-                      styles.optionButton,
-                      selectedDifficulty === d.value && styles.optionButtonSelected,
-                    ]}
-                  >
                     <Text
                       style={[
-                        styles.optionButtonText,
-                        selectedDifficulty === d.value && styles.optionButtonTextSelected,
+                        styles.presetButtonDesc,
+                        selectedPreset === preset.value && styles.presetButtonDescSelected,
                       ]}
                     >
-                      {d.label}
+                      {preset.description}
                     </Text>
                   </Pressable>
                 ))}
@@ -472,12 +465,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  optionButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
+  presetButtons: {
+    gap: spacing.sm,
   },
-  optionButton: {
+  presetButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.base,
@@ -485,17 +476,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  optionButtonSelected: {
+  presetButtonSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.accentGold,
+    borderWidth: 2,
   },
-  optionButtonText: {
+  presetButtonLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textMuted,
-  },
-  optionButtonTextSelected: {
-    color: colors.text,
     fontWeight: typography.fontWeight.medium,
+    color: colors.text,
+  },
+  presetButtonLabelSelected: {
+    color: colors.text,
+    fontWeight: typography.fontWeight.bold,
+  },
+  presetButtonDesc: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  presetButtonDescSelected: {
+    color: colors.textMuted,
   },
   quickActions: {
     flexDirection: 'row',
