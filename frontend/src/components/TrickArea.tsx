@@ -1,16 +1,14 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
   withDelay,
-  withSequence,
-  Easing,
+  FadeIn,
 } from 'react-native-reanimated';
-import { type Card as CardType, type Player, type TrickCard, parseCard } from '../stores/gameStore';
+import { type Player, type TrickCard, parseCard } from '../stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
 import { Card } from './Card';
 
@@ -27,7 +25,6 @@ interface TrickCardDisplayProps {
   trickCard: TrickCard;
   playerName: string;
   index: number;
-  totalCards: number;
   isWinner: boolean;
 }
 
@@ -35,66 +32,34 @@ function TrickCardDisplay({
   trickCard,
   playerName,
   index,
-  totalCards,
   isWinner,
 }: TrickCardDisplayProps): React.JSX.Element {
   const scale = useSharedValue(0);
-  const rotation = useSharedValue(-15 + Math.random() * 30);
-  const glowOpacity = useSharedValue(0);
 
   React.useEffect(() => {
-    // Entry animation
-    scale.value = withDelay(index * 100, withSpring(1, { damping: 12, stiffness: 180 }));
-    rotation.value = withDelay(index * 100, withSpring(0, { damping: 15 }));
-  }, [index, scale, rotation]);
-
-  React.useEffect(() => {
-    if (isWinner) {
-      // Winner glow animation
-      glowOpacity.value = withSequence(
-        withTiming(1, { duration: 300 }),
-        withTiming(0.6, { duration: 500 }),
-        withTiming(1, { duration: 500 }),
-      );
-    }
-  }, [isWinner, glowOpacity]);
+    // Entry animation with stagger
+    scale.value = withDelay(index * 80, withSpring(1, { damping: 12, stiffness: 180 }));
+  }, [index, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
+    transform: [{ scale: scale.value }],
+    opacity: scale.value,
   }));
 
   const card = parseCard(trickCard.card_id);
 
-  // Calculate position in circular layout
-  const angle = (index / Math.max(totalCards, 4)) * Math.PI * 2 - Math.PI / 2;
-  const radius = 50;
-  const x = Math.cos(angle) * radius;
-  const y = Math.sin(angle) * radius;
-
   return (
-    <Animated.View
-      style={[
-        styles.trickCardWrapper,
-        {
-          transform: [{ translateX: x }, { translateY: y }],
-          zIndex: index,
-        },
-        animatedStyle,
-      ]}
-    >
-      {isWinner && <Animated.View style={[styles.winnerGlow, glowStyle]} />}
+    <Animated.View style={[styles.trickCardWrapper, animatedStyle]}>
       <Card card={card} size="small" showGlow={isWinner} />
       <Text style={[styles.playerName, isWinner && styles.winnerName]} numberOfLines={1}>
         {playerName}
       </Text>
       {trickCard.tigress_choice && (
-        <Text style={styles.tigressChoice}>
-          ({trickCard.tigress_choice === 'pirate' ? '🏴‍☠️' : '🏃'})
-        </Text>
+        <View style={styles.tigressBadge}>
+          <Text style={styles.tigressChoice}>
+            {trickCard.tigress_choice === 'pirate' ? '🏴‍☠️' : '👻'}
+          </Text>
+        </View>
       )}
     </Animated.View>
   );
@@ -125,11 +90,10 @@ export function TrickArea({
         ) : (
           trickCards.map((tc, index) => (
             <TrickCardDisplay
-              key={tc.card_id}
+              key={`${tc.card_id}-${tc.player_id}`}
               trickCard={tc}
               playerName={getPlayerName(tc.player_id)}
               index={index}
-              totalCards={trickCards.length}
               isWinner={tc.player_id === winnerId}
             />
           ))
@@ -137,7 +101,7 @@ export function TrickArea({
       </View>
 
       {winnerId && winnerName && (
-        <Animated.View style={styles.winnerBanner}>
+        <Animated.View entering={FadeIn.duration(300)} style={styles.winnerBanner}>
           <Text style={styles.winnerText}>
             {winnerName} {t('game.wonTrick')}
           </Text>
@@ -160,11 +124,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   trickArea: {
-    width: 200,
-    height: 180,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    minHeight: 120,
+    paddingHorizontal: spacing.md,
   },
   emptyText: {
     fontSize: typography.fontSize.md,
@@ -172,32 +138,33 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   trickCardWrapper: {
-    position: 'absolute',
     alignItems: 'center',
   },
   playerName: {
     fontSize: typography.fontSize.xs,
     color: colors.textMuted,
     marginTop: spacing.xs,
-    maxWidth: 60,
+    maxWidth: 70,
     textAlign: 'center',
   },
   winnerName: {
     color: colors.accentGold,
     fontWeight: typography.fontWeight.bold,
   },
-  tigressChoice: {
-    fontSize: typography.fontSize.xs,
-    marginTop: 2,
-  },
-  winnerGlow: {
+  tigressBadge: {
     position: 'absolute',
-    top: -8,
-    left: -8,
-    right: -8,
-    bottom: -8,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.accentGold,
+    top: -4,
+    right: -4,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  tigressChoice: {
+    fontSize: 12,
   },
   winnerBanner: {
     marginTop: spacing.md,

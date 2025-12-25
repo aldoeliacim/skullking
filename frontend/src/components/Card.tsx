@@ -1,68 +1,17 @@
 import React, { useCallback } from 'react';
-import {
-  Image,
-  type ImageSourcePropType,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
   interpolate,
   runOnJS,
 } from 'react-native-reanimated';
 import type { Card as CardType } from '../stores/gameStore';
 import { borderRadius, cardDimensions, colors, shadows, typography } from '../styles/theme';
 
-// Card image mapping
-const cardImages: Record<string, ImageSourcePropType> = {
-  // We'll use placeholder for now - images would be loaded from assets
-};
-
-// Suit colors - map backend types to colors
-const suitColors: Record<string, string> = {
-  blue: colors.suitBlue,
-  yellow: colors.suitYellow,
-  green: colors.suitGreen,
-  purple: colors.suitPurple,
-  black: colors.suitBlack,
-  // Backend suit types
-  parrot: colors.suitGreen, // Green suit
-  map: colors.suitYellow, // Yellow suit
-  chest: colors.suitPurple, // Purple suit
-  roger: colors.suitBlack, // Black/trump suit
-};
-
-// Suit symbols - map backend types to symbols
-const suitSymbols: Record<string, string> = {
-  blue: '🏴‍☠️',
-  yellow: '⚓',
-  green: '🗡️',
-  purple: '🔮',
-  black: '💀',
-  // Backend suit types
-  parrot: '🦜', // Parrot
-  map: '🗺️', // Map
-  chest: '📦', // Chest
-  roger: '🏴‍☠️', // Jolly Roger
-};
-
-// Special card emojis
-const specialEmojis: Record<string, string> = {
-  escape: '🏃',
-  pirate: '🏴‍☠️',
-  skull_king: '👑',
-  mermaid: '🧜‍♀️',
-  tigress: '🎭',
-  kraken: '🦑',
-  white_whale: '🐋',
-  loot: '💰',
-};
+// Base URL for card images
+const CARD_IMAGE_BASE_URL = '/static/images/cards/';
 
 interface CardProps {
   card: CardType;
@@ -137,66 +86,55 @@ export function Card({
     large: { width: cardDimensions.widthLarge, height: cardDimensions.heightLarge },
   }[size];
 
-  // Get card styling based on type
-  const getCardBackground = (): string => {
-    if (faceDown) {
-      return colors.primaryDark;
-    }
-    if (card.suit) {
-      return suitColors[card.suit] || colors.surface;
-    }
-    if (card.type === 'skull_king') {
-      return colors.accentGold;
-    }
-    if (card.type === 'pirate' || card.type === 'tigress') {
-      return colors.error;
-    }
-    if (card.type === 'mermaid') {
-      return colors.accentBlue;
-    }
-    if (card.type === 'kraken') {
-      return colors.accentPurple;
-    }
-    if (card.type === 'white_whale') {
-      return colors.textMuted;
-    }
-    return colors.surface;
-  };
-
   const renderCardContent = (): React.JSX.Element => {
+    // Face down card
     if (faceDown) {
       return (
-        <View style={styles.cardBack}>
-          <Text style={styles.cardBackText}>🏴‍☠️</Text>
-        </View>
+        <Image
+          source={{ uri: `${CARD_IMAGE_BASE_URL}back.png` }}
+          style={styles.cardImage}
+          resizeMode="cover"
+        />
       );
     }
 
-    // Standard suit card
-    if (card.suit && card.number) {
+    // Card with image
+    if (card.image) {
       return (
-        <View style={styles.suitCard}>
-          <Text style={[styles.cardNumber, size === 'small' && styles.cardNumberSmall]}>
-            {card.number}
-          </Text>
-          <Text style={[styles.suitSymbol, size === 'small' && styles.suitSymbolSmall]}>
-            {suitSymbols[card.suit] || '?'}
-          </Text>
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: `${CARD_IMAGE_BASE_URL}${card.image}` }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+          {/* Number overlay for suit cards */}
+          {card.number && (
+            <View style={styles.numberOverlay}>
+              <Text
+                style={[
+                  styles.overlayNumber,
+                  size === 'small' && styles.overlayNumberSmall,
+                  card.number === 14 && styles.overlayNumberBonus,
+                ]}
+              >
+                {card.number}
+              </Text>
+            </View>
+          )}
+          {/* Bonus badge for 14 cards */}
+          {card.number === 14 && (
+            <View style={styles.bonusBadge}>
+              <Text style={styles.bonusText}>+10</Text>
+            </View>
+          )}
         </View>
       );
     }
 
-    // Special card
+    // Fallback for cards without images
     return (
-      <View style={styles.specialCard}>
-        <Text style={[styles.specialEmoji, size === 'small' && styles.specialEmojiSmall]}>
-          {specialEmojis[card.type || ''] || '?'}
-        </Text>
-        {size !== 'small' && card.name && (
-          <Text style={styles.specialName} numberOfLines={2}>
-            {card.name}
-          </Text>
-        )}
+      <View style={styles.fallbackCard}>
+        <Text style={styles.fallbackText}>{card.name || card.type || '?'}</Text>
       </View>
     );
   };
@@ -208,7 +146,6 @@ export function Card({
       style={[
         styles.card,
         dimensions,
-        { backgroundColor: getCardBackground() },
         disabled && styles.cardDisabled,
         selected && styles.cardSelected,
         showGlow && styles.cardGlow,
@@ -226,8 +163,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 2,
     borderColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
     ...shadows.md,
   },
   cardDisabled: {
@@ -241,53 +178,59 @@ const styles = StyleSheet.create({
   cardGlow: {
     ...shadows.glow(colors.primary),
   },
-  cardBack: {
+  imageContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%',
+    position: 'relative',
   },
-  cardBackText: {
-    fontSize: typography.fontSize['2xl'],
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
-  suitCard: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
+  numberOverlay: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  cardNumber: {
-    fontSize: typography.fontSize['2xl'],
+  overlayNumber: {
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.text,
   },
-  cardNumberSmall: {
-    fontSize: typography.fontSize.lg,
+  overlayNumberSmall: {
+    fontSize: typography.fontSize.sm,
   },
-  suitSymbol: {
-    fontSize: typography.fontSize.xl,
-    marginTop: 2,
+  overlayNumberBonus: {
+    color: colors.accentGold,
   },
-  suitSymbolSmall: {
-    fontSize: typography.fontSize.md,
+  bonusBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: colors.accentGold,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
-  specialCard: {
+  bonusText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.backgroundDark,
+  },
+  fallbackCard: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 4,
   },
-  specialEmoji: {
-    fontSize: typography.fontSize['3xl'],
-  },
-  specialEmojiSmall: {
-    fontSize: typography.fontSize.xl,
-  },
-  specialName: {
-    fontSize: typography.fontSize.xs,
+  fallbackText: {
+    fontSize: typography.fontSize.sm,
     color: colors.text,
     textAlign: 'center',
-    marginTop: 2,
-    fontWeight: typography.fontWeight.medium,
   },
 });
 

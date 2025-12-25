@@ -20,6 +20,7 @@ export interface Card {
   number?: number;
   type?: string;
   name?: string;
+  image?: string;
 }
 
 export interface TrickCard {
@@ -465,6 +466,9 @@ function handleMessage(
   }
 }
 
+// Pirate image names matching backend PIRATE_IDENTITY order
+const PIRATE_IMAGES = ['rosie', 'bendt', 'rascal', 'juanita', 'harry'];
+
 // Parse card ID to card object
 // Backend sends integer IDs based on CardId enum
 export function parseCard(cardIdInput: string | number): Card {
@@ -476,47 +480,61 @@ export function parseCard(cardIdInput: string | number): Card {
   if (numId === 1) {
     card.type = 'skull_king';
     card.name = 'Skull King';
+    card.image = 'skullking.png';
   } else if (numId === 2) {
     card.type = 'white_whale';
     card.name = 'White Whale';
+    card.image = 'whale.png';
   } else if (numId === 3) {
     card.type = 'kraken';
     card.name = 'Kraken';
+    card.image = 'kraken.png';
   } else if (numId >= 4 && numId <= 5) {
     card.type = 'mermaid';
     card.name = `Mermaid ${numId - 3}`;
+    card.image = 'siren.png';
   } else if (numId >= 6 && numId <= 10) {
     card.type = 'pirate';
     card.name = getPirateName(numId);
+    card.image = `${PIRATE_IMAGES[numId - 6]}.png`;
   } else if (numId >= 11 && numId <= 24) {
     // Roger (trump/black suit) 1-14
     card.suit = 'roger';
     card.number = numId - 10;
     card.type = 'suit';
+    card.image = 'black.png';
   } else if (numId >= 25 && numId <= 38) {
     // Parrot (green) 1-14
     card.suit = 'parrot';
     card.number = numId - 24;
     card.type = 'suit';
+    card.image = 'green.png';
   } else if (numId >= 39 && numId <= 52) {
-    // Map (yellow) 1-14
+    // Map 1-14
     card.suit = 'map';
     card.number = numId - 38;
     card.type = 'suit';
+    card.image = 'purple.png';
   } else if (numId >= 53 && numId <= 66) {
-    // Chest (purple) 1-14
+    // Chest 1-14
     card.suit = 'chest';
     card.number = numId - 52;
     card.type = 'suit';
+    card.image = 'yellow.png';
   } else if (numId >= 67 && numId <= 71) {
     card.type = 'escape';
     card.name = 'Escape';
+    card.image = 'flee.png';
   } else if (numId === 72) {
     card.type = 'tigress';
     card.name = 'Scary Mary';
+    card.image = 'tigress.png';
   } else if (numId >= 73 && numId <= 74) {
     card.type = 'loot';
     card.name = 'Loot';
+    card.image = 'loot.png';
+  } else {
+    card.image = 'back.png';
   }
 
   return card;
