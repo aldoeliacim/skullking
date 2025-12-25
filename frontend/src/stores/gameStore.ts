@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { type ConnectionState, type WebSocketMessage, websocket } from '../services/websocket';
+import { logValidationErrors, validateGameState } from './stateValidator';
 
 // Types
 export interface Player {
@@ -354,18 +355,16 @@ function handleMessage(
     }
 
     case 'START_PICKING': {
-      // Check if this is a new trick BEFORE updating currentTrick
-      const newTrick = content.trick as number;
-      const oldTrick = get().currentTrick;
-      const isNewTrick = newTrick > oldTrick || newTrick === 1;
-
+      // Backend sends START_PICKING only at the start of a new trick
+      // (NEXT_TRICK is sent for subsequent players in the same trick)
+      // So we ALWAYS clear trick cards here - no conditional logic needed
       set({
         phase: 'PICKING',
         pickingPlayerId: content.picking_player_id as string,
-        currentTrick: newTrick,
+        currentTrick: content.trick as number,
         leadSuit: (content.lead_suit as string) || null,
-        // Clear trick cards if new trick
-        ...(isNewTrick ? { trickCards: [], trickWinner: null } : {}),
+        trickCards: [],
+        trickWinner: null,
       });
       break;
     }
@@ -469,6 +468,10 @@ function handleMessage(
     default:
       console.log('[Game] Unhandled message:', type, content);
   }
+
+  // Validate state invariants after each message (dev mode only)
+  const errors = validateGameState(get() as GameState, type);
+  logValidationErrors(errors);
 }
 
 // Pirate image names matching backend PIRATE_IDENTITY order
