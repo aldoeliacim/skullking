@@ -33,6 +33,8 @@ export default function LobbyScreen(): React.JSX.Element {
 
   const [copied, setCopied] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<BotPreset>('ai');
+  const [isAddingBot, setIsAddingBot] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const navigatingToGame = useRef(false);
 
   const {
@@ -94,17 +96,25 @@ export default function LobbyScreen(): React.JSX.Element {
   }, [gameCode]);
 
   const handleAddBot = useCallback(() => {
+    if (isAddingBot) return;
+    setIsAddingBot(true);
     const config = BOT_PRESET_CONFIG[selectedPreset];
     addBot(config.type, config.difficulty);
-  }, [addBot, selectedPreset]);
+    // Reset after a short delay (WebSocket response should update players)
+    setTimeout(() => setIsAddingBot(false), 500);
+  }, [addBot, selectedPreset, isAddingBot]);
 
   const handleFillWithBots = useCallback(() => {
+    if (isAddingBot) return;
+    setIsAddingBot(true);
     const botsNeeded = Math.max(0, 4 - players.length);
     const config = BOT_PRESET_CONFIG.ai; // Fill with AI bots
     for (let i = 0; i < botsNeeded; i++) {
       setTimeout(() => addBot(config.type, config.difficulty), i * 100);
     }
-  }, [addBot, players.length]);
+    // Reset after all bots are added
+    setTimeout(() => setIsAddingBot(false), botsNeeded * 100 + 500);
+  }, [addBot, players.length, isAddingBot]);
 
   const handleClearBots = useCallback(() => {
     players.filter((p) => p.is_bot).forEach((bot) => removeBot(bot.id));
@@ -125,10 +135,13 @@ export default function LobbyScreen(): React.JSX.Element {
   }, [disconnect, router, t]);
 
   const handleStartGame = useCallback(() => {
-    if (canStart) {
+    if (canStart && !isStarting) {
+      setIsStarting(true);
       startGame();
+      // Will navigate away on success, reset on timeout if stuck
+      setTimeout(() => setIsStarting(false), 3000);
     }
-  }, [canStart, startGame]);
+  }, [canStart, startGame, isStarting]);
 
   // Simplified bot presets - combines type and difficulty into meaningful options
   const botPresets: Array<{ value: BotPreset; label: string; description: string }> = [
@@ -257,6 +270,7 @@ export default function LobbyScreen(): React.JSX.Element {
               variant="secondary"
               fullWidth
               disabled={players.length >= 8}
+              loading={isAddingBot}
             />
 
             <View style={styles.quickActions}>
@@ -265,6 +279,8 @@ export default function LobbyScreen(): React.JSX.Element {
                 onPress={handleFillWithBots}
                 variant="outline"
                 size="sm"
+                loading={isAddingBot}
+                disabled={players.length >= 4}
               />
               <Button
                 title={t('lobby.clearBots')}
@@ -283,6 +299,7 @@ export default function LobbyScreen(): React.JSX.Element {
               title={t('lobby.startGame')}
               onPress={handleStartGame}
               disabled={!canStart}
+              loading={isStarting}
               fullWidth
               size="lg"
             />
