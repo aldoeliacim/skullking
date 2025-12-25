@@ -93,14 +93,16 @@ skullking/
 │   ├── api/          # FastAPI routes, WebSocket, game handler
 │   ├── models/       # Game domain models (Card, Deck, Game, etc.)
 │   ├── bots/         # AI bots (RandomBot, RuleBasedBot, RLBot)
-│   ├── gym_env/      # Gymnasium RL environment with action masking
+│   ├── gym_env/      # Gymnasium RL environment (SkullKingEnvMasked)
+│   ├── training/     # MaskablePPO training with curriculum learning
 │   ├── repositories/ # MongoDB data access layer
 │   └── services/     # Game serialization, persistence
 ├── frontend/         # React Native (Expo) app - see frontend/README.md
 ├── models/           # Trained RL model checkpoints
-├── scripts/          # Training and utility scripts
-├── static/           # Legacy web frontend (deprecated)
-└── tests/            # Pytest test suite (200+ tests)
+├── scripts/          # Utility scripts (see scripts/README.md)
+├── static/           # Standalone web client for local play
+├── archive/          # Legacy code preserved for reference
+└── tests/            # Pytest test suite (288 tests)
 ```
 
 ## Training RL Agents
@@ -115,11 +117,20 @@ model.learn(total_timesteps=1_000_000)
 model.save("models/skull_king_ppo")
 ```
 
-Or use the training script:
+Or use the training module:
 
 ```bash
-uv run python scripts/train_masked_ppo.py
+# Train new model (10M steps, ~2.5 hours on RTX 4080)
+uv run python -m app.training.train_ppo train --timesteps 10000000
+
+# Resume from checkpoint
+uv run python -m app.training.train_ppo resume --load models/masked_ppo/best_model/best_model.zip
+
+# Quick test (100k steps)
+uv run python -m app.training.train_ppo train --timesteps 100000 --envs 8
 ```
+
+See [TRAINING_LOG.md](./TRAINING_LOG.md) for training history and results.
 
 ## Docker Services
 

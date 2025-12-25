@@ -1,7 +1,14 @@
-"""Gymnasium environment for Skull King."""
+"""Gymnasium environment for Skull King.
 
-from app.gym_env.skullking_env import SkullKingEnv
-from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
+Active environment:
+- SkullKingEnvMasked: MaskablePPO-compatible env with action masking,
+  dense rewards, and 190-dim observations (V6)
+
+Legacy environments archived in archive/gym_env/:
+- SkullKingEnv: Original env (no masking)
+- SkullKingEnvEnhanced: Enhanced observations (no masking)
+"""
+
 from app.gym_env.skullking_env_masked import SkullKingEnvMasked
 
-__all__ = ["SkullKingEnv", "SkullKingEnvEnhanced", "SkullKingEnvMasked"]
+__all__ = ["SkullKingEnvMasked"]
