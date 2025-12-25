@@ -423,6 +423,95 @@ class TestLootCards:
         assert determine_winner(cards) == CardId.LOOT1
 
 
+class TestLootAllianceBonus:
+    """Test Loot alliance bonus rules (Section 11.4)."""
+
+    def test_loot_alliance_formed_with_trick_winner(self):
+        """Rule: Playing Loot forms alliance with trick winner."""
+        trick = Trick(number=1, starter_player_index=0)
+        trick.add_card("player1", CardId.LOOT1)
+        trick.add_card("player2", CardId.PARROT10)
+        trick.determine_winner()
+
+        alliances = trick.get_loot_alliances()
+        assert len(alliances) == 1
+        assert alliances[0] == ("player1", "player2")
+
+    def test_loot_alliance_no_bonus_if_player_is_winner(self):
+        """Rule: No alliance if loot player wins the trick themselves."""
+        trick = Trick(number=1, starter_player_index=0)
+        trick.add_card("player1", CardId.LOOT1)
+        trick.add_card("player2", CardId.ESCAPE1)
+        trick.determine_winner()  # player1 wins (first loot)
+
+        alliances = trick.get_loot_alliances()
+        assert len(alliances) == 0  # No alliance since loot player won
+
+    def test_loot_alliance_bonus_both_correct_bids(self):
+        """Rule: +20 bonus each if both alliance members make their bids."""
+        game_round = Round(number=3, starter_player_index=0)
+        game_round.bids = {"player1": 1, "player2": 1}
+
+        # Trick 1: player1 plays Loot, player2 wins with Parrot
+        trick1 = Trick(number=1, starter_player_index=0)
+        trick1.add_card("player1", CardId.LOOT1)
+        trick1.add_card("player2", CardId.PARROT10)
+        trick1.determine_winner()
+        game_round.tricks.append(trick1)
+
+        # Trick 2: player2 plays Escape, player1 wins
+        trick2 = Trick(number=2, starter_player_index=1)
+        trick2.add_card("player2", CardId.ESCAPE1)
+        trick2.add_card("player1", CardId.PARROT5)
+        trick2.determine_winner()
+        game_round.tricks.append(trick2)
+
+        # Trick 3: both play something neutral
+        trick3 = Trick(number=3, starter_player_index=0)
+        trick3.add_card("player1", CardId.MAP1)
+        trick3.add_card("player2", CardId.MAP2)
+        trick3.determine_winner()
+        game_round.tricks.append(trick3)
+
+        # Both made their bids: player1 won 1, player2 won 2
+        # Wait - player2 won 2 tricks but bid 1, so only player1 made bid
+        # Let me adjust: player1 bid 1 (won 1 ✓), player2 bid 2 (won 2 ✓)
+        game_round.bids = {"player1": 1, "player2": 2}
+        game_round.calculate_scores()
+
+        # Base scores: player1 = 20*1=20, player2 = 20*2=40
+        # Alliance bonus: +20 each since both made bids
+        assert game_round.scores["player1"] == 20 + 20  # 40
+        assert game_round.scores["player2"] == 40 + 20  # 60
+
+    def test_loot_alliance_no_bonus_if_one_fails_bid(self):
+        """Rule: No bonus if either alliance member fails their bid."""
+        game_round = Round(number=2, starter_player_index=0)
+        game_round.bids = {"player1": 0, "player2": 1}
+
+        # Trick 1: player1 plays Loot, player2 wins
+        trick1 = Trick(number=1, starter_player_index=0)
+        trick1.add_card("player1", CardId.LOOT1)
+        trick1.add_card("player2", CardId.PARROT10)
+        trick1.determine_winner()
+        game_round.tricks.append(trick1)
+
+        # Trick 2: player2 wins again
+        trick2 = Trick(number=2, starter_player_index=1)
+        trick2.add_card("player2", CardId.PARROT5)
+        trick2.add_card("player1", CardId.ESCAPE1)
+        trick2.determine_winner()
+        game_round.tricks.append(trick2)
+
+        # player1 bid 0 but won 0 ✓, player2 bid 1 but won 2 ✗
+        game_round.calculate_scores()
+
+        # player1: 10 * round = 20 (zero bid correct, no alliance bonus)
+        # player2: -10 * diff = -10 (bid wrong)
+        assert game_round.scores["player1"] == 20  # No +20 bonus
+        assert game_round.scores["player2"] == -10
+
+
 # =============================================================================
 # SECTION 2.4 & 6.4: SUIT FOLLOWING RULES
 # =============================================================================

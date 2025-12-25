@@ -21,6 +21,7 @@ class Round:
         tricks: List of tricks in this round
         starter_player_index: Index of player who starts bidding/picking
         scores: Score changes for each player this round
+        loot_alliances: Alliances formed by Loot cards (loot_player -> ally_player)
 
     """
 
@@ -31,6 +32,7 @@ class Round:
     tricks: list[Trick] = field(default_factory=list)
     scores: dict[str, int] = field(default_factory=dict)
     ability_state: AbilityState = field(default_factory=AbilityState)
+    loot_alliances: dict[str, str] = field(default_factory=dict)
 
     def get_player_hand(self, player_id: str) -> list[CardId]:
         """Get the cards dealt to a player."""
@@ -87,12 +89,22 @@ class Round:
         Pirate abilities affecting scoring:
         - Harry: Modify effective bid by ±1 before checking
         - Roatán: Extra bet added/subtracted based on bid correctness
+
+        Loot alliance bonus:
+        - If both loot player and ally made their bids, each gets +20
         """
         won_tricks: dict[str, int] = {}
+        bid_correct_map: dict[str, bool] = {}
 
         # Count tricks won by each player
         for player_id in self.bids:
             won_tricks[player_id] = self.get_tricks_won(player_id)
+
+        # Collect loot alliances from all tricks
+        self.loot_alliances = {}
+        for trick in self.tricks:
+            for loot_player, ally_player in trick.get_loot_alliances():
+                self.loot_alliances[loot_player] = ally_player
 
         # Calculate scores
         for player_id, bid in self.bids.items():
@@ -104,6 +116,7 @@ class Round:
             effective_bid = max(0, effective_bid)
 
             bid_correct = tricks_won == effective_bid
+            bid_correct_map[player_id] = bid_correct
 
             if bid_correct:
                 # Bid correct
@@ -122,6 +135,14 @@ class Round:
             # Apply Roatán's extra bet bonus/penalty
             roatan_bonus = self.ability_state.get_roatan_bonus(player_id, bid_correct=bid_correct)
             self.scores[player_id] += roatan_bonus
+
+        # Apply Loot alliance bonus (+20 each if both made their bids)
+        for loot_player, ally_player in self.loot_alliances.items():
+            loot_correct = bid_correct_map.get(loot_player, False)
+            ally_correct = bid_correct_map.get(ally_player, False)
+            if loot_correct and ally_correct:
+                self.scores[loot_player] = self.scores.get(loot_player, 0) + 20
+                self.scores[ally_player] = self.scores.get(ally_player, 0) + 20
 
     def is_complete(self) -> bool:
         """Check if the round is complete (all tricks played)."""

@@ -1038,6 +1038,7 @@ class GameHandler:
                 "bids": bids,
                 "tricks": tricks,
                 "starter_player_index": current_round.starter_player_index,
+                "loot_alliances": current_round.loot_alliances,
             }
 
         # Get player's hand (private info)

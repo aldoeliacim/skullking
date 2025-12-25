@@ -166,6 +166,7 @@ def serialize_round(round_obj: Round) -> dict[str, Any]:
         "tricks": [serialize_trick(t) for t in round_obj.tricks],
         "scores": round_obj.scores,
         "ability_state": serialize_ability_state(round_obj.ability_state),
+        "loot_alliances": round_obj.loot_alliances,
     }
 
 
@@ -182,6 +183,7 @@ def deserialize_round(data: dict[str, Any]) -> Round:
         tricks=[deserialize_trick(t) for t in data.get("tricks", [])],
         scores=data.get("scores", {}),
         ability_state=deserialize_ability_state(data.get("ability_state", {})),
+        loot_alliances=data.get("loot_alliances", {}),
     )
 
 

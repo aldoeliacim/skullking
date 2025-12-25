@@ -201,6 +201,29 @@ class Trick:
         # Can't follow suit, can play anything
         return list(hand)
 
+    def get_loot_alliances(self) -> list[tuple[str, str]]:
+        """Get loot alliances formed in this trick.
+
+        When a player plays a Loot card, they form an alliance with the trick winner.
+        If both make their bids at round end, each gets +20 bonus.
+
+        Returns:
+            List of (loot_player_id, ally_player_id) tuples.
+            Empty if no winner (Kraken) or no loot cards played.
+
+        """
+        if not self.winner_player_id:
+            return []
+
+        alliances = []
+        for picked_card in self.picked_cards:
+            card = get_card(picked_card.card_id)
+            if card.is_loot() and picked_card.player_id != self.winner_player_id:
+                # Loot player allies with trick winner (unless they are the winner)
+                alliances.append((picked_card.player_id, self.winner_player_id))
+
+        return alliances
+
     def __str__(self) -> str:
         """Return string representation of the trick."""
         if self.winner_player_id:
