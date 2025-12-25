@@ -138,7 +138,7 @@ export function BiddingModal({
               ]}
             >
               {selectedBid !== null
-                ? `${t('game.bid')}: ${selectedBid} ${selectedBid === 1 ? t('game.card') : t('game.cards')}`
+                ? `${t('game.bid')}: ${selectedBid} ${selectedBid === 1 ? t('game.trick') : t('game.tricksPlural')}`
                 : t('game.makeYourBid')}
             </Text>
           </Pressable>
