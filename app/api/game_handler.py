@@ -12,7 +12,7 @@ from app.bots import RandomBot, RuleBasedBot
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.bots.rl_bot import RLBot
 from app.config import settings
-from app.constants import HARRY_THE_GIANT_DISCARD_COUNT, MAX_PLAYERS
+from app.constants import BENDT_DRAW_DISCARD_COUNT, MAX_PLAYERS
 from app.models.card import CardId, get_card
 from app.models.enums import GameState
 from app.models.game import Game
@@ -729,8 +729,8 @@ class GameHandler:
             if player_obj:
                 player_obj.hand.extend(drawn_cards)
                 discard = (
-                    player_obj.hand[:HARRY_THE_GIANT_DISCARD_COUNT]
-                    if len(player_obj.hand) >= HARRY_THE_GIANT_DISCARD_COUNT
+                    player_obj.hand[:BENDT_DRAW_DISCARD_COUNT]
+                    if len(player_obj.hand) >= BENDT_DRAW_DISCARD_COUNT
                     else player_obj.hand[:]
                 )
                 for card in discard:
