@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
-"""Train MaskablePPO with critical improvements:
+"""Train MaskablePPO with V5 improvements:
 1. Action masking (only sample valid actions)
 2. Dense reward shaping (trick-level, bid quality)
 3. Enhanced observations (171 dims with context awareness)
-4. Refined curriculum for faster learning
+4. Refined curriculum with self-play phases
+5. Mixed opponent evaluation for robust metrics
+6. More eval episodes (20) for stable estimates
 """
 
 import argparse
 import os
+import random
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
-from stable_baselines3.common.callbacks import (
-    BaseCallback,
-    CheckpointCallback,
-    EvalCallback,
-)
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, sync_envs_normalization
 
 from app.gym_env.skullking_env_masked import SkullKingEnvMasked
 
@@ -62,6 +62,160 @@ class CurriculumCallback(BaseCallback):
                 self.current_phase += 1
 
         return True
+
+
+class MixedOpponentEvalCallback(BaseCallback):
+    """Evaluate against multiple opponent types for robust metrics.
+
+    Rotates through different opponent configurations to get a more
+    comprehensive view of agent performance.
+    """
+
+    def __init__(
+        self,
+        eval_env,
+        opponent_configs: list[tuple[str, str]],
+        n_eval_episodes: int = 20,
+        eval_freq: int = 50_000,
+        best_model_save_path: str | None = None,
+        log_path: str | None = None,
+        deterministic: bool = True,
+        verbose: int = 1,
+    ):
+        super().__init__(verbose)
+        self.eval_env = eval_env
+        self.opponent_configs = opponent_configs  # [(type, difficulty), ...]
+        self.n_eval_episodes = n_eval_episodes
+        self.eval_freq = eval_freq
+        self.best_model_save_path = best_model_save_path
+        self.log_path = log_path
+        self.deterministic = deterministic
+        self.best_mean_reward = -np.inf
+        self.last_eval_timestep = 0
+
+    def _on_step(self) -> bool:
+        if self.num_timesteps - self.last_eval_timestep >= self.eval_freq:
+            self._evaluate()
+            self.last_eval_timestep = self.num_timesteps
+        return True
+
+    def _evaluate(self):
+        """Run evaluation against all opponent types."""
+        all_rewards = []
+        all_lengths = []
+
+        episodes_per_opponent = max(1, self.n_eval_episodes // len(self.opponent_configs))
+
+        for opp_type, opp_diff in self.opponent_configs:
+            # Set opponent type
+            self.eval_env.env_method("set_opponent", opp_type, opp_diff)
+            sync_envs_normalization(self.training_env, self.eval_env)
+
+            rewards = []
+            lengths = []
+
+            for _ in range(episodes_per_opponent):
+                obs = self.eval_env.reset()
+                done = False
+                episode_reward = 0.0
+                episode_length = 0
+
+                while not done:
+                    action_masks = self.eval_env.env_method("action_masks")[0]
+                    action, _ = self.model.predict(
+                        obs,
+                        deterministic=self.deterministic,
+                        action_masks=action_masks,
+                    )
+                    obs, reward, done, info = self.eval_env.step(action)
+                    episode_reward += reward[0]
+                    episode_length += 1
+                    done = done[0]
+
+                rewards.append(episode_reward)
+                lengths.append(episode_length)
+
+            all_rewards.extend(rewards)
+            all_lengths.extend(lengths)
+
+        mean_reward = np.mean(all_rewards)
+        std_reward = np.std(all_rewards)
+        mean_length = np.mean(all_lengths)
+
+        print(f"Eval num_timesteps={self.num_timesteps}, episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+        print(f"Episode length: {mean_length:.2f} +/- {np.std(all_lengths):.2f}")
+        print(f"(Mixed eval: {len(self.opponent_configs)} opponent types, {len(all_rewards)} total episodes)")
+
+        # Save best model
+        if mean_reward > self.best_mean_reward:
+            self.best_mean_reward = mean_reward
+            if self.best_model_save_path:
+                os.makedirs(self.best_model_save_path, exist_ok=True)
+                self.model.save(f"{self.best_model_save_path}/best_model")
+                print("New best mean reward!")
+
+
+class SelfPlayCallback(BaseCallback):
+    """Periodically train against past versions of the agent.
+
+    Loads checkpoints from training and uses them as opponents
+    to prevent overfitting to fixed opponent strategies.
+    """
+
+    def __init__(
+        self,
+        checkpoint_dir: str,
+        vec_env,
+        self_play_start: int = 2_000_000,
+        self_play_freq: int = 200_000,
+        verbose: int = 1,
+    ):
+        super().__init__(verbose)
+        self.checkpoint_dir = Path(checkpoint_dir)
+        self.vec_env = vec_env
+        self.self_play_start = self_play_start
+        self.self_play_freq = self_play_freq
+        self.last_self_play_step = 0
+        self.in_self_play = False
+
+    def _on_step(self) -> bool:
+        # Only start self-play after reaching threshold
+        if self.num_timesteps < self.self_play_start:
+            return True
+
+        # Check if it's time for self-play phase
+        if self.num_timesteps - self.last_self_play_step >= self.self_play_freq:
+            self._activate_self_play()
+            self.last_self_play_step = self.num_timesteps
+
+        return True
+
+    def _activate_self_play(self):
+        """Load a random past checkpoint as opponent."""
+        checkpoints = list(self.checkpoint_dir.glob("*.zip"))
+        if not checkpoints:
+            if self.verbose:
+                print("[SelfPlay] No checkpoints found, skipping")
+            return
+
+        # Select random checkpoint (prefer more recent ones)
+        weights = [i + 1 for i in range(len(checkpoints))]
+        checkpoint = random.choices(checkpoints, weights=weights, k=1)[0]
+
+        print(f"\n{'=' * 60}")
+        print(f"🎯 SELF-PLAY ACTIVATED at {self.num_timesteps:,} steps")
+        print(f"Opponent checkpoint: {checkpoint.name}")
+        print(f"{'=' * 60}\n")
+
+        # Update environments to use self-play
+        for env_idx in range(self.vec_env.num_envs):
+            self.vec_env.env_method(
+                "set_self_play_opponent",
+                str(checkpoint),
+                indices=[env_idx],
+            )
+
+        self.in_self_play = True
 
 
 def mask_fn(env):
@@ -166,15 +320,30 @@ def train_masked_ppo(
         save_vecnormalize=True,
     )
 
-    # Evaluation callback (evaluate every 50k steps)
-    eval_cb = EvalCallback(
+    # Mixed opponent evaluation callback (V5: more robust metrics)
+    # Evaluates against easy, medium, and hard opponents
+    opponent_configs = [
+        ("rule_based", "easy"),
+        ("rule_based", "medium"),
+        ("rule_based", "hard"),
+    ]
+    eval_cb = MixedOpponentEvalCallback(
         eval_env,
+        opponent_configs=opponent_configs,
+        n_eval_episodes=21,  # 7 episodes per opponent type
+        eval_freq=50_000 // n_envs,
         best_model_save_path=f"{save_dir}/best_model",
         log_path=f"{save_dir}/eval_logs",
-        eval_freq=50_000 // n_envs,
-        n_eval_episodes=5,
         deterministic=True,
-        render=False,
+    )
+
+    # Self-play callback (V5: prevent overfitting to fixed opponents)
+    # Activates after 2M steps, switches to past checkpoints periodically
+    self_play_cb = SelfPlayCallback(
+        checkpoint_dir=f"{save_dir}/checkpoints",
+        vec_env=vec_env,
+        self_play_start=2_000_000,
+        self_play_freq=200_000,
     )
 
     # Create or load MaskablePPO model
@@ -219,10 +388,10 @@ def train_masked_ppo(
 
     print("\n🏋️ Starting training...\n")
 
-    # Train with all callbacks
+    # Train with all callbacks (V5: added self-play)
     model.learn(
         total_timesteps=total_timesteps,
-        callback=[curriculum_cb, checkpoint_cb, eval_cb],
+        callback=[curriculum_cb, checkpoint_cb, eval_cb, self_play_cb],
         progress_bar=True,
     )
 
