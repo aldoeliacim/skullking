@@ -161,9 +161,9 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         # V6 LOOT ALLIANCE (+8 dims):
         # - Has loot card (1): binary indicator
         # - Loot card count (1): normalized 0-1
-        # - Alliance status (4): one-hot for allied player index
-        # - Ally bid accuracy (1): how well ally is doing on their bid
-        # - Alliance potential (1): expected bonus value
+        # - Alliance status (4): binary mask for allied players (supports multiple alliances)
+        # - Ally bid accuracy (1): average accuracy across all allies
+        # - Alliance potential (1): sum of potential bonuses (0.2 per ally on track)
         self.observation_space = spaces.Box(low=-1, high=1, shape=(190,), dtype=np.float32)
 
         # Action space: 0-10 (bids or card indices)
@@ -577,19 +577,60 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         return reward
 
     def _calculate_round_reward(self, agent_player: Player, current_round: Round) -> float:
-        """Round completion reward (bidding accuracy) - NORMALIZED."""
+        """Round completion reward (bidding accuracy + alliance bonus) - NORMALIZED."""
         bid = agent_player.bid if agent_player.bid is not None else 0
         tricks_won = current_round.get_tricks_won(self.agent_player_id)
         bid_accuracy = abs(bid - tricks_won)
 
-        # Normalized scale: -5 to +5 (was -80 to +20)
+        # Base reward from bid accuracy (normalized scale: -5 to +5)
         if bid_accuracy == 0:
-            return 5.0  # Perfect bid!
-        if bid_accuracy == self.BID_ACCURACY_CLOSE:
-            return 2.0  # Close
-        if bid_accuracy == self.BID_ACCURACY_OFF_BY_2:
-            return -1.0
-        return -5.0  # Bad bid (capped)
+            base_reward = 5.0  # Perfect bid!
+        elif bid_accuracy == self.BID_ACCURACY_CLOSE:
+            base_reward = 2.0  # Close
+        elif bid_accuracy == self.BID_ACCURACY_OFF_BY_2:
+            base_reward = -1.0
+        else:
+            base_reward = -5.0  # Bad bid (capped)
+
+        # Alliance bonus: +2.0 per successful alliance (normalized from +20 actual)
+        alliance_reward = self._calculate_alliance_reward(agent_player, current_round)
+
+        return base_reward + alliance_reward
+
+    def _calculate_alliance_reward(self, agent_player: Player, current_round: Round) -> float:
+        """Calculate alliance bonus reward at round end.
+
+        Backend awards +20 to each player if both loot player and ally made their bids.
+        We normalize to +2.0 per successful alliance for RL training.
+        """
+        if not current_round.loot_alliances:
+            return 0.0
+
+        agent_bid_correct = self._check_bid_correct(self.agent_player_id, current_round)
+        if not agent_bid_correct:
+            return 0.0  # Agent must make bid to get alliance bonus
+
+        alliance_bonus = 0.0
+        for loot_player_id, ally_player_id in current_round.loot_alliances.items():
+            # Check if agent is involved in this alliance
+            if loot_player_id == self.agent_player_id:
+                # Agent played loot, check if ally made their bid
+                if self._check_bid_correct(ally_player_id, current_round):
+                    alliance_bonus += 2.0  # +20 normalized to +2.0
+            elif ally_player_id == self.agent_player_id:
+                # Agent won the loot, check if loot player made their bid
+                if self._check_bid_correct(loot_player_id, current_round):
+                    alliance_bonus += 2.0  # +20 normalized to +2.0
+
+        return alliance_bonus
+
+    def _check_bid_correct(self, player_id: str, current_round: Round) -> bool:
+        """Check if a player made their bid correctly."""
+        if player_id not in current_round.bids:
+            return False
+        bid = current_round.bids[player_id]
+        tricks_won = current_round.get_tricks_won(player_id)
+        return bid == tricks_won
 
     def _calculate_game_reward(self, _agent_player: Player) -> float:
         """Calculate final game reward (ranking) - NORMALIZED."""
@@ -1052,13 +1093,16 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         When a player plays a loot card, they form an alliance with the trick
         winner. If both make their bids at round end, each gets +20 bonus.
 
+        Supports multiple alliances: A player can be allied with multiple others
+        (e.g., winning tricks containing loot cards from different players).
+
         Returns:
             8 floats:
             - has_loot (1): 1.0 if agent has loot in hand, else 0.0
             - loot_count (1): normalized count (0, 0.5, or 1.0)
-            - alliance_status (4): one-hot for which player we're allied with
-            - ally_bid_accuracy (1): how well ally is tracking their bid
-            - alliance_potential (1): expected bonus value (0 or 0.2)
+            - alliance_status (4): binary mask for allied players (multiple can be 1.0)
+            - ally_bid_accuracy (1): average accuracy across all allies
+            - alliance_potential (1): sum of potential bonuses (0.2 per ally on track)
         """
         obs = []
 
@@ -1074,12 +1118,13 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         # Loot count normalized (1 dim): 0, 0.5, or 1.0
         obs.append(loot_count / 2.0)
 
-        # Alliance status (4 dims): one-hot for allied player index
-        alliance_onehot = [0.0, 0.0, 0.0, 0.0]
-        ally_player = None
+        # Alliance status (4 dims): binary mask for allied player indices
+        # Multiple alliances possible (e.g., winning multiple loot cards)
+        alliance_mask = [0.0, 0.0, 0.0, 0.0]
+        ally_players: list[Player] = []
 
         if current_round and current_round.loot_alliances and self.game:
-            # Check if agent is in any alliance (as loot player or ally)
+            # Check ALL alliances involving the agent (as loot player or ally)
             for loot_player_id, ally_player_id in current_round.loot_alliances.items():
                 if loot_player_id == self.agent_player_id:
                     # Agent played loot, find ally's index
@@ -1087,51 +1132,51 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
                     if ally_player:
                         ally_idx = self.game.players.index(ally_player)
                         if 0 <= ally_idx < 4:
-                            alliance_onehot[ally_idx] = 1.0
-                    break
+                            alliance_mask[ally_idx] = 1.0
+                            ally_players.append(ally_player)
                 elif ally_player_id == self.agent_player_id:
                     # Agent is the ally (won trick with loot)
                     loot_player = self.game.get_player(loot_player_id)
                     if loot_player:
-                        ally_player = loot_player
                         ally_idx = self.game.players.index(loot_player)
                         if 0 <= ally_idx < 4:
-                            alliance_onehot[ally_idx] = 1.0
-                    break
+                            alliance_mask[ally_idx] = 1.0
+                            ally_players.append(loot_player)
 
-        obs.extend(alliance_onehot)
+        obs.extend(alliance_mask)
 
-        # Ally bid accuracy (1 dim): how well ally is doing
+        # Ally bid accuracy (1 dim): average across all allies
         ally_accuracy = 0.0
-        if ally_player and current_round and ally_player.bid is not None:
-            tricks_won = current_round.get_tricks_won(ally_player.id)
-            bid = ally_player.bid
-            # Positive if ahead, negative if behind
-            if current_round.number > 0:
-                ally_accuracy = (tricks_won - bid) / current_round.number
-                ally_accuracy = max(-1.0, min(1.0, ally_accuracy))  # Clamp to [-1, 1]
+        if ally_players and current_round and current_round.number > 0:
+            accuracies = []
+            for ally in ally_players:
+                if ally.bid is not None:
+                    tricks_won = current_round.get_tricks_won(ally.id)
+                    acc = (tricks_won - ally.bid) / current_round.number
+                    accuracies.append(max(-1.0, min(1.0, acc)))
+            if accuracies:
+                ally_accuracy = sum(accuracies) / len(accuracies)
         obs.append(ally_accuracy)
 
-        # Alliance potential (1 dim): expected bonus value
-        # High if we have alliance and ally is on track for their bid
+        # Alliance potential (1 dim): sum of potential bonuses
+        # +0.2 per ally on track (could be +0.4 if 2 allies on track)
         alliance_potential = 0.0
-        if ally_player and ally_player.bid is not None and agent_player:
-            # Check if ally is likely to make their bid
-            if current_round:
-                ally_tricks_won = current_round.get_tricks_won(ally_player.id)
-                tricks_remaining = current_round.number - len(current_round.tricks)
-                ally_needed = ally_player.bid - ally_tricks_won
+        if ally_players and agent_player and current_round:
+            tricks_remaining = current_round.number - len(current_round.tricks)
 
-                # Ally on track if needed <= remaining
-                ally_on_track = ally_needed <= tricks_remaining and ally_needed >= 0
+            # Check if agent is on track
+            agent_tricks_won = current_round.get_tricks_won(self.agent_player_id)
+            agent_needed = (agent_player.bid or 0) - agent_tricks_won
+            agent_on_track = 0 <= agent_needed <= tricks_remaining
 
-                # Agent on track
-                agent_tricks_won = current_round.get_tricks_won(self.agent_player_id)
-                agent_needed = (agent_player.bid or 0) - agent_tricks_won
-                agent_on_track = agent_needed <= tricks_remaining and agent_needed >= 0
-
-                if ally_on_track and agent_on_track:
-                    alliance_potential = 0.2  # Represents +20 bonus normalized
+            if agent_on_track:
+                for ally in ally_players:
+                    if ally.bid is not None:
+                        ally_tricks_won = current_round.get_tricks_won(ally.id)
+                        ally_needed = ally.bid - ally_tricks_won
+                        ally_on_track = 0 <= ally_needed <= tricks_remaining
+                        if ally_on_track:
+                            alliance_potential += 0.2  # +20 per ally, normalized
 
         obs.append(alliance_potential)
 

@@ -8,14 +8,14 @@ Training history and results for the MaskablePPO agent.
 
 ## V6 (Planned) - Loot Alliances & Enhanced Observations
 
-**Status:** Planned
+**Status:** Ready to Train
 
 ### Motivation
 
 V5 model doesn't understand loot alliance mechanics (new feature: +20 bonus when both allied players make their bids). Need to add alliance observations so the agent can:
 1. Recognize when it holds loot cards
-2. Track active alliances
-3. Consider alliance bonus in bidding strategy
+2. Track active alliances (supports multiple alliances)
+3. Consider alliance bonus in bidding/play strategy
 
 ### Changes from V5
 
@@ -24,20 +24,26 @@ V5 model doesn't understand loot alliance mechanics (new feature: +20 bonus when
 | New Observation | Dims | Description |
 |-----------------|------|-------------|
 | Has loot card | 1 | Binary: agent has loot in hand |
-| Loot card count | 1 | Number of loot cards in hand (0-2) |
-| Alliance status | 4 | One-hot: allied with player 0/1/2/3 |
-| Ally bid accuracy | 1 | Ally's (tricks_won - bid) / round_num |
-| Alliance potential | 1 | Expected alliance bonus (0 or 0.2) |
+| Loot card count | 1 | Normalized count (0, 0.5, 1.0) |
+| Alliance status | 4 | Binary mask: allied with players (multi-alliance support) |
+| Ally bid accuracy | 1 | Average (tricks_won - bid) / round_num across all allies |
+| Alliance potential | 1 | Sum of potential bonuses (0.2 per ally on track) |
 
-**Training Enhancements:**
+**Reward Shaping Enhancements:**
 
-1. Alliance-aware reward shaping:
-   - +0.5 bonus when forming alliance via loot card
-   - Alliance bonus properly attributed at round end
+1. **Alliance bonus in round reward** (CRITICAL FIX):
+   - +2.0 per successful alliance at round end (normalized from +20)
+   - Only awarded when BOTH agent and ally make their bids
+   - Supports multiple alliances (could be +4.0 with 2 allies)
 
-2. Extended self-play: activate at 1M steps (earlier than V5)
+2. Round reward now: base bid accuracy (-5 to +5) + alliance bonus (0 to +4)
 
-3. Curriculum includes alliance scenarios
+**Multi-Alliance Support:**
+
+- A player can have multiple allies (e.g., winning tricks with loot cards from multiple players)
+- Alliance status uses binary mask (not one-hot) to track all allies
+- Ally accuracy averaged across all allies
+- Alliance potential sums bonuses from all on-track allies
 
 ### Configuration
 
@@ -52,8 +58,9 @@ V5 model doesn't understand loot alliance mechanics (new feature: +20 bonus when
 ### Expected Improvements
 
 - Model understands loot card strategic value
-- Better bidding when holding loot (adjust for potential +20)
-- Learns to play loot with likely winners
+- Learns alliance formation is valuable (+20 each when both win)
+- Better card play to win tricks containing loot cards
+- Supports multiple simultaneous alliances
 
 ---
 
