@@ -6,3 +6,4 @@ export { TrickArea } from './TrickArea';
 export { Scoreboard } from './Scoreboard';
 export { BiddingModal } from './BiddingModal';
 export { TigressModal } from './TigressModal';
+export { AbilityModal } from './AbilityModal';

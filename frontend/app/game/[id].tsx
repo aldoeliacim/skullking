@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  AbilityModal,
   BiddingModal,
   Button,
   Hand,
@@ -40,12 +41,15 @@ export default function GameScreen(): React.JSX.Element {
     pickingPlayerId,
     bids,
     showBidding,
+    showAbility,
+    abilityData,
     trickWinner,
     isSpectator,
     connect,
     disconnect,
     placeBid,
     playCard,
+    resolveAbility,
     clearTrickWinner,
     logs,
   } = useGameStore();
@@ -278,6 +282,13 @@ export default function GameScreen(): React.JSX.Element {
       <BiddingModal visible={showBidding} maxBid={currentRound} hand={hand} onBid={handleBid} />
 
       <TigressModal visible={showTigressModal} onChoice={handleTigressChoice} />
+
+      <AbilityModal
+        visible={showAbility}
+        abilityData={abilityData}
+        players={players}
+        onResolve={resolveAbility}
+      />
     </SafeAreaView>
   );
 }
