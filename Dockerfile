@@ -23,6 +23,7 @@ RUN uv sync --no-dev --frozen --no-install-project
 # Copy application code
 COPY app/ ./app/
 COPY scripts/ ./scripts/
+COPY static/ ./static/
 
 # Install the project itself
 RUN uv sync --no-dev --frozen
