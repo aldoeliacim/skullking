@@ -93,6 +93,7 @@ class GameHandler:
             "START_GAME": self._handle_start_game,
             "SYNC_STATE": self._handle_sync_state,
             "ADD_BOT": self._handle_add_bot,
+            "REMOVE_BOT": self._handle_remove_bot,
             # Pirate ability handlers
             "RESOLVE_ROSIE": self._handle_resolve_rosie,
             "RESOLVE_BENDT": self._handle_resolve_bendt,
@@ -1066,6 +1067,72 @@ class GameHandler:
         )
 
         # Broadcast updated game state so lobby refreshes
+        await self.manager.broadcast_to_game(
+            ServerMessage(
+                command=Command.GAME_STATE,
+                game_id=game.id,
+                content={
+                    "id": game.id,
+                    "slug": game.slug,
+                    "state": game.state.value,
+                    "players": [
+                        {
+                            "id": p.id,
+                            "username": p.username,
+                            "score": p.score,
+                            "index": p.index,
+                            "is_bot": p.is_bot,
+                            "is_connected": p.is_connected,
+                        }
+                        for p in game.players
+                    ],
+                },
+            ),
+            game.id,
+        )
+
+    async def _handle_remove_bot(
+        self, game: Game, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Handle REMOVE_BOT command - removes an AI opponent from the game."""
+        if game.state != GameState.PENDING:
+            await self._send_error(game.id, player_id, "Cannot remove bot after game started")
+            return
+
+        bot_id = content.get("bot_id")
+        if not bot_id:
+            await self._send_error(game.id, player_id, "Missing bot_id")
+            return
+
+        # Check if bot exists
+        bot_player = game.get_player(bot_id)
+        if not bot_player or not bot_player.is_bot:
+            await self._send_error(game.id, player_id, "Bot not found")
+            return
+
+        # Remove from game
+        game.remove_player(bot_id)
+
+        # Remove bot instance
+        if game.id in self.bots and bot_id in self.bots[game.id]:
+            del self.bots[game.id][bot_id]
+
+        logger.info("Removed bot %s from game %s", bot_id, game.id)
+
+        # Broadcast player left
+        await self.manager.broadcast_to_game(
+            ServerMessage(
+                command=Command.LEFT,
+                game_id=game.id,
+                content={
+                    "player_id": bot_id,
+                    "username": bot_player.username,
+                },
+            ),
+            game.id,
+        )
+
+        # Broadcast updated game state
         await self.manager.broadcast_to_game(
             ServerMessage(
                 command=Command.GAME_STATE,
