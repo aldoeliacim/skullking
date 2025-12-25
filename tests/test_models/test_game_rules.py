@@ -511,6 +511,45 @@ class TestLootAllianceBonus:
         assert game_round.scores["player1"] == 20  # No +20 bonus
         assert game_round.scores["player2"] == -10
 
+    def test_multiple_loot_alliances_with_same_winner(self):
+        """Rule: Winner allied with multiple loot players gets +20 per alliance."""
+        game_round = Round(number=3, starter_player_index=0)
+        game_round.bids = {"player1": 0, "player2": 3, "player3": 0}
+
+        # Trick 1: player1 plays LOOT1, player2 wins
+        trick1 = Trick(number=1, starter_player_index=0)
+        trick1.add_card("player1", CardId.LOOT1)
+        trick1.add_card("player2", CardId.PIRATE1)
+        trick1.add_card("player3", CardId.ESCAPE1)
+        trick1.determine_winner()
+        game_round.tricks.append(trick1)
+
+        # Trick 2: player3 plays LOOT2, player2 wins
+        trick2 = Trick(number=2, starter_player_index=1)
+        trick2.add_card("player2", CardId.PIRATE2)
+        trick2.add_card("player3", CardId.LOOT2)
+        trick2.add_card("player1", CardId.ESCAPE2)
+        trick2.determine_winner()
+        game_round.tricks.append(trick2)
+
+        # Trick 3: player2 wins
+        trick3 = Trick(number=3, starter_player_index=1)
+        trick3.add_card("player2", CardId.PIRATE3)
+        trick3.add_card("player3", CardId.ESCAPE3)
+        trick3.add_card("player1", CardId.ESCAPE4)
+        trick3.determine_winner()
+        game_round.tricks.append(trick3)
+
+        # All make bids: player1 won 0 ✓, player2 won 3 ✓, player3 won 0 ✓
+        game_round.calculate_scores()
+
+        # player1: 10 * 3 (zero bid) + 20 (alliance with player2) = 50
+        # player2: 20 * 3 (bid correct) + 20 (ally with player1) + 20 (ally with player3) = 100
+        # player3: 10 * 3 (zero bid) + 20 (alliance with player2) = 50
+        assert game_round.scores["player1"] == 50
+        assert game_round.scores["player2"] == 100
+        assert game_round.scores["player3"] == 50
+
 
 # =============================================================================
 # SECTION 2.4 & 6.4: SUIT FOLLOWING RULES
