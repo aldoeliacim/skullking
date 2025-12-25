@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
+      "backgroundColor": "#0a1628"
     },
     "ios": {
       "supportsTablet": true,
@@ -20,7 +20,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a1a2e"
+        "backgroundColor": "#0a1628"
       },
       "package": "com.skullking.app"
     },
@@ -31,8 +31,8 @@
       "name": "Skull King",
       "shortName": "SkullKing",
       "description": "Skull King card game - play with friends online",
-      "themeColor": "#1a1a2e",
-      "backgroundColor": "#1a1a2e",
+      "themeColor": "#0a1628",
+      "backgroundColor": "#0a1628",
       "display": "standalone",
       "orientation": "portrait",
       "startUrl": "/"

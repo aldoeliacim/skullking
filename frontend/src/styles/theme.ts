@@ -24,62 +24,77 @@ export const verticalScale = (size: number): number => (SCREEN_HEIGHT / guidelin
 export const moderateScale = (size: number, factor = 0.5): number =>
   size + (scale(size) - size) * factor;
 
-// Color palette matching existing CSS
+// Color palette inspired by Skull King box art
+// Deep navy seas, ornate gold treasures, kraken teal, and vintage parchment
 export const colors = {
-  // Primary colors
-  primary: '#e94560',
-  primaryDark: '#c73e54',
-  primaryLight: '#ff6b8a',
+  // Primary colors - Rich Gold (like the Skull King title)
+  primary: '#d4a84b',
+  primaryDark: '#b8923d',
+  primaryLight: '#e6c36a',
 
-  // Background colors
-  background: '#1a1a2e',
-  backgroundLight: '#16213e',
-  backgroundDark: '#0f0f1a',
-  surface: '#1f1f3a',
-  surfaceLight: '#2a2a4a',
+  // Background colors - Deep Navy Blue (ocean depths)
+  background: '#0a1628',
+  backgroundLight: '#0f1e32',
+  backgroundDark: '#060e18',
+  surface: '#12253d',
+  surfaceLight: '#1a3352',
 
-  // Text colors
-  text: '#eee',
-  textMuted: '#aaa',
-  textDark: '#888',
+  // Text colors - Vintage Cream/Parchment
+  text: '#f0ebe3',
+  textMuted: '#a8a090',
+  textDark: '#6b6560',
 
   // Accent colors
-  accent: '#e94560',
-  accentGold: '#f1c40f',
-  accentBlue: '#3498db',
-  accentGreen: '#27ae60',
-  accentPurple: '#9b59b6',
+  accent: '#d4a84b', // Gold
+  accentGold: '#d4a84b',
+  accentTeal: '#2d8a8a', // Kraken tentacles
+  accentCrimson: '#8b2635', // Pirate red
+  accentPurple: '#4a3b5c', // Mysterious purple
 
-  // Card suit colors
-  suitBlue: '#4a90d9',
-  suitYellow: '#f1c40f',
-  suitGreen: '#27ae60',
-  suitPurple: '#9b59b6',
-  suitBlack: '#333',
-  suitRed: '#e74c3c',
+  // Suit colors - Vintage card aesthetic
+  suitBlue: '#3a7ca5', // Parrot (blue) - ocean blue
+  suitYellow: '#d4a84b', // Treasure chest (yellow) - gold
+  suitGreen: '#2d6b4f', // Map (green) - sea green
+  suitPurple: '#5c4a6e', // Kraken (purple) - deep purple
+  suitBlack: '#1a1a1a', // Jolly Roger (black)
+  suitRed: '#8b2635', // Pirate flag (red)
 
-  // Status colors
-  success: '#27ae60',
-  warning: '#f39c12',
-  error: '#e74c3c',
-  info: '#3498db',
+  // Special card colors
+  skullKing: '#1a1a1a',
+  pirate: '#8b2635',
+  mermaid: '#2d8a8a',
+  escape: '#f0ebe3',
+  kraken: '#1a3352',
+  whale: '#f0ebe3',
 
-  // Overlay
-  overlay: 'rgba(0, 0, 0, 0.7)',
-  overlayLight: 'rgba(0, 0, 0, 0.5)',
+  // Status colors - Nautical themed
+  success: '#2d8a8a', // Teal - safe waters
+  warning: '#d4a84b', // Gold - treasure/caution
+  error: '#8b2635', // Crimson - danger
+  info: '#3a7ca5', // Ocean blue
 
-  // Borders
-  border: 'rgba(255, 255, 255, 0.1)',
-  borderLight: 'rgba(255, 255, 255, 0.2)',
+  // Overlay - Deep sea darkness
+  overlay: 'rgba(6, 14, 24, 0.85)',
+  overlayLight: 'rgba(6, 14, 24, 0.6)',
+
+  // Borders - Subtle gold tint
+  border: 'rgba(212, 168, 75, 0.2)',
+  borderLight: 'rgba(212, 168, 75, 0.35)',
+  borderGold: 'rgba(212, 168, 75, 0.6)',
 } as const;
 
-// Typography
+// Typography - Nautical/Pirate themed
 export const typography = {
-  // Font families
+  // Font families - Using Pirata One for titles on web (loaded via +html.tsx)
   fontFamily: Platform.select({
     ios: 'System',
     android: 'Roboto',
-    web: "'Segoe UI', system-ui, -apple-system, sans-serif",
+    web: "'Crimson Text', 'Georgia', serif",
+  }),
+  fontFamilyDisplay: Platform.select({
+    ios: 'System',
+    android: 'Roboto',
+    web: "'Pirata One', 'Crimson Text', cursive",
   }),
   fontFamilyMono: Platform.select({
     ios: 'Menlo',
@@ -143,43 +158,57 @@ export const borderRadius = {
   full: 9999,
 } as const;
 
-// Shadows
+// Shadows - Deep ocean shadows with golden accent glows
 export const shadows = {
   sm: {
-    shadowColor: '#000',
+    shadowColor: '#060e18',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.4,
     shadowRadius: 2,
     elevation: 2,
   },
   md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowColor: '#060e18',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#060e18',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
     elevation: 8,
   },
   xl: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowColor: '#060e18',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.7,
+    shadowRadius: 20,
     elevation: 16,
   },
   glow: (color: string) => ({
     shadowColor: color,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
+    shadowOpacity: 0.7,
+    shadowRadius: 16,
     elevation: 12,
   }),
+  goldGlow: {
+    shadowColor: '#d4a84b',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  tealGlow: {
+    shadowColor: '#2d8a8a',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
 } as const;
 
 // Animation durations

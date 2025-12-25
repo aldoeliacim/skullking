@@ -154,9 +154,11 @@ const styles = StyleSheet.create({
   // Variants
   primaryContainer: {
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.primaryDark,
   },
   primaryText: {
-    color: colors.text,
+    color: '#0a1628', // Dark navy for contrast on gold
   },
   secondaryContainer: {
     backgroundColor: colors.surfaceLight,
