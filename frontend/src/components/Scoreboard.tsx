@@ -6,7 +6,6 @@ import Animated, {
   useSharedValue,
   withSpring,
   withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 import type { Player } from '../stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
@@ -41,7 +40,6 @@ function PlayerRow({
   // Animate on score change
   React.useEffect(() => {
     if (player.score !== prevScore.value) {
-      const isPositive = player.score > prevScore.value;
       scale.value = withSequence(withSpring(1.1, { damping: 10 }), withSpring(1, { damping: 15 }));
       prevScore.value = player.score;
     }

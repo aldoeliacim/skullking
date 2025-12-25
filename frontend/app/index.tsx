@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Input } from '../src/components';
 import { type LanguageCode, changeLanguage, getCurrentLanguage } from '../src/i18n';
 import { api } from '../src/services/api';
-import { colors, screen, spacing, typography } from '../src/styles/theme';
+import { colors, spacing, typography } from '../src/styles/theme';
 
 const PLAYER_NAME_KEY = '@skullking/playerName';
 

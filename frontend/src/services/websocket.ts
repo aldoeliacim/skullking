@@ -1,3 +1,4 @@
+import { type PickPayload, toCardIdNumeric } from '../types/api';
 import { WS_BASE_URL } from './api';
 
 // WebSocket message types (matching backend Command enum)
@@ -194,12 +195,14 @@ class WebSocketClient {
   }
 
   playCard(cardId: string, tigressChoice?: 'pirate' | 'escape'): boolean {
-    // Backend expects card_id as integer
-    const content: Record<string, unknown> = { card_id: parseInt(cardId, 10) };
+    // Use typed payload to ensure correct format for backend
+    const payload: PickPayload = {
+      card_id: toCardIdNumeric(cardId),
+    };
     if (tigressChoice) {
-      content.tigress_choice = tigressChoice;
+      payload.tigress_choice = tigressChoice;
     }
-    return this.send('PICK', content);
+    return this.send('PICK', payload);
   }
 
   addBot(botType: string, difficulty: string): boolean {

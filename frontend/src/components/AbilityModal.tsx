@@ -21,7 +21,7 @@ interface PlayerOption {
 export function AbilityModal({
   visible,
   abilityData,
-  players,
+  players: _players,
   onResolve,
 }: AbilityModalProps): React.JSX.Element | null {
   const { t } = useTranslation();
@@ -33,7 +33,7 @@ export function AbilityModal({
     return null;
   }
 
-  const { type, pirate, data } = abilityData;
+  const { type, pirate: _pirate, data } = abilityData;
 
   const handleCardSelect = (cardId: string): void => {
     setSelectedCards((prev) => {

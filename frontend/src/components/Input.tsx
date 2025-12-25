@@ -17,8 +17,6 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   containerStyle?: ViewStyle;
 }
 
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
-
 export function Input({
   label,
   error,

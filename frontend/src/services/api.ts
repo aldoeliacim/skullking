@@ -1,11 +1,7 @@
-import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 // API configuration
 const getBaseUrl = (): string => {
-  // Check for environment variable first
-  const envUrl = Constants.expirationDate;
-
   if (Platform.OS === 'web') {
     // On web, use relative URL or window.location
     if (typeof window !== 'undefined') {

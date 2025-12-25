@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Pressable,
   ScrollView,
   type ScrollView as ScrollViewType,
   StyleSheet,
@@ -21,7 +20,7 @@ import {
   TrickArea,
 } from '../../src/components';
 import { type Card as CardType, useGameStore } from '../../src/stores/gameStore';
-import { borderRadius, colors, screen, shadows, spacing, typography } from '../../src/styles/theme';
+import { borderRadius, colors, shadows, spacing, typography } from '../../src/styles/theme';
 
 export default function GameScreen(): React.JSX.Element {
   const { t } = useTranslation();
@@ -43,11 +42,11 @@ export default function GameScreen(): React.JSX.Element {
     players,
     playerId,
     currentRound,
-    currentTrick,
+    currentTrick: _currentTrick,
     hand,
     trickCards,
     pickingPlayerId,
-    bids,
+    bids: _bids,
     showBidding,
     showAbility,
     abilityData,

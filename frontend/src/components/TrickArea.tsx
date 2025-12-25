@@ -68,7 +68,7 @@ function TrickCardDisplay({
 export function TrickArea({
   trickCards,
   players,
-  currentPlayerId,
+  currentPlayerId: _currentPlayerId,
   winnerId,
   winnerName,
   style,

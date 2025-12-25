@@ -1,12 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withDelay,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import type { Card as CardType } from '../stores/gameStore';
 import { cardDimensions, colors, screen, spacing, typography } from '../styles/theme';
 import { Card } from './Card';

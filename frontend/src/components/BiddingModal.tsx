@@ -10,7 +10,7 @@ import Animated, {
   SlideInDown,
 } from 'react-native-reanimated';
 import type { Card as CardType } from '../stores/gameStore';
-import { borderRadius, colors, screen, shadows, spacing, typography } from '../styles/theme';
+import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
 import { Card } from './Card';
 
 interface BiddingModalProps {
@@ -81,10 +81,6 @@ export function BiddingModal({
 
   // Generate bid options (0 to maxBid)
   const bidOptions = Array.from({ length: Math.min(maxBid + 1, 11) }, (_, i) => i);
-
-  // Calculate grid layout
-  const columns = screen.isSmall ? 4 : 6;
-  const rows = Math.ceil(bidOptions.length / columns);
 
   return (
     <Modal visible={visible} transparent animationType="none">
