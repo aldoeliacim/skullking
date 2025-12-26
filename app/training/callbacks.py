@@ -11,6 +11,19 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import sync_envs_normalization
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy types."""
+
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
 class CurriculumCallback(BaseCallback):
     """Callback to change opponent difficulty during training.
 
@@ -354,7 +367,7 @@ class MixedOpponentEvalCallback(BaseCallback):
             os.makedirs(self.log_path, exist_ok=True)
             history_file = Path(self.log_path) / "eval_history.json"
             with open(history_file, "w") as f:
-                json.dump(self.eval_history, f, indent=2)
+                json.dump(self.eval_history, f, indent=2, cls=NumpyEncoder)
 
     def _on_training_end(self) -> None:
         """Print training efficiency summary."""
