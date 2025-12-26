@@ -602,17 +602,17 @@ class RoundStatsCallback(BaseCallback):
         """Collect per-round statistics."""
         # Get infos from step
         infos = self.locals.get("infos", [])
+        rewards = self.locals.get("rewards", [])
 
-        for info in infos:
+        for i, info in enumerate(infos):
             if isinstance(info, dict):
                 round_num = info.get("round")
                 if round_num and 1 <= round_num <= 10:
                     self.round_counts[round_num] += 1
 
-                    # Collect reward if available
-                    rewards = self.locals.get("rewards", [])
-                    if len(rewards) > 0:
-                        self.round_rewards[round_num].append(float(rewards[0]))
+                    # Collect reward matching this environment's index
+                    if i < len(rewards):
+                        self.round_rewards[round_num].append(float(rewards[i]))
 
                     if "bid_accuracy" in info:
                         self.round_bid_accuracy[round_num].append(info["bid_accuracy"] == 1.0)
