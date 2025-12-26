@@ -428,12 +428,72 @@ def benchmark_v9():
 
 ---
 
-## Next Steps
+## Implementation Status
 
-1. [ ] Fix hierarchical env API (Game, Player constructors)
-2. [ ] Implement Numba-accelerated observation encoding
-3. [ ] Create V9 training script with larger network
-4. [ ] Benchmark Numba speedup
-5. [ ] If significant: proceed with Cython
-6. [ ] Implement Manager/Worker hierarchical training
-7. [ ] Long-term: Evaluate EnvPool C++ rewrite ROI
+### Completed ✅
+
+1. [x] Fix hierarchical env API (Game, Player constructors)
+2. [x] Implement Numba-accelerated observation encoding
+3. [x] Create V9 training script with larger network
+4. [x] Benchmark hierarchical env speedup (2.8x faster)
+5. [x] Implement Manager/Worker hierarchical training
+6. [x] **Episode Design Optimizations:**
+   - [x] Round-weighted sampling (late rounds 4x more likely)
+   - [x] Phase curriculum callback (late → mid → all)
+   - [x] Phase embedding in observations (+3 dims)
+   - [x] Phase-specific epochs (Manager: 25, Worker: 12)
+   - [x] Round stats tracking callback
+
+### Pending
+
+7. [ ] If significant improvement: proceed with Cython
+8. [ ] Long-term: Evaluate EnvPool C++ rewrite ROI
+
+---
+
+## Episode Design Optimizations (New)
+
+Based on `EPISODE_DESIGN.md` analysis:
+
+### Game Flow Analysis
+
+| Phase | Rounds | Decisions | Complexity |
+|-------|--------|-----------|------------|
+| Early | 1-3 | 14% | Low - special cards dominate |
+| Mid | 4-6 | 28% | Medium - suit management |
+| Late | 7-10 | 58% | High - multi-trick planning |
+
+### Implemented Solutions
+
+**1. Round-Weighted Sampling**
+```python
+ROUND_WEIGHTS = {
+    1: 0.5, 2: 0.6, 3: 0.7,     # Early: less weight
+    4: 0.8, 5: 0.9, 6: 1.0,     # Mid: medium weight
+    7: 1.2, 8: 1.4, 9: 1.6, 10: 2.0  # Late: 4x early
+}
+```
+
+**2. Phase Curriculum**
+```python
+PHASE_SCHEDULE = [
+    (0, (2,)),           # Start: Late only
+    (1_000_000, (1, 2)), # 1M: Mid + Late
+    (2_000_000, (0, 1, 2)), # 2M: All rounds
+]
+```
+
+**3. Phase Embedding**
+- 3-dim one-hot: (early, mid, late)
+- ManagerEnv: 168 → 171 dims
+- WorkerEnv: 200 → 203 dims
+
+**4. Phase-Specific Epochs**
+```python
+MANAGER_N_EPOCHS = 25  # Sparse reward (bid → round-end)
+WORKER_N_EPOCHS = 12   # Dense reward (trick-level shaping)
+```
+
+**5. New Callbacks**
+- `PhaseSchedulerCallback`: Progressive phase unlocking
+- `RoundStatsCallback`: Per-phase performance tracking
