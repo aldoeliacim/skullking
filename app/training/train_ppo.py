@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """Train MaskablePPO agent for Skull King.
 
-V7 Training Features:
+V8 Training Features (benchmark-optimized):
 1. Action masking (only sample valid actions)
 2. Dense reward shaping (trick-level, bid quality, alliance bonus)
 3. Enhanced observations (190 dims with loot alliance awareness)
 4. Curriculum learning with progressive difficulty
 5. Mixed opponent evaluation for robust metrics
 6. Self-play to prevent overfitting
-7. SubprocVecEnv for multi-core parallelism (NEW)
-8. Larger batch sizes for better GPU utilization (NEW)
-9. torch.compile for optimized forward passes (NEW)
+7. SubprocVecEnv with 768 envs (optimal for 24-thread CPU)
+8. Batch size 32768 (max GPU throughput without overhead)
+9. n_steps 2048 (benchmark-optimized)
+10. 6,836 FPS on RTX 4080 SUPER + Ryzen 9 7900X
 
 Usage:
-    # Train with V7 max performance (128 envs, batch 4096, SubprocVecEnv, torch.compile)
+    # Train with V8 max performance (768 envs, batch 32768, SubprocVecEnv)
     uv run python -m app.training.train_ppo train --timesteps 10000000
 
     # Resume training from checkpoint
@@ -43,11 +44,12 @@ from app.training.callbacks import (
     SelfPlayCallback,
 )
 
-# Default training configuration (V7 max performance)
+# Default training configuration (V8 optimized from benchmark)
+# RTX 4080 SUPER + Ryzen 9 7900X: 6,836 FPS with SubprocVecEnv
 DEFAULT_TIMESTEPS = 10_000_000
-DEFAULT_N_ENVS = 128  # V7: max parallelism
-DEFAULT_BATCH_SIZE = 4096  # V7: max GPU utilization
-DEFAULT_N_STEPS = 4096
+DEFAULT_N_ENVS = 768  # V8: benchmark-optimized for 24-thread CPU
+DEFAULT_BATCH_SIZE = 32768  # V8: max GPU batch without overhead
+DEFAULT_N_STEPS = 2048  # V8: optimal rollout length
 DEFAULT_SAVE_DIR = "./models/masked_ppo"
 
 # Curriculum schedule: (timestep, opponent_type, difficulty)
@@ -94,6 +96,7 @@ def train(
     use_compile: bool = False,
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
+    use_early_stopping: bool = True,
 ) -> None:
     """Train MaskablePPO agent with curriculum learning.
 
@@ -106,6 +109,7 @@ def train(
         use_compile: Use torch.compile for optimized forward passes
         save_dir: Directory to save models and logs
         load_path: Optional path to load existing model
+        use_early_stopping: Stop training when plateau detected
 
     """
     # Check GPU availability
@@ -120,7 +124,7 @@ def train(
     vec_env_type = "SubprocVecEnv" if use_subproc else "DummyVecEnv"
 
     print("=" * 60)
-    print("SKULL KING - MaskablePPO Training (V7)")
+    print("SKULL KING - MaskablePPO Training (V8)")
     print("=" * 60)
     print(
         f"Device: {device.upper()}"
@@ -179,11 +183,22 @@ def train(
         eval_env,
         opponent_configs=EVAL_OPPONENTS,
         n_eval_episodes=21,  # 7 episodes per opponent type
-        eval_freq=200_000 // n_envs,
+        eval_freq=500_000,  # Eval every 500K total timesteps
         best_model_save_path=str(save_path / "best_model"),
         log_path=str(save_path / "eval_logs"),
         deterministic=True,
+        # Early stopping: stop when training plateaus
+        early_stopping=use_early_stopping,
+        plateau_window=10,  # Check last 10 evals
+        plateau_threshold=3.0,  # Stop if reward range < 3.0
+        min_evals_before_stopping=20,  # Need 20 evals before stopping
+        reward_per_hour_threshold=15.0,  # Stop if Δreward/hour < 15
     )
+
+    if use_early_stopping:
+        print("Early stopping: ENABLED (plateau detection)")
+    else:
+        print("Early stopping: DISABLED (train for full timesteps)")
 
     self_play_cb = SelfPlayCallback(
         checkpoint_dir=str(save_path / "checkpoints"),
@@ -202,7 +217,7 @@ def train(
         )
     else:
         print("\nCreating new MaskablePPO model...")
-        print("Hyperparameters (V7 - optimized for multi-core + GPU):")
+        print("Hyperparameters (V8 - benchmark-optimized for RTX 4080 SUPER):")
         print("  learning_rate: 3e-4")
         print(f"  n_steps: {n_steps}")
         print(f"  batch_size: {batch_size}")
@@ -226,7 +241,10 @@ def train(
             verbose=1,
             tensorboard_log=str(save_path / "tensorboard"),
             device=device,
-            policy_kwargs={"net_arch": [256, 256]},
+            policy_kwargs={
+                "net_arch": {"pi": [512, 512, 256], "vf": [512, 512, 256]},
+                "activation_fn": torch.nn.ReLU,
+            },
         )
 
     # Apply torch.compile for optimized forward passes (PyTorch 2.0+)
@@ -346,6 +364,17 @@ Examples:
         default=DEFAULT_SAVE_DIR,
         help=f"Directory to save models (default: {DEFAULT_SAVE_DIR})",
     )
+    parser.add_argument(
+        "--early-stopping",
+        action="store_true",
+        default=True,
+        help="Enable early stopping on plateau (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-early-stopping",
+        action="store_true",
+        help="Disable early stopping (train for full timesteps)",
+    )
 
     args = parser.parse_args()
 
@@ -355,6 +384,7 @@ Examples:
     # Handle flag logic
     use_subproc = args.subproc and not args.no_subproc
     use_compile = args.compile and not args.no_compile
+    use_early_stopping = args.early_stopping and not args.no_early_stopping
 
     train(
         total_timesteps=args.timesteps,
@@ -365,6 +395,7 @@ Examples:
         use_compile=use_compile,
         save_dir=args.save_dir,
         load_path=args.load,
+        use_early_stopping=use_early_stopping,
     )
 
 
