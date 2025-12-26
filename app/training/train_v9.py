@@ -282,7 +282,7 @@ def train_manager(
         best_model_save_path=str(save_path / "best_model"),
         log_path=str(save_path / "eval_logs"),
         deterministic=True,
-        early_stopping=True,
+        early_stopping=False,  # Disabled: curriculum learning causes temporary performance drops
         plateau_window=5,
         plateau_threshold=5.0,
         min_evals_before_stopping=10,
@@ -442,7 +442,7 @@ def train_worker(
         best_model_save_path=str(save_path / "best_model"),
         log_path=str(save_path / "eval_logs"),
         deterministic=True,
-        early_stopping=True,
+        early_stopping=False,  # Disabled: curriculum learning causes temporary performance drops
         plateau_window=5,
         plateau_threshold=3.0,
         min_evals_before_stopping=10,
