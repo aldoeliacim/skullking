@@ -395,12 +395,12 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
                 else:
                     # Fallback: use rule-based strategy
                     fallback = RuleBasedBot(player_id, BotDifficulty.HARD)
-                    card_id = fallback.pick_card(self.game, player.hand, trick.cards_played())
+                    card_id = fallback.pick_card(self.game, player.hand, trick.get_all_card_ids())
             else:
                 # Bot plays
                 bot = next((b for pid, b in self.bots if pid == player_id), None)
                 if bot:
-                    card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
+                    card_id = bot.pick_card(self.game, player.hand, trick.get_all_card_ids())
                 else:
                     card_id = player.hand[0]
 
@@ -410,7 +410,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             if card.is_tigress():
                 tigress_choice = TigressChoice.ESCAPE
 
-            trick.play_card(player_id, card_id, tigress_choice)
+            trick.add_card(player_id, card_id, tigress_choice)
             player.hand.remove(card_id)
 
         trick.determine_winner()
@@ -421,9 +421,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         obs = self._get_worker_obs_for_manager(player, trick, current_round)
 
         # Get action mask
-        valid_cards = current_round.get_valid_cards(
-            self.agent_player_id, player.hand, trick.cards_played()
-        )
+        valid_cards = trick.get_valid_cards(player.hand, trick.get_all_card_ids())
         mask = np.zeros(11, dtype=bool)
         for i, card_id in enumerate(player.hand):
             if i < 11 and card_id in valid_cards:
@@ -466,7 +464,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             else:
                 bot = next((b for pid, b in self.bots if pid == player_id), None)
                 if bot:
-                    card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
+                    card_id = bot.pick_card(self.game, player.hand, trick.get_all_card_ids())
                 else:
                     card_id = player.hand[0]
 
@@ -475,7 +473,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             if card.is_tigress():
                 tigress_choice = TigressChoice.ESCAPE
 
-            trick.play_card(player_id, card_id, tigress_choice)
+            trick.add_card(player_id, card_id, tigress_choice)
             player.hand.remove(card_id)
 
         trick.determine_winner()
@@ -1002,8 +1000,9 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         for r in range(1, self.current_round_num):
             self._simulate_full_round(r)
 
-        # Start target round and complete bidding
+        # Start target round, deal cards, and complete bidding
         self.game.start_new_round()
+        self.game.deal_cards()
         self._complete_bidding()
 
     def _create_bot(self, player_id: str) -> BaseBot:
@@ -1043,6 +1042,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
     def _simulate_full_round(self, round_num: int) -> None:
         """Simulate a complete round."""
         self.game.start_new_round()
+        self.game.deal_cards()
         current_round = self.game.get_current_round()
         if not current_round:
             return
@@ -1081,7 +1081,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             else:
                 bot = next((b for pid, b in self.bots if pid == player_id), None)
                 if bot:
-                    card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
+                    card_id = bot.pick_card(self.game, player.hand, trick.get_all_card_ids())
                 else:
                     card_id = player.hand[0]
 
@@ -1089,7 +1089,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             if get_card(card_id).is_tigress():
                 tigress_choice = TigressChoice.ESCAPE
 
-            trick.play_card(player_id, card_id, tigress_choice)
+            trick.add_card(player_id, card_id, tigress_choice)
             player.hand.remove(card_id)
 
         trick.determine_winner()
@@ -1129,7 +1129,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
         # Get or create current trick
         trick = current_round.get_current_trick()
-        if not trick or trick.is_complete():
+        if not trick or trick.is_complete(self.num_players):
             trick = self._start_new_trick(current_round)
 
         if not trick:
@@ -1139,9 +1139,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         self._play_until_agent_turn(current_round, trick)
 
         # Play agent's card
-        valid_cards = current_round.get_valid_cards(
-            self.agent_player_id, agent.hand, trick.cards_played()
-        )
+        valid_cards = trick.get_valid_cards(agent.hand, trick.get_all_card_ids())
 
         # Map action to card
         if 0 <= action < len(agent.hand):
@@ -1159,7 +1157,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             need_wins = self.goal_bid - self.tricks_won
             tigress_choice = TigressChoice.PIRATE if need_wins > 0 else TigressChoice.ESCAPE
 
-        trick.play_card(self.agent_player_id, card_id, tigress_choice)
+        trick.add_card(self.agent_player_id, card_id, tigress_choice)
         agent.hand.remove(card_id)
 
         # Complete trick with remaining players
@@ -1167,7 +1165,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
         # Determine winner and update state
         trick.determine_winner()
-        won_trick = trick.winner == self.agent_player_id
+        won_trick = trick.winner_player_id == self.agent_player_id
         if won_trick:
             self.tricks_won += 1
 
@@ -1175,7 +1173,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         reward = self._calculate_worker_reward(won_trick, trick)
 
         # Check if round is complete
-        round_complete = len(current_round.tricks) >= self.current_round_num and trick.is_complete()
+        round_complete = len(current_round.tricks) >= self.current_round_num and trick.is_complete(self.num_players)
 
         if round_complete:
             current_round.calculate_scores()
@@ -1193,7 +1191,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
     def _play_until_agent_turn(self, current_round: Round, trick: Trick) -> None:
         """Play bot cards until it's agent's turn."""
         play_order = self._get_play_order(trick)
-        played_ids = {pid for pid, _ in trick.plays}
+        played_ids = {pc.player_id for pc in trick.picked_cards}
 
         for player_id in play_order:
             if player_id in played_ids:
@@ -1207,7 +1205,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
             bot = next((b for pid, b in self.bots if pid == player_id), None)
             if bot:
-                card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
+                card_id = bot.pick_card(self.game, player.hand, trick.get_all_card_ids())
             else:
                 card_id = player.hand[0]
 
@@ -1215,13 +1213,13 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             if get_card(card_id).is_tigress():
                 tigress_choice = TigressChoice.ESCAPE
 
-            trick.play_card(player_id, card_id, tigress_choice)
+            trick.add_card(player_id, card_id, tigress_choice)
             player.hand.remove(card_id)
 
     def _complete_trick(self, current_round: Round, trick: Trick) -> None:
         """Complete trick with remaining players after agent."""
         play_order = self._get_play_order(trick)
-        played_ids = {pid for pid, _ in trick.plays}
+        played_ids = {pc.player_id for pc in trick.picked_cards}
 
         agent_played = False
         for player_id in play_order:
@@ -1239,7 +1237,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
             bot = next((b for pid, b in self.bots if pid == player_id), None)
             if bot:
-                card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
+                card_id = bot.pick_card(self.game, player.hand, trick.get_all_card_ids())
             else:
                 card_id = player.hand[0]
 
@@ -1247,7 +1245,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             if get_card(card_id).is_tigress():
                 tigress_choice = TigressChoice.ESCAPE
 
-            trick.play_card(player_id, card_id, tigress_choice)
+            trick.add_card(player_id, card_id, tigress_choice)
             player.hand.remove(card_id)
 
     def _calculate_worker_reward(self, won_trick: bool, trick: Trick) -> float:
@@ -1301,8 +1299,8 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         # === TRICK STATE (36 dims: 4 players x 9 features) ===
         trick = current_round.get_current_trick()
         if trick:
-            for i, (player_id, card_id) in enumerate(trick.plays[:4]):
-                card = get_card(card_id)
+            for i, pc in enumerate(trick.picked_cards[:4]):
+                card = get_card(pc.card_id)
                 obs[idx + i * 9 : idx + i * 9 + 9] = self._encode_card(card)
         idx += self.TRICK_DIM  # 36
 
@@ -1338,7 +1336,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
         # Position in trick (4 dims one-hot)
         if trick:
-            pos = len(trick.plays)
+            pos = len(trick.picked_cards)
             if pos < 4:
                 obs[idx + 3 + pos] = 1.0
         idx += 7
@@ -1514,7 +1512,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         trick = current_round.get_current_trick()
         if trick and pirate_count > 0:
             # Check if any pirate in trick
-            trick_has_pirate = any(get_card(card_id).is_pirate() for _, card_id in trick.plays)
+            trick_has_pirate = any(get_card(pc.card_id).is_pirate() for pc in trick.picked_cards)
             if not trick_has_pirate:
                 features[17] = 0.8  # Our pirate would dominate
             else:
@@ -1578,11 +1576,14 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             return mask
 
         trick = current_round.get_current_trick()
-        cards_in_trick = trick.cards_played() if trick else []
+        if not trick:
+            # No trick yet, all cards are valid
+            for i in range(min(len(agent.hand), 11)):
+                mask[i] = True
+            return mask
 
-        valid_cards = current_round.get_valid_cards(
-            self.agent_player_id, agent.hand, cards_in_trick
-        )
+        cards_in_trick = trick.get_all_card_ids()
+        valid_cards = trick.get_valid_cards(agent.hand, cards_in_trick)
 
         for i, card_id in enumerate(agent.hand):
             if i < 11 and card_id in valid_cards:
