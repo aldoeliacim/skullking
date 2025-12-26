@@ -30,6 +30,7 @@ Benefits:
 """
 
 import logging
+import uuid
 from typing import Any
 
 import gymnasium as gym
@@ -138,15 +139,18 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             self.current_round_num = self.np_random.integers(1, MAX_ROUNDS + 1)
 
         # Create new game
-        self.game = Game()
+        game_id = str(uuid.uuid4())
+        self.game = Game(id=game_id, slug=game_id[:4].upper())
         self.agent_player_id = "agent"
-        self.game.add_player(self.agent_player_id, "Agent")
+        agent_player = Player(id=self.agent_player_id, username="Agent", game_id=game_id)
+        self.game.add_player(agent_player)
 
         # Add opponents
         self.bots = []
         for i in range(self.num_players - 1):
             player_id = f"bot_{i}"
-            self.game.add_player(player_id, f"Bot {i}")
+            bot_player = Player(id=player_id, username=f"Bot {i}", game_id=game_id)
+            self.game.add_player(bot_player)
             bot = self._create_bot(player_id)
             self.bots.append((player_id, bot))
 
@@ -155,7 +159,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             self._simulate_round(r, random_bid=True)
 
         # Start target round
-        self.game.start_round()
+        self.game.start_new_round()
 
         # Make bot bids
         self._make_bot_bids()
@@ -169,7 +173,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
 
     def _simulate_round(self, round_num: int, random_bid: bool = False) -> None:
         """Simulate a complete round with random/rule-based play."""
-        self.game.start_round()
+        self.game.start_new_round()
         current_round = self.game.get_current_round()
         if not current_round:
             return
@@ -811,14 +815,17 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
     def _setup_game(self) -> None:
         """Set up game state for card-play phase."""
-        self.game = Game()
+        game_id = str(uuid.uuid4())
+        self.game = Game(id=game_id, slug=game_id[:4].upper())
         self.agent_player_id = "agent"
-        self.game.add_player(self.agent_player_id, "Agent")
+        agent_player = Player(id=self.agent_player_id, username="Agent", game_id=game_id)
+        self.game.add_player(agent_player)
 
         self.bots = []
         for i in range(self.num_players - 1):
             player_id = f"bot_{i}"
-            self.game.add_player(player_id, f"Bot {i}")
+            bot_player = Player(id=player_id, username=f"Bot {i}", game_id=game_id)
+            self.game.add_player(bot_player)
             bot = self._create_bot(player_id)
             self.bots.append((player_id, bot))
 
@@ -827,7 +834,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             self._simulate_full_round(r)
 
         # Start target round and complete bidding
-        self.game.start_round()
+        self.game.start_new_round()
         self._complete_bidding()
 
     def _create_bot(self, player_id: str) -> BaseBot:
@@ -837,7 +844,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
     def _simulate_full_round(self, round_num: int) -> None:
         """Simulate a complete round."""
-        self.game.start_round()
+        self.game.start_new_round()
         current_round = self.game.get_current_round()
         if not current_round:
             return
