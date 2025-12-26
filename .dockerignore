@@ -50,11 +50,8 @@ htmlcov/
 logs/
 training.log
 
-# Models (mounted separately)
-models/checkpoints/
-models/best_model/
-models/self_play/
-*.zip
+# Models (mounted as volume at runtime, not baked into image)
+models/
 
 # Git
 .git/

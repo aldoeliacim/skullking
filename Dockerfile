@@ -28,8 +28,8 @@ COPY static/ ./static/
 # Install the project itself
 RUN uv sync --no-dev --frozen
 
-# Copy trained models if available
-COPY models/ ./models/
+# Note: models/ directory is mounted as a volume at runtime (see docker-compose.yml)
+# This keeps the image small and allows model updates without rebuilding
 
 # Expose port
 EXPOSE 8000
