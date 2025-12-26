@@ -61,13 +61,15 @@ def parse_log(log_path: str) -> list[dict]:
                 fps = first_ts / first_time
                 elapsed = int(timesteps / fps)
 
-        results.append({
-            "timesteps": timesteps,
-            "elapsed_seconds": elapsed,
-            "elapsed_minutes": elapsed / 60,
-            "mean_reward": reward,
-            "std_reward": std,
-        })
+        results.append(
+            {
+                "timesteps": timesteps,
+                "elapsed_seconds": elapsed,
+                "elapsed_minutes": elapsed / 60,
+                "mean_reward": reward,
+                "std_reward": std,
+            }
+        )
 
     return results
 

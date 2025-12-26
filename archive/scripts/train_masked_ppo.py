@@ -142,9 +142,13 @@ class MixedOpponentEvalCallback(BaseCallback):
         std_reward = np.std(all_rewards)
         mean_length = np.mean(all_lengths)
 
-        print(f"Eval num_timesteps={self.num_timesteps}, episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+        print(
+            f"Eval num_timesteps={self.num_timesteps}, episode_reward={mean_reward:.2f} +/- {std_reward:.2f}"
+        )
         print(f"Episode length: {mean_length:.2f} +/- {np.std(all_lengths):.2f}")
-        print(f"(Mixed eval: {len(self.opponent_configs)} opponent types, {len(all_rewards)} total episodes)")
+        print(
+            f"(Mixed eval: {len(self.opponent_configs)} opponent types, {len(all_rewards)} total episodes)"
+        )
 
         # Save best model
         if mean_reward > self.best_mean_reward:

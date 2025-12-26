@@ -159,8 +159,7 @@ def serialize_round(round_obj: Round) -> dict[str, Any]:
         "number": round_obj.number,
         "starter_player_index": round_obj.starter_player_index,
         "dealt_cards": {
-            player_id: [int(c) for c in cards]
-            for player_id, cards in round_obj.dealt_cards.items()
+            player_id: [int(c) for c in cards] for player_id, cards in round_obj.dealt_cards.items()
         },
         "bids": round_obj.bids,
         "tricks": [serialize_trick(t) for t in round_obj.tricks],

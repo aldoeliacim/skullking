@@ -20,10 +20,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-
-from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
 
 
 def create_env(opponent_type="random", difficulty="medium"):

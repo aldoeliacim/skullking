@@ -194,9 +194,7 @@ class RLBot(BaseBot):
                 return card
         return None
 
-    def _heuristic_pick(
-        self, playable: list[CardId], cards_in_trick: list[CardId]
-    ) -> CardId:
+    def _heuristic_pick(self, playable: list[CardId], cards_in_trick: list[CardId]) -> CardId:
         """Pick a card using simple heuristics when model fails.
 
         Strategy: If leading, play a medium card. If following, play lowest valid.

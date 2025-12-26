@@ -8,10 +8,7 @@ Note: Requires sb3_contrib for MaskablePPO support.
 """
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-import numpy as np
 
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.bots.rule_based_bot import RuleBasedBot
@@ -53,9 +50,7 @@ class RLBot(BaseBot):
         self._gym_env: Any = None
 
         if model is None:
-            logger.warning(
-                "RLBot initialized without model, using rule-based fallback"
-            )
+            logger.warning("RLBot initialized without model, using rule-based fallback")
 
     def _get_gym_env(self) -> Any:
         """Lazily create gym environment for observation building."""
@@ -72,9 +67,7 @@ class RLBot(BaseBot):
                 logger.warning("Could not import SkullKingEnvMasked")
         return self._gym_env
 
-    def make_bid(
-        self, game: "Game", round_number: int, hand: list[CardId]
-    ) -> int:
+    def make_bid(self, game: "Game", round_number: int, hand: list[CardId]) -> int:
         """Make a bid using the RL model or fallback.
 
         Args:
@@ -104,9 +97,7 @@ class RLBot(BaseBot):
             mask = env._get_bid_action_mask(round_number)
 
             # Predict action
-            action, _ = self.model.predict(
-                obs, deterministic=True, action_masks=mask
-            )
+            action, _ = self.model.predict(obs, deterministic=True, action_masks=mask)
             bid = int(action.item() if hasattr(action, "item") else action)
             return max(0, min(round_number, bid))
 
@@ -151,9 +142,7 @@ class RLBot(BaseBot):
             mask = env._get_pick_action_mask(hand, cards_in_trick)
 
             # Predict action (card index)
-            action, _ = self.model.predict(
-                obs, deterministic=True, action_masks=mask
-            )
+            action, _ = self.model.predict(obs, deterministic=True, action_masks=mask)
             card_idx = int(action.item() if hasattr(action, "item") else action)
 
             # Map action to card

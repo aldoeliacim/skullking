@@ -17,9 +17,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from stable_baselines3 import PPO
-
 from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
+from stable_baselines3 import PPO
 
 
 def evaluate_model_comprehensive(

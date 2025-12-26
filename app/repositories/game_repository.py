@@ -178,9 +178,13 @@ class GameRepository:
             return []
 
         try:
-            cursor = self.db.games.find(
-                {"state": {"$ne": "ENDED"}},
-            ).sort("updated_at", DESCENDING).limit(limit)
+            cursor = (
+                self.db.games.find(
+                    {"state": {"$ne": "ENDED"}},
+                )
+                .sort("updated_at", DESCENDING)
+                .limit(limit)
+            )
 
             games = []
             async for doc in cursor:

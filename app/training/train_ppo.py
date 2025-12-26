@@ -275,7 +275,7 @@ def train(
     print("=" * 60)
     print(f"Final model: {final_path}.zip")
     print(f"Best model: {save_path / 'best_model' / 'best_model.zip'}")
-    print(f"\nView training progress:")
+    print("\nView training progress:")
     print(f"  tensorboard --logdir {save_path / 'tensorboard'}")
 
 

@@ -8,10 +8,8 @@ Usage:
 """
 
 import gc
-import os
 import time
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 import torch
@@ -28,12 +26,14 @@ def mask_fn(env: SkullKingEnvMasked) -> np.ndarray:
     """Get action mask from environment."""
     return env.action_masks()
 
+
 console = Console()
 
 
 @dataclass
 class BenchmarkResult:
     """Results from a benchmark run."""
+
     n_envs: int
     batch_size: int
     vec_env_type: str
@@ -50,9 +50,16 @@ def get_gpu_stats() -> tuple[float, float]:
     """Get GPU utilization and memory usage."""
     try:
         import subprocess
+
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, check=True
+            [
+                "nvidia-smi",
+                "--query-gpu=utilization.gpu,memory.used",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
         )
         util, mem = result.stdout.strip().split(", ")
         return float(util), float(mem)
@@ -62,12 +69,14 @@ def get_gpu_stats() -> tuple[float, float]:
 
 def make_env(rank: int) -> callable:
     """Create SkullKingEnvMasked environment factory."""
+
     def _init() -> ActionMasker:
         env = SkullKingEnvMasked(
             opponent_bot_type="rule_based",
             opponent_difficulty="medium",
         )
         return ActionMasker(env, mask_fn)
+
     return _init
 
 
@@ -187,10 +196,8 @@ def main():
     # Try pushing higher with more envs
     configs = [
         # (n_envs, batch_size, use_subproc, n_steps)
-
         # Previous best baseline
         (256, 32768, True, 2048),
-
         # Push more envs
         (384, 32768, True, 2048),
         (512, 32768, True, 2048),
@@ -249,7 +256,7 @@ def main():
     if results:
         best = results[0]
         console.print()
-        console.print(f"[bold green]Best Configuration:[/bold green]")
+        console.print("[bold green]Best Configuration:[/bold green]")
         console.print(f"  n_envs: {best.n_envs}")
         console.print(f"  batch_size: {best.batch_size}")
         console.print(f"  vec_env: {best.vec_env_type}")

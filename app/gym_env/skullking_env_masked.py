@@ -65,9 +65,7 @@ class SelfPlayBot(BaseBot):
             and card.number >= self.STRONG_CARD_THRESHOLD
         )
 
-    def pick_card(
-        self, game: "Game", hand: list[CardId], cards_in_trick: list[CardId]
-    ) -> CardId:
+    def pick_card(self, game: "Game", hand: list[CardId], cards_in_trick: list[CardId]) -> CardId:
         """Pick card using rule-based strategy (trained model behavior)."""
         # Use rule-based hard as proxy for self-play
         fallback = RuleBasedBot(self.player_id, BotDifficulty.HARD)

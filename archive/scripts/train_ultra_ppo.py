@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import (
     BaseCallback,
@@ -25,8 +26,6 @@ from stable_baselines3.common.callbacks import (
 )
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-
-from app.gym_env.skullking_env_enhanced import SkullKingEnvEnhanced
 
 
 class CurriculumCallback(BaseCallback):

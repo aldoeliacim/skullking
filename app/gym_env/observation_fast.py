@@ -7,7 +7,7 @@ Provides 2-5x speedup for observation generation.
 import numpy as np
 from numba import njit
 
-from app.models.card import CardId, CardType, get_card
+from app.models.card import CardId, get_card
 
 # Pre-compute card properties for all 74 cards
 # These arrays are indexed by card_id (1-74, 0 is unused)

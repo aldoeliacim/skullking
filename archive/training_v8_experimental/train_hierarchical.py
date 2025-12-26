@@ -13,26 +13,20 @@ providing clearer credit assignment and faster convergence.
 
 import argparse
 import logging
-import os
-import sys
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from sb3_contrib import MaskablePPO
-from sb3_contrib.common.maskable.callbacks import MaskableEvalCallback
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from app.gym_env.skullking_env_hierarchical import (
     ManagerEnv,
     WorkerEnv,
-    create_manager_env,
-    create_worker_env,
     mask_fn_manager,
     mask_fn_worker,
 )
@@ -48,12 +42,10 @@ DEFAULT_CONFIG = {
     "use_subproc": True,  # SubprocVecEnv for multi-core
     "batch_size": 2048,  # Larger batches for GPU
     "use_torch_compile": True,  # torch.compile optimization
-
     # Training steps
     "worker_pretrain_steps": 2_000_000,
     "manager_pretrain_steps": 1_000_000,
     "joint_finetune_steps": 3_000_000,
-
     # PPO hyperparameters
     "learning_rate": 3e-4,
     "n_epochs": 15,
@@ -63,13 +55,11 @@ DEFAULT_CONFIG = {
     "vf_coef": 0.5,
     "max_grad_norm": 0.5,
     "clip_range": 0.2,
-
     # Network architecture
     "policy_kwargs": {
         "net_arch": {"pi": [256, 256], "vf": [256, 256]},
         "activation_fn": torch.nn.ReLU,
     },
-
     # Paths
     "model_dir": "models/hierarchical",
     "tensorboard_dir": "models/hierarchical/tensorboard",
@@ -152,6 +142,7 @@ def make_worker_env(
     fixed_goal: int | None = None,
 ) -> callable:
     """Create a Worker environment factory."""
+
     def _init() -> ActionMasker:
         env = WorkerEnv(
             opponent_bot_type=opponent_type,
@@ -159,6 +150,7 @@ def make_worker_env(
             fixed_goal=fixed_goal,
         )
         return ActionMasker(env, mask_fn_worker)
+
     return _init
 
 
@@ -169,6 +161,7 @@ def make_manager_env(
     worker_policy: Any = None,
 ) -> callable:
     """Create a Manager environment factory."""
+
     def _init() -> ActionMasker:
         env = ManagerEnv(
             worker_policy=worker_policy,
@@ -176,6 +169,7 @@ def make_manager_env(
             opponent_difficulty=difficulty,
         )
         return ActionMasker(env, mask_fn_manager)
+
     return _init
 
 
@@ -237,17 +231,19 @@ def train_worker(config: dict) -> MaskablePPO:
             console.print(f"[yellow]torch.compile failed: {e}[/yellow]")
 
     # Callbacks
-    callbacks = CallbackList([
-        HierarchicalProgressCallback(
-            config["worker_pretrain_steps"],
-            phase_name="Worker Pre-training",
-        ),
-        CheckpointCallback(
-            save_freq=500_000,
-            save_path=config["model_dir"],
-            name_prefix="worker_checkpoint",
-        ),
-    ])
+    callbacks = CallbackList(
+        [
+            HierarchicalProgressCallback(
+                config["worker_pretrain_steps"],
+                phase_name="Worker Pre-training",
+            ),
+            CheckpointCallback(
+                save_freq=500_000,
+                save_path=config["model_dir"],
+                name_prefix="worker_checkpoint",
+            ),
+        ]
+    )
 
     # Train
     model.learn(
@@ -307,17 +303,19 @@ def train_manager(config: dict, worker_policy: MaskablePPO | None = None) -> Mas
             pass
 
     # Callbacks
-    callbacks = CallbackList([
-        HierarchicalProgressCallback(
-            config["manager_pretrain_steps"],
-            phase_name="Manager Pre-training",
-        ),
-        CheckpointCallback(
-            save_freq=200_000,
-            save_path=config["model_dir"],
-            name_prefix="manager_checkpoint",
-        ),
-    ])
+    callbacks = CallbackList(
+        [
+            HierarchicalProgressCallback(
+                config["manager_pretrain_steps"],
+                phase_name="Manager Pre-training",
+            ),
+            CheckpointCallback(
+                save_freq=200_000,
+                save_path=config["model_dir"],
+                name_prefix="manager_checkpoint",
+            ),
+        ]
+    )
 
     # Train
     model.learn(
@@ -356,17 +354,19 @@ def joint_finetune(
 
     manager_model.set_env(vec_env)
 
-    callbacks = CallbackList([
-        HierarchicalProgressCallback(
-            config["joint_finetune_steps"],
-            phase_name="Joint Fine-tuning",
-        ),
-        CheckpointCallback(
-            save_freq=500_000,
-            save_path=config["model_dir"],
-            name_prefix="joint_checkpoint",
-        ),
-    ])
+    callbacks = CallbackList(
+        [
+            HierarchicalProgressCallback(
+                config["joint_finetune_steps"],
+                phase_name="Joint Fine-tuning",
+            ),
+            CheckpointCallback(
+                save_freq=500_000,
+                save_path=config["model_dir"],
+                name_prefix="joint_checkpoint",
+            ),
+        ]
+    )
 
     manager_model.learn(
         total_timesteps=config["joint_finetune_steps"],
@@ -398,7 +398,9 @@ def train(config: dict | None = None) -> None:
 
     console.print("[bold]Skull King Hierarchical RL Training (V7+V8)[/bold]")
     console.print(f"Environments: {config['n_envs']}")
-    console.print(f"Total steps: {config['worker_pretrain_steps'] + config['manager_pretrain_steps'] + config['joint_finetune_steps']:,}")
+    console.print(
+        f"Total steps: {config['worker_pretrain_steps'] + config['manager_pretrain_steps'] + config['joint_finetune_steps']:,}"
+    )
 
     # Phase 1: Pre-train Worker
     worker_model = train_worker(config)
