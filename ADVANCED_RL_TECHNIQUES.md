@@ -2329,11 +2329,11 @@ class TheoryOfMind(nn.Module):
 | Alliance reward | ✅ Done | V6 | +2.0 per successful alliance |
 | **Performance benchmarks** | ✅ Done | V7 | Found optimal: 768 envs, batch 32768 |
 | **SubprocVecEnv** | ✅ Done | V7 | 5.8x speedup (6,836 FPS) |
-| **Optimized training** | 🔄 Running | V8 | 50M steps, eval 82+ already |
-| Hierarchical RL | 📋 Planned | V9 | Manager/Worker policies |
+| **Optimized training** | ✅ Done | V8 | 31M steps, reward 80.62, plateaued |
+| **Hierarchical RL** | ✅ Done | V9 | Manager/Worker policies, phase curriculum |
 | Transformer Architecture | 📋 Planned | V10 | Attention over cards |
 
-### 10.2 Priority Order (Updated December 25, 2024)
+### 10.2 Priority Order (Updated December 26, 2024)
 
 Based on expected impact vs implementation complexity:
 
@@ -2341,8 +2341,8 @@ Based on expected impact vs implementation complexity:
 |----------|-----------|--------|------------|--------|
 | ~~1~~ | ~~Loot Alliance Observations~~ | Medium | Low | ✅ V6 Done |
 | ~~2~~ | ~~Performance Benchmarking~~ | High | Low | ✅ V7 Done |
-| ~~3~~ | ~~Optimized Training~~ | High | Low | 🔄 V8 Running |
-| **4** | **Hierarchical RL** | High | Medium | 📋 V9 Planned |
+| ~~3~~ | ~~Optimized Training~~ | High | Low | ✅ V8 Done |
+| ~~4~~ | ~~Hierarchical RL~~ | High | Medium | ✅ V9 Done |
 | **5** | **Transformer Architecture** | High | Medium | 📋 V10 Planned |
 | 6 | Round-as-Episode | Medium | Low | Backlog |
 | 7 | Intrinsic Motivation (RND) | Medium | Low | Backlog |
@@ -2371,13 +2371,26 @@ V7: Performance Benchmarking [COMPLETED Dec 25, 2024]
 ├── ✅ GPU util: 50% (CPU-bound, not GPU-bound)
 └── Analysis: 768 envs saturates 24-thread Ryzen 9 7900X
 
-V8: Optimized Training at Scale [IN PROGRESS Dec 25, 2024]
-├── ✅ Applied V7 optimal config
+V8: Optimized Training at Scale [COMPLETED Dec 25, 2024]
+├── ✅ Applied V7 optimal config (768 envs, batch 32768)
 ├── ✅ Network upgraded: [256,256] → [512,512,256]
-├── ✅ Extended training: 10M → 50M steps
-├── 🔄 Training at 6,643 FPS
-├── 🔄 At 18.9M steps: eval reward 82.30 (exceeds V6's 81.35)
-└── Projected: 90-95 reward at 50M steps
+├── ✅ Training: 31M steps in 79 minutes (6,539 FPS)
+├── ✅ Final reward: 80.62 (plateaued from 80 after 20 min)
+└── Analysis: Diminishing returns, need architectural change
+
+V9: Hierarchical RL + Episode Design [COMPLETED Dec 26, 2024]
+├── ✅ Manager/Worker policy separation
+│   ├── ManagerEnv: Bidding only (obs 171 dims, action 0-10)
+│   ├── WorkerEnv: Card play only (obs 203 dims, action 0-10)
+│   └── 2.8x faster stepping than flat env
+├── ✅ Episode Design Optimizations
+│   ├── Round-weighted sampling (late rounds 4x more likely)
+│   ├── Phase curriculum (late → mid → all phases)
+│   ├── Phase embedding (+3 dims one-hot)
+│   ├── Phase-specific epochs (Manager: 25, Worker: 12)
+│   └── Callbacks: PhaseSchedulerCallback, RoundStatsCallback
+├── ✅ Numba-accelerated observation encoding
+└── Training: In progress
 ```
 
 ### 10.4 Roadmap
@@ -2390,14 +2403,15 @@ Phase 1: Foundation [DONE]
 
 Phase 2: Performance [DONE]
 ├── ✅ V7: Benchmarking (found 768 envs, batch 32768 optimal)
-└── 🔄 V8: Training 50M steps at 6,643 FPS (already exceeds V6)
+└── ✅ V8: Training 31M steps, reward 80.62, identified plateau
 
-Phase 3: Architecture [NEXT]
-├── 📋 V9: Hierarchical RL (Manager/Worker policies)
-│   ├── Manager: Bidding decisions (10 per game)
-│   ├── Worker: Card-play decisions (14 per game avg)
-│   ├── Requires: Fix hierarchical env API (Game, Player constructors)
-│   └── Expected: 2-3x sample efficiency, 80% bid accuracy
+Phase 3: Architecture [IN PROGRESS]
+├── ✅ V9: Hierarchical RL (Manager/Worker policies)
+│   ├── Manager: Bidding decisions (obs 171 dims)
+│   ├── Worker: Card-play decisions (obs 203 dims)
+│   ├── Phase curriculum: late → mid → all rounds
+│   ├── Round-weighted sampling: late rounds 4x more likely
+│   └── 2.8x faster stepping than flat env
 └── 📋 V10: Transformer Architecture
     ├── CardTransformer with attention over hand
     ├── Variable-length input handling
