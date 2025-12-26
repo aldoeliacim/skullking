@@ -107,6 +107,8 @@ skullking/
 
 ## Training RL Agents
 
+### Flat Environment (V8)
+
 ```python
 from sb3_contrib import MaskablePPO
 from app.gym_env import SkullKingEnvMasked
@@ -117,20 +119,26 @@ model.learn(total_timesteps=1_000_000)
 model.save("models/skull_king_ppo")
 ```
 
-Or use the training module:
-
 ```bash
 # Train new model (10M steps, ~2.5 hours on RTX 4080)
 uv run python -m app.training.train_ppo train --timesteps 10000000
 
 # Resume from checkpoint
 uv run python -m app.training.train_ppo resume --load models/masked_ppo/best_model/best_model.zip
-
-# Quick test (100k steps)
-uv run python -m app.training.train_ppo train --timesteps 100000 --envs 8
 ```
 
-See [TRAINING_LOG.md](./TRAINING_LOG.md) for training history and results.
+### Hierarchical RL (V9)
+
+Separate Manager (bidding) and Worker (card play) policies for better credit assignment:
+
+```bash
+# Train with V9 hierarchical approach
+uv run python -m app.training.train_v9 --manager-timesteps 5000000 --worker-timesteps 10000000
+
+# Features: phase curriculum, round-weighted sampling, phase embeddings
+```
+
+See [TRAINING_LOG.md](./TRAINING_LOG.md) for training history and [V9_OPTIMIZATION_PLAN.md](./V9_OPTIMIZATION_PLAN.md) for optimization details.
 
 ## Docker Services
 
