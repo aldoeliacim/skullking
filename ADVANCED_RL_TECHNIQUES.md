@@ -2325,12 +2325,13 @@ class TheoryOfMind(nn.Module):
 | Bid goal observation | ✅ Done | V5 | Helps card-play credit assignment |
 | Mixed opponent evaluation | ✅ Done | V5 | 21 eps across 3 opponent types |
 | Self-play training | ✅ Done | V5 | Activates at 2M steps |
-| **Loot alliance obs** | ✅ Done | V6 | +8 dims for alliance mechanics |
-| **Alliance reward** | ✅ Done | V6 | +2.0 per successful alliance |
-| **SubprocVecEnv** | ✅ Ready | V7 | Multi-core parallelism |
-| **torch.compile** | ✅ Ready | V7 | Optimized forward passes |
-| Hierarchical RL | 📋 Planned | V8 | Manager/Worker policies |
-| Transformer Architecture | 📋 Planned | V9 | Attention over cards |
+| Loot alliance obs | ✅ Done | V6 | +8 dims for alliance mechanics |
+| Alliance reward | ✅ Done | V6 | +2.0 per successful alliance |
+| **Performance benchmarks** | ✅ Done | V7 | Found optimal: 768 envs, batch 32768 |
+| **SubprocVecEnv** | ✅ Done | V7 | 5.8x speedup (6,836 FPS) |
+| **Optimized training** | 🔄 Running | V8 | 50M steps, eval 82+ already |
+| Hierarchical RL | 📋 Planned | V9 | Manager/Worker policies |
+| Transformer Architecture | 📋 Planned | V10 | Attention over cards |
 
 ### 10.2 Priority Order (Updated December 25, 2024)
 
@@ -2339,15 +2340,15 @@ Based on expected impact vs implementation complexity:
 | Priority | Technique | Impact | Complexity | Status |
 |----------|-----------|--------|------------|--------|
 | ~~1~~ | ~~Loot Alliance Observations~~ | Medium | Low | ✅ V6 Done |
-| ~~2~~ | ~~Performance Optimization~~ | High | Low | ✅ V7 Ready |
-| **3** | **Hierarchical RL** | High | Medium | 📋 V8 Planned |
-| **4** | **Transformer Architecture** | High | Medium | 📋 V9 Planned |
-| 5 | Round-as-Episode | Medium | Low | Backlog |
-| 6 | Intrinsic Motivation (RND) | Medium | Low | Backlog |
-| 7 | Population Training | High | High | Backlog |
-| 8 | MCTS + RL | Very High | High | Backlog |
-| 9 | Deep CFR | High | Very High | Backlog |
-| 10 | Opponent Modeling | Medium | Medium | Backlog |
+| ~~2~~ | ~~Performance Benchmarking~~ | High | Low | ✅ V7 Done |
+| ~~3~~ | ~~Optimized Training~~ | High | Low | 🔄 V8 Running |
+| **4** | **Hierarchical RL** | High | Medium | 📋 V9 Planned |
+| **5** | **Transformer Architecture** | High | Medium | 📋 V10 Planned |
+| 6 | Round-as-Episode | Medium | Low | Backlog |
+| 7 | Intrinsic Motivation (RND) | Medium | Low | Backlog |
+| 8 | Population Training | High | High | Backlog |
+| 9 | MCTS + RL | Very High | High | Backlog |
+| 10 | Deep CFR | High | Very High | Backlog |
 
 ### 10.3 Version History
 
@@ -2362,12 +2363,21 @@ V6: Loot Alliance Awareness [COMPLETED Dec 25, 2024]
 └── Results: 79.4 mean reward (similar to V5)
     └── Analysis: Alliance situations rare, may need stronger signal
 
-V7: Performance Optimization [READY]
-├── ✅ SubprocVecEnv (multi-core parallelism)
-├── ✅ 128 parallel environments (up from 32)
-├── ✅ Batch size 4096 (up from 1024)
-├── ✅ torch.compile (optimized forward passes)
-└── Expected: 3-4x speedup (~4000 FPS, 45 min for 10M)
+V7: Performance Benchmarking [COMPLETED Dec 25, 2024]
+├── ✅ Benchmark script (app/training/benchmark_hierarchical.py)
+├── ✅ Tested: n_envs 256-768, batch 32768-65536, n_steps 2048
+├── ✅ Found optimal: 768 envs, batch 32768, n_steps 2048
+├── ✅ Achieved: 6,836 FPS (5.8x faster than V6)
+├── ✅ GPU util: 50% (CPU-bound, not GPU-bound)
+└── Analysis: 768 envs saturates 24-thread Ryzen 9 7900X
+
+V8: Optimized Training at Scale [IN PROGRESS Dec 25, 2024]
+├── ✅ Applied V7 optimal config
+├── ✅ Network upgraded: [256,256] → [512,512,256]
+├── ✅ Extended training: 10M → 50M steps
+├── 🔄 Training at 6,643 FPS
+├── 🔄 At 18.9M steps: eval reward 82.30 (exceeds V6's 81.35)
+└── Projected: 90-95 reward at 50M steps
 ```
 
 ### 10.4 Roadmap
@@ -2378,16 +2388,17 @@ Phase 1: Foundation [DONE]
 ├── ✅ V5: Round encoding, bid goal, mixed evaluation, self-play
 └── ✅ V6: Alliance observations and rewards
 
-Phase 2: Performance [IN PROGRESS]
-├── ✅ V7 config ready (SubprocVecEnv, torch.compile)
-└── 🔄 Run V7 training to validate speedup
+Phase 2: Performance [DONE]
+├── ✅ V7: Benchmarking (found 768 envs, batch 32768 optimal)
+└── 🔄 V8: Training 50M steps at 6,643 FPS (already exceeds V6)
 
 Phase 3: Architecture [NEXT]
-├── 📋 V8: Hierarchical RL (Manager/Worker policies)
+├── 📋 V9: Hierarchical RL (Manager/Worker policies)
 │   ├── Manager: Bidding decisions (10 per game)
 │   ├── Worker: Card-play decisions (14 per game avg)
+│   ├── Requires: Fix hierarchical env API (Game, Player constructors)
 │   └── Expected: 2-3x sample efficiency, 80% bid accuracy
-└── 📋 V9: Transformer Architecture
+└── 📋 V10: Transformer Architecture
     ├── CardTransformer with attention over hand
     ├── Variable-length input handling
     └── Attention visualization for interpretability
