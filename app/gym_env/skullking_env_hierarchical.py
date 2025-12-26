@@ -981,7 +981,16 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         return self.np_random.integers(1, MAX_ROUNDS + 1)
 
     def _setup_game(self) -> None:
-        """Set up game state for card-play phase."""
+        """Set up game state for card-play phase.
+
+        OPTIMIZED: Skip simulation of previous rounds - directly start at target round.
+        Previous rounds are not needed for single-round Worker training since:
+        - We don't use game history in observations
+        - We don't need accurate cumulative scores
+        - Bot decisions don't depend on past round outcomes
+
+        This optimization gives ~5-10x speedup for late rounds.
+        """
         game_id = str(uuid.uuid4())
         self.game = Game(id=game_id, slug=game_id[:4].upper())
         self.agent_player_id = "agent"
@@ -996,9 +1005,9 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             bot = self._create_bot(player_id)
             self.bots.append((player_id, bot))
 
-        # Fast-forward to target round
-        for r in range(1, self.current_round_num):
-            self._simulate_full_round(r)
+        # OPTIMIZED: Jump directly to target round (skip simulating rounds 1 to N-1)
+        # Set round number directly instead of calling start_new_round() N times
+        self.game.current_round_number = self.current_round_num - 1  # Will be incremented
 
         # Start target round, deal cards, and complete bidding
         self.game.start_new_round()
