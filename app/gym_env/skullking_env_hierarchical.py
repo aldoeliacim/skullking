@@ -40,19 +40,11 @@ from sb3_contrib.common.wrappers import ActionMasker
 
 from app.bots import RandomBot, RuleBasedBot
 
-# Round-weighted sampling weights (favor late rounds with more decisions)
-ROUND_WEIGHTS = {
-    1: 0.5,
-    2: 0.6,
-    3: 0.7,  # Early: less weight
-    4: 0.8,
-    5: 0.9,
-    6: 1.0,  # Mid: medium weight
-    7: 1.2,
-    8: 1.4,
-    9: 1.6,
-    10: 2.0,  # Late: high weight
-}
+# Step-weighted sampling: weight = round number (balances training signal per step)
+# Round 10 has 10 decisions, Round 1 has 1 decision
+# By weighting by round number, each STEP has equal probability across all rounds
+# This prevents short episodes (round 1-3) from dominating the training buffer
+ROUND_WEIGHTS = {r: r for r in range(1, 11)}  # {1: 1, 2: 2, ..., 10: 10}
 ROUND_WEIGHT_SUM = sum(ROUND_WEIGHTS.values())
 ROUND_PROBABILITIES = [ROUND_WEIGHTS[r] / ROUND_WEIGHT_SUM for r in range(1, 11)]
 
@@ -98,9 +90,9 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
     Episode = one round (not full game).
     Reward = bid accuracy at round end.
 
-    Observation breakdown (171 dims):
+    Observation breakdown (167 dims):
     - Hand encoding (90): 10 cards x 9 features
-    - Game context (28): round info, hand strength, etc.
+    - Game context (24): round info, hand strength, etc.
     - Pirate abilities in hand (10): which pirates we hold + strategic value
     - Opponent context (24): bids, patterns, history
     - Round one-hot (10): explicit round encoding
@@ -112,7 +104,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
 
     # Observation dimensions breakdown
     HAND_DIM = 90  # 10 cards x 9 features
-    GAME_CONTEXT_DIM = 28  # round info, hand strength
+    GAME_CONTEXT_DIM = 24  # round(1) + hand_size(1) + strength(10) + trump(4) + suits(4) + bid_pressure(4)
     PIRATE_ABILITY_DIM = 10  # pirates in hand + strategic value
     OPPONENT_DIM = 24  # 3 opponents x 8 features
     ROUND_ONEHOT_DIM = 10  # explicit round
@@ -127,7 +119,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         + ROUND_ONEHOT_DIM
         + PHASE_DIM
         + ALLIANCE_DIM
-    )  # 171
+    )  # 167
 
     def __init__(
         self,
@@ -1182,7 +1174,9 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         reward = self._calculate_worker_reward(won_trick, trick)
 
         # Check if round is complete
-        round_complete = len(current_round.tricks) >= self.current_round_num and trick.is_complete(self.num_players)
+        round_complete = len(current_round.tricks) >= self.current_round_num and trick.is_complete(
+            self.num_players
+        )
 
         if round_complete:
             current_round.calculate_scores()
