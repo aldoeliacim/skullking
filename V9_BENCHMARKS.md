@@ -339,8 +339,14 @@ class TrickEnv:
 
 **For V9 immediate improvement:**
 1. Keep current round-level Worker episodes
-2. Implement step-weighted sampling (weight = round number)
+2. ✅ **IMPLEMENTED**: Step-weighted sampling (weight = round number)
 3. This naturally balances training signal per step
+
+```python
+# Now in skullking_env_hierarchical.py:
+ROUND_WEIGHTS = {r: r for r in range(1, 11)}  # {1: 1, 2: 2, ..., 10: 10}
+# Result: Round 10 = 18.2% probability, Round 1 = 1.8% probability
+```
 
 **For V10+ if plateau persists:**
 1. Implement TrickEnv for maximum credit assignment
