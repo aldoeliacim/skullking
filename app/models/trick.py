@@ -188,16 +188,20 @@ class Trick:
         # Check if player has cards of the lead suit
         suit_cards = []
         special_cards = []
+        trump_cards = []
         for card_id in hand:
             card = get_card(card_id)
             if card.is_special():
                 special_cards.append(card_id)
+            elif card.is_roger():
+                # Trump (Jolly Roger) can always be played
+                trump_cards.append(card_id)
             elif card.card_type == lead_suit:
                 suit_cards.append(card_id)
 
-        # Must follow suit if possible, but can always play special cards
+        # Must follow suit if possible, but can always play special cards or trump
         if suit_cards:
-            return suit_cards + special_cards
+            return suit_cards + special_cards + trump_cards
         # Can't follow suit, can play anything
         return list(hand)
 

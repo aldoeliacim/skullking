@@ -47,6 +47,21 @@ export function isSpecialCard(cardId: number): boolean {
 }
 
 /**
+ * Check if a card is a trump card (Jolly Roger / Black suit).
+ * Trump cards can always be played regardless of the led suit.
+ */
+export function isTrumpCard(cardId: number): boolean {
+  return cardId >= 11 && cardId <= 24;
+}
+
+/**
+ * Check if a card can always be played regardless of suit (special or trump).
+ */
+export function isAlwaysPlayable(cardId: number): boolean {
+  return isSpecialCard(cardId) || isTrumpCard(cardId);
+}
+
+/**
  * Get the suit of a card. Returns null for special cards.
  */
 export function getCardSuit(cardId: number): Suit | null {
@@ -124,22 +139,23 @@ export function getValidCardIds(hand: Card[], trickCards: TrickCard[]): string[]
     return hand.map((c) => c.id);
   }
 
-  // Separate special cards and cards of the led suit
-  const specialCards: string[] = [];
+  // Separate always-playable cards (special + trump) and cards of the led suit
+  const alwaysPlayableCards: string[] = [];
   const suitCards: string[] = [];
 
   for (const card of hand) {
     const cardId = parseInt(card.id, 10);
-    if (isSpecialCard(cardId)) {
-      specialCards.push(card.id);
+    if (isAlwaysPlayable(cardId)) {
+      // Special cards and trump cards can always be played
+      alwaysPlayableCards.push(card.id);
     } else if (getCardSuit(cardId) === ledSuit) {
       suitCards.push(card.id);
     }
   }
 
-  // If player has cards of led suit, must play those (or special cards)
+  // If player has cards of led suit, must play those (or always-playable cards)
   if (suitCards.length > 0) {
-    return [...suitCards, ...specialCards];
+    return [...suitCards, ...alwaysPlayableCards];
   }
 
   // Player doesn't have led suit, can play anything

@@ -77,6 +77,11 @@ async def join_game(
     player = game.get_player(player_id)
 
     if not player:
+        # New player - only allow joining games that haven't started yet
+        if game.state != GameState.PENDING:
+            await websocket.close(code=4005, reason="Game already in progress")
+            return
+
         # Add new player
         player = Player(
             id=player_id,
@@ -250,10 +255,11 @@ async def get_cards() -> CardListResponse:
 
 @router.get("/games/active")
 async def get_active_games() -> dict[str, Any]:
-    """Get list of active games that can be spectated.
+    """Get list of active games that can be joined or spectated.
 
     Returns:
-        List of active games with player counts and states
+        List of active games with player counts and states.
+        Games in PENDING state can be joined, others can only be spectated.
 
     """
     active_games = []
@@ -261,12 +267,15 @@ async def get_active_games() -> dict[str, Any]:
     for game_id, game in websocket_manager.games.items():
         # Only include games that are in progress or have players
         if game.state != GameState.ENDED and len(game.players) > 0:
+            is_joinable = game.state == GameState.PENDING
             active_games.append(
                 {
                     "game_id": game_id,
                     "slug": game.slug,
                     "state": game.state.value,
+                    "joinable": is_joinable,
                     "player_count": len(game.players),
+                    "max_players": 6,  # Skull King supports up to 6 players
                     "player_names": [p.username for p in game.players if not p.is_bot][:3],
                     "bot_count": sum(1 for p in game.players if p.is_bot),
                     "current_round": game.current_round_number,
@@ -274,8 +283,8 @@ async def get_active_games() -> dict[str, Any]:
                 }
             )
 
-    # Sort by player count descending, then by state (BIDDING/PICKING first)
-    active_games.sort(key=lambda g: (g["player_count"], g["state"] != "PENDING"), reverse=True)
+    # Sort joinable games first, then by player count descending
+    active_games.sort(key=lambda g: (not g["joinable"], -g["player_count"]))
 
     return {"games": active_games, "count": len(active_games)}
 

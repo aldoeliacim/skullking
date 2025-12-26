@@ -250,33 +250,52 @@ export function AbilityModal({
 
   const renderModifyBid = (): React.JSX.Element => {
     const currentBid = (data?.current_bid as number) || 0;
-    const maxBid = (data?.max_bid as number) || 10;
-    const bidOptions = Array.from({ length: maxBid + 1 }, (_, i) => i);
+    const tricksWon = (data?.tricks_won as number) || 0;
+    // Harry's options are -1 (decrease), 0 (keep), 1 (increase)
+    const options = (data?.options as number[]) || [-1, 0, 1];
+
+    const getOptionLabel = (modifier: number): string => {
+      if (modifier === -1) return t('ability.harry.decrease', '-1');
+      if (modifier === 1) return t('ability.harry.increase', '+1');
+      return t('ability.harry.keep', 'Keep');
+    };
+
+    const getOptionDescription = (modifier: number): string => {
+      const newBid = Math.max(0, currentBid + modifier);
+      return `${t('ability.harry.newBid', 'Bid')}: ${newBid}`;
+    };
 
     return (
       <>
         <Text style={styles.emoji}>💪</Text>
         <Text style={styles.title}>{t('ability.harry.title', "Harry's Ability")}</Text>
         <Text style={styles.subtitle}>
-          {t('ability.harry.description', `Current bid: ${currentBid}. Choose a new bid:`)}
+          {t(
+            'ability.harry.description',
+            `Current bid: ${currentBid}, Tricks won: ${tricksWon}. Adjust your bid:`,
+          )}
         </Text>
         <View style={styles.bidOptionsContainer}>
-          {bidOptions.map((bid) => (
+          {options.map((modifier) => (
             <Pressable
-              key={bid}
-              onPress={() => setSelectedBid(bid)}
+              key={modifier}
+              onPress={() => setSelectedBid(modifier)}
               style={({ pressed }) => [
                 styles.bidButton,
-                selectedBid === bid && styles.bidButtonSelected,
-                bid === currentBid && styles.bidButtonCurrent,
+                selectedBid === modifier && styles.bidButtonSelected,
+                modifier === 0 && styles.bidButtonCurrent,
                 pressed && styles.bidButtonPressed,
               ]}
             >
               <Text
-                style={[styles.bidButtonText, selectedBid === bid && styles.bidButtonTextSelected]}
+                style={[
+                  styles.bidButtonText,
+                  selectedBid === modifier && styles.bidButtonTextSelected,
+                ]}
               >
-                {bid}
+                {getOptionLabel(modifier)}
               </Text>
+              <Text style={styles.bidDescriptionText}>{getOptionDescription(modifier)}</Text>
             </Pressable>
           ))}
         </View>
@@ -461,6 +480,11 @@ const styles = StyleSheet.create({
   },
   bidButtonTextSelected: {
     color: colors.text,
+  },
+  bidDescriptionText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   confirmButton: {
     backgroundColor: colors.primary,
