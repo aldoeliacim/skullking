@@ -48,16 +48,34 @@ from app.gym_env.skullking_env_hierarchical import ManagerEnv, WorkerEnv
 from app.training.callbacks import MixedOpponentEvalCallback
 
 # V9 Configuration (benchmark-optimized for RTX 4080 SUPER + Ryzen 9 7900X)
-# Key findings from benchmarks:
+#
+# HARDWARE BENCHMARKS:
 # - Hierarchical envs are 2.8x faster than flat masked env (51μs vs 145μs per step)
 # - DummyVecEnv outperforms SubprocVecEnv (env stepping too fast for subprocess overhead)
 # - Large network [2048,2048,1024] achieves 79% GPU vs 30-46% for standard network
 # - VRAM usage: ~3.7GB per model (17GB available)
+#
+# GAME FLOW ANALYSIS (see EPISODE_DESIGN.md):
+# - Game has 10 rounds: 65 total decisions (10 bids + 55 plays)
+# - Early rounds (1-3): 14% of decisions, simple (special cards dominate)
+# - Late rounds (7-10): 58% of decisions, complex (multi-trick planning)
+# - Bidding has delayed reward: bid at round start, feedback at round end
+# - Card play has dense reward: trick-level shaping
+#
+# EPOCH STRATEGY:
+# - Manager (bidding): MORE epochs (sparse reward, need signal extraction)
+# - Worker (card play): FEWER epochs (dense reward, avoid overfitting)
+
 DEFAULT_TIMESTEPS = 5_000_000
 DEFAULT_N_ENVS = 256  # Optimal for hierarchical envs with DummyVecEnv
 DEFAULT_BATCH_SIZE = 16384
-DEFAULT_N_STEPS = 1024  # Reduced from 2048 - more frequent updates
-DEFAULT_N_EPOCHS = 20  # Increased from 15 - more GPU work per rollout
+DEFAULT_N_STEPS = 1024  # More frequent updates for fresh data
+
+# Phase-specific epoch configuration
+MANAGER_N_EPOCHS = 25  # Higher: sparse reward (bid → round-end feedback)
+WORKER_N_EPOCHS = 12   # Lower: dense reward (trick-level shaping)
+DEFAULT_N_EPOCHS = 15  # Fallback
+
 DEFAULT_SAVE_DIR = "./models/hierarchical_v9"
 
 # V9 Network Architecture (large network to maximize GPU utilization)
@@ -114,12 +132,15 @@ def train_manager(
     n_envs: int = DEFAULT_N_ENVS,
     batch_size: int = DEFAULT_BATCH_SIZE,
     n_steps: int = DEFAULT_N_STEPS,
-    n_epochs: int = DEFAULT_N_EPOCHS,
+    n_epochs: int = MANAGER_N_EPOCHS,  # Higher epochs: sparse reward (bid → round-end)
     use_subproc: bool = False,  # DummyVecEnv is faster for hierarchical envs
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
 ) -> str:
     """Train Manager (bidding) policy.
+
+    Bidding has SPARSE reward (feedback only at round end), so we use more
+    epochs to extract maximum learning signal from each batch of experiences.
 
     Returns path to trained model.
     """
@@ -228,13 +249,16 @@ def train_worker(
     n_envs: int = DEFAULT_N_ENVS,
     batch_size: int = DEFAULT_BATCH_SIZE,
     n_steps: int = DEFAULT_N_STEPS,
-    n_epochs: int = DEFAULT_N_EPOCHS,
+    n_epochs: int = WORKER_N_EPOCHS,  # Lower epochs: dense reward (trick-level shaping)
     use_subproc: bool = False,  # DummyVecEnv is faster for hierarchical envs
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
     fixed_goal: int | None = None,
 ) -> str:
     """Train Worker (card-playing) policy.
+
+    Card play has DENSE reward (trick-level shaping), so we use fewer epochs
+    to avoid overfitting to the current batch and collect more fresh data.
 
     Args:
         fixed_goal: If set, train worker for specific bid goal.
