@@ -39,18 +39,52 @@ from gymnasium import spaces
 from sb3_contrib.common.wrappers import ActionMasker
 
 from app.bots import RandomBot, RuleBasedBot
+
+# Round-weighted sampling weights (favor late rounds with more decisions)
+ROUND_WEIGHTS = {
+    1: 0.5,
+    2: 0.6,
+    3: 0.7,  # Early: less weight
+    4: 0.8,
+    5: 0.9,
+    6: 1.0,  # Mid: medium weight
+    7: 1.2,
+    8: 1.4,
+    9: 1.6,
+    10: 2.0,  # Late: high weight
+}
+ROUND_WEIGHT_SUM = sum(ROUND_WEIGHTS.values())
+ROUND_PROBABILITIES = [ROUND_WEIGHTS[r] / ROUND_WEIGHT_SUM for r in range(1, 11)]
+
+# Phase definitions for curriculum and embedding
+EARLY_ROUNDS = (1, 2, 3)
+MID_ROUNDS = (4, 5, 6)
+LATE_ROUNDS = (7, 8, 9, 10)
+
+
+def get_phase(round_num: int) -> int:
+    """Return phase index: 0=early, 1=mid, 2=late."""
+    if round_num <= 3:
+        return 0
+    if round_num <= 6:
+        return 1
+    return 2
+
+
+def sample_weighted_round(np_random: np.random.Generator) -> int:
+    """Sample a round using round-weighted probabilities."""
+    return np_random.choice(range(1, 11), p=ROUND_PROBABILITIES)
+
+
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.models.card import Card, CardId, get_card
-from app.models.enums import MAX_ROUNDS, GameState
+from app.models.enums import MAX_ROUNDS
 from app.models.game import Game
-from app.models.player import Player
 from app.models.pirate_ability import (
-    AbilityState,
-    AbilityType,
     PirateType,
-    PIRATE_IDENTITY,
     get_pirate_type,
 )
+from app.models.player import Player
 from app.models.round import Round
 from app.models.trick import TigressChoice, Trick
 
@@ -64,12 +98,13 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
     Episode = one round (not full game).
     Reward = bid accuracy at round end.
 
-    Observation breakdown (168 dims):
+    Observation breakdown (171 dims):
     - Hand encoding (90): 10 cards x 9 features
     - Game context (28): round info, hand strength, etc.
     - Pirate abilities in hand (10): which pirates we hold + strategic value
     - Opponent context (24): bids, patterns, history
     - Round one-hot (10): explicit round encoding
+    - Phase embedding (3): early/mid/late one-hot
     - Alliance features (6): loot alliance status
     """
 
@@ -81,9 +116,18 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
     PIRATE_ABILITY_DIM = 10  # pirates in hand + strategic value
     OPPONENT_DIM = 24  # 3 opponents x 8 features
     ROUND_ONEHOT_DIM = 10  # explicit round
+    PHASE_DIM = 3  # early/mid/late one-hot
     ALLIANCE_DIM = 6  # loot alliance features
 
-    OBS_DIM = HAND_DIM + GAME_CONTEXT_DIM + PIRATE_ABILITY_DIM + OPPONENT_DIM + ROUND_ONEHOT_DIM + ALLIANCE_DIM  # 168
+    OBS_DIM = (
+        HAND_DIM
+        + GAME_CONTEXT_DIM
+        + PIRATE_ABILITY_DIM
+        + OPPONENT_DIM
+        + ROUND_ONEHOT_DIM
+        + PHASE_DIM
+        + ALLIANCE_DIM
+    )  # 171
 
     def __init__(
         self,
@@ -91,6 +135,8 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         num_opponents: int = 3,
         opponent_bot_type: str = "rule_based",
         opponent_difficulty: str = "medium",
+        use_weighted_sampling: bool = True,
+        allowed_phases: tuple[int, ...] | None = None,
     ) -> None:
         """Initialize Manager environment.
 
@@ -99,16 +145,19 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             num_opponents: Number of bot opponents
             opponent_bot_type: Type of opponent bot
             opponent_difficulty: Difficulty level
+            use_weighted_sampling: If True, sample rounds proportional to ROUND_WEIGHTS
+            allowed_phases: Tuple of allowed phase indices (0=early, 1=mid, 2=late)
+                           for curriculum learning. None means all phases.
         """
         super().__init__()
         self.worker_policy = worker_policy
         self.num_players = num_opponents + 1
         self.opponent_bot_type = opponent_bot_type
         self.opponent_difficulty = self._parse_difficulty(opponent_difficulty)
+        self.use_weighted_sampling = use_weighted_sampling
+        self.allowed_phases = allowed_phases
 
-        self.observation_space = spaces.Box(
-            low=-1, high=1, shape=(self.OBS_DIM,), dtype=np.float32
-        )
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(self.OBS_DIM,), dtype=np.float32)
         # Bid 0-10
         self.action_space = spaces.Discrete(11)
 
@@ -135,8 +184,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         if options and "round_number" in options:
             self.current_round_num = options["round_number"]
         else:
-            # Random round for diverse training
-            self.current_round_num = self.np_random.integers(1, MAX_ROUNDS + 1)
+            self.current_round_num = self._sample_round()
 
         # Create new game
         game_id = str(uuid.uuid4())
@@ -164,7 +212,29 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         # Make bot bids
         self._make_bot_bids()
 
-        return self._get_manager_obs(), {}
+        return self._get_manager_obs(), {"round": self.current_round_num}
+
+    def _sample_round(self) -> int:
+        """Sample a round number respecting weighted sampling and phase curriculum."""
+        if self.allowed_phases is not None:
+            # Filter rounds by allowed phases
+            allowed_rounds = []
+            for r in range(1, 11):
+                if get_phase(r) in self.allowed_phases:
+                    allowed_rounds.append(r)
+
+            if not allowed_rounds:
+                allowed_rounds = list(range(1, 11))
+
+            if self.use_weighted_sampling:
+                weights = [ROUND_WEIGHTS[r] for r in allowed_rounds]
+                total = sum(weights)
+                probs = [w / total for w in weights]
+                return self.np_random.choice(allowed_rounds, p=probs)
+            return self.np_random.choice(allowed_rounds)
+        if self.use_weighted_sampling:
+            return sample_weighted_round(self.np_random)
+        return self.np_random.integers(1, MAX_ROUNDS + 1)
 
     def _create_bot(self, player_id: str) -> BaseBot:
         if self.opponent_bot_type == "random":
@@ -325,16 +395,12 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
                 else:
                     # Fallback: use rule-based strategy
                     fallback = RuleBasedBot(player_id, BotDifficulty.HARD)
-                    card_id = fallback.pick_card(
-                        self.game, player.hand, trick.cards_played()
-                    )
+                    card_id = fallback.pick_card(self.game, player.hand, trick.cards_played())
             else:
                 # Bot plays
                 bot = next((b for pid, b in self.bots if pid == player_id), None)
                 if bot:
-                    card_id = bot.pick_card(
-                        self.game, player.hand, trick.cards_played()
-                    )
+                    card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
                 else:
                     card_id = player.hand[0]
 
@@ -349,9 +415,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
 
         trick.determine_winner()
 
-    def _worker_pick_card(
-        self, player: Player, trick: Trick, current_round: Round
-    ) -> CardId:
+    def _worker_pick_card(self, player: Player, trick: Trick, current_round: Round) -> CardId:
         """Use worker policy to pick a card."""
         # Build worker observation
         obs = self._get_worker_obs_for_manager(player, trick, current_round)
@@ -402,9 +466,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             else:
                 bot = next((b for pid, b in self.bots if pid == player_id), None)
                 if bot:
-                    card_id = bot.pick_card(
-                        self.game, player.hand, trick.cards_played()
-                    )
+                    card_id = bot.pick_card(self.game, player.hand, trick.cards_played())
                 else:
                     card_id = player.hand[0]
 
@@ -428,12 +490,11 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
                 # Zero bid bonus scales with round
                 return 5.0 + self.current_round_num * 0.5
             return 5.0
-        elif diff == 1:
+        if diff == 1:
             return 1.0
-        elif diff == 2:
+        if diff == 2:
             return -1.0
-        else:
-            return -2.0 - diff * 0.5
+        return -2.0 - diff * 0.5
 
     def _get_manager_obs(self) -> np.ndarray:
         """Build observation for manager (bidding decision).
@@ -454,7 +515,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         # === HAND ENCODING (90 dims: 10 cards x 9 features) ===
         for i, card_id in enumerate(agent.hand[:10]):
             card = get_card(card_id)
-            obs[idx:idx + 9] = self._encode_card(card)
+            obs[idx : idx + 9] = self._encode_card(card)
             idx += 9
 
         # Pad remaining card slots
@@ -476,7 +537,8 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         escapes = sum(1 for c in agent.hand if get_card(c).is_escape())
         tigress_count = sum(1 for c in agent.hand if get_card(c).is_tigress())
         high_cards = sum(
-            1 for c in agent.hand
+            1
+            for c in agent.hand
             if get_card(c).is_standard_suit() and get_card(c).number and get_card(c).number >= 10
         )
         loot_cards = sum(1 for c in agent.hand if get_card(c).is_loot())
@@ -496,20 +558,30 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
 
         # Trump suit breakdown (4 dims) - black suits are trump
         black_count = sum(
-            1 for c in agent.hand
-            if get_card(c).is_standard_suit() and get_card(c).suit and get_card(c).suit.value in ("black",)
+            1
+            for c in agent.hand
+            if get_card(c).is_standard_suit()
+            and get_card(c).suit
+            and get_card(c).suit.value in ("black",)
         )
         obs[idx] = black_count / MAX_ROUNDS
-        obs[idx + 1] = (black_count / max(len(agent.hand), 1))  # Trump density in hand
+        obs[idx + 1] = black_count / max(len(agent.hand), 1)  # Trump density in hand
         # Best trump value
         best_trump = max(
-            (get_card(c).number or 0 for c in agent.hand
-             if get_card(c).is_standard_suit() and get_card(c).suit and get_card(c).suit.value == "black"),
-            default=0
+            (
+                get_card(c).number or 0
+                for c in agent.hand
+                if get_card(c).is_standard_suit()
+                and get_card(c).suit
+                and get_card(c).suit.value == "black"
+            ),
+            default=0,
         )
         obs[idx + 2] = best_trump / 14.0
         # Average hand value
-        avg_value = np.mean([get_card(c).number or 7 for c in agent.hand if get_card(c).is_standard_suit()] or [0])
+        avg_value = np.mean(
+            [get_card(c).number or 7 for c in agent.hand if get_card(c).is_standard_suit()] or [0]
+        )
         obs[idx + 3] = avg_value / 14.0
         idx += 4
 
@@ -529,15 +601,19 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
                     total_opponent_bids += player.bid
 
         obs[idx] = total_opponent_bids / (self.current_round_num * 3)  # Avg opponent bid
-        obs[idx + 1] = max(0, self.current_round_num - total_opponent_bids) / MAX_ROUNDS  # Available tricks
-        obs[idx + 2] = 1.0 if total_opponent_bids > self.current_round_num else 0.0  # Overbid signal
+        obs[idx + 1] = (
+            max(0, self.current_round_num - total_opponent_bids) / MAX_ROUNDS
+        )  # Available tricks
+        obs[idx + 2] = (
+            1.0 if total_opponent_bids > self.current_round_num else 0.0
+        )  # Overbid signal
         obs[idx + 3] = 1.0 if total_opponent_bids == 0 else 0.0  # All zeros signal
         idx += 4
 
         # === PIRATE ABILITIES IN HAND (10 dims) ===
         # Critical for bidding strategy!
         pirate_obs = self._encode_pirate_abilities(agent.hand)
-        obs[idx:idx + 10] = pirate_obs
+        obs[idx : idx + 10] = pirate_obs
         idx += 10
 
         # === OPPONENT CONTEXT (24 dims: 3 opponents x 8 features) ===
@@ -574,6 +650,11 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         if 1 <= self.current_round_num <= MAX_ROUNDS:
             obs[idx + self.current_round_num - 1] = 1.0
         idx += 10
+
+        # === PHASE EMBEDDING (3 dims) ===
+        phase = get_phase(self.current_round_num)
+        obs[idx + phase] = 1.0
+        idx += 3
 
         # === ALLIANCE FEATURES (6 dims) ===
         # Loot card alliance potential
@@ -764,13 +845,14 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
     Episode = one round of card play (after bidding).
     Reward = progress toward goal + trick outcomes.
 
-    Observation breakdown (200 dims):
+    Observation breakdown (203 dims):
     - Hand encoding (90): 10 cards x 9 features
     - Trick state (36): 4 players x 9 features per card
     - Goal context (20): bid goal, progress, needs
     - Pirate abilities (18): abilities in hand + ability state
     - Game state (20): round, position, opponent info
     - Round one-hot (10): explicit round encoding
+    - Phase embedding (3): early/mid/late one-hot
     - Alliance features (6): loot alliance status
     """
 
@@ -783,9 +865,19 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
     PIRATE_ABILITY_DIM = 18  # abilities in hand + ability state
     GAME_STATE_DIM = 20  # round, position, opponents
     ROUND_ONEHOT_DIM = 10  # explicit round
+    PHASE_DIM = 3  # early/mid/late one-hot
     ALLIANCE_DIM = 6  # loot alliance
 
-    OBS_DIM = HAND_DIM + TRICK_DIM + GOAL_DIM + PIRATE_ABILITY_DIM + GAME_STATE_DIM + ROUND_ONEHOT_DIM + ALLIANCE_DIM  # 200
+    OBS_DIM = (
+        HAND_DIM
+        + TRICK_DIM
+        + GOAL_DIM
+        + PIRATE_ABILITY_DIM
+        + GAME_STATE_DIM
+        + ROUND_ONEHOT_DIM
+        + PHASE_DIM
+        + ALLIANCE_DIM
+    )  # 203
 
     def __init__(
         self,
@@ -793,6 +885,8 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         opponent_bot_type: str = "rule_based",
         opponent_difficulty: str = "medium",
         fixed_goal: int | None = None,
+        use_weighted_sampling: bool = True,
+        allowed_phases: tuple[int, ...] | None = None,
     ) -> None:
         """Initialize Worker environment.
 
@@ -801,16 +895,19 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             opponent_bot_type: Type of opponent bot
             opponent_difficulty: Difficulty level
             fixed_goal: If set, use this bid goal (for pre-training)
+            use_weighted_sampling: If True, sample rounds proportional to ROUND_WEIGHTS
+            allowed_phases: Tuple of allowed phase indices (0=early, 1=mid, 2=late)
+                           for curriculum learning. None means all phases.
         """
         super().__init__()
         self.num_players = num_opponents + 1
         self.opponent_bot_type = opponent_bot_type
         self.opponent_difficulty = self._parse_difficulty(opponent_difficulty)
         self.fixed_goal = fixed_goal
+        self.use_weighted_sampling = use_weighted_sampling
+        self.allowed_phases = allowed_phases
 
-        self.observation_space = spaces.Box(
-            low=-1, high=1, shape=(self.OBS_DIM,), dtype=np.float32
-        )
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(self.OBS_DIM,), dtype=np.float32)
         # Card index 0-10
         self.action_space = spaces.Discrete(11)
 
@@ -836,19 +933,49 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         super().reset(seed=seed)
 
         # Get round number and goal from options
-        if options:
-            self.current_round_num = options.get("round_number", self.np_random.integers(1, MAX_ROUNDS + 1))
-            self.goal_bid = options.get("goal_bid", self.fixed_goal or 0)
+        if options and "round_number" in options:
+            self.current_round_num = options["round_number"]
         else:
-            self.current_round_num = self.np_random.integers(1, MAX_ROUNDS + 1)
-            self.goal_bid = self.fixed_goal if self.fixed_goal is not None else self.np_random.integers(0, self.current_round_num + 1)
+            # Sample round based on settings
+            self.current_round_num = self._sample_round()
+
+        if options and "goal_bid" in options:
+            self.goal_bid = options["goal_bid"]
+        elif self.fixed_goal is not None:
+            self.goal_bid = self.fixed_goal
+        else:
+            self.goal_bid = self.np_random.integers(0, self.current_round_num + 1)
 
         self.tricks_won = 0
 
         # Create game and fast-forward to bidding complete
         self._setup_game()
 
-        return self._get_worker_obs(), {"goal_bid": self.goal_bid}
+        return self._get_worker_obs(), {"goal_bid": self.goal_bid, "round": self.current_round_num}
+
+    def _sample_round(self) -> int:
+        """Sample a round number respecting weighted sampling and phase curriculum."""
+        if self.allowed_phases is not None:
+            # Filter rounds by allowed phases
+            allowed_rounds = []
+            for r in range(1, 11):
+                if get_phase(r) in self.allowed_phases:
+                    allowed_rounds.append(r)
+
+            if not allowed_rounds:
+                allowed_rounds = list(range(1, 11))  # Fallback to all
+
+            if self.use_weighted_sampling:
+                # Weighted sampling within allowed rounds
+                weights = [ROUND_WEIGHTS[r] for r in allowed_rounds]
+                total = sum(weights)
+                probs = [w / total for w in weights]
+                return self.np_random.choice(allowed_rounds, p=probs)
+            return self.np_random.choice(allowed_rounds)
+        # All rounds allowed
+        if self.use_weighted_sampling:
+            return sample_weighted_round(self.np_random)
+        return self.np_random.integers(1, MAX_ROUNDS + 1)
 
     def _setup_game(self) -> None:
         """Set up game state for card-play phase."""
@@ -906,10 +1033,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
         starter_index = trick.starter_player_index
         num_players = len(self.game.players)
-        return [
-            self.game.players[(starter_index + i) % num_players].id
-            for i in range(num_players)
-        ]
+        return [self.game.players[(starter_index + i) % num_players].id for i in range(num_players)]
 
     def _simulate_full_round(self, round_num: int) -> None:
         """Simulate a complete round."""
@@ -1130,23 +1254,20 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             if tricks_needed > 0:
                 # Needed this win
                 return 3.0
-            elif tricks_needed == 0:
+            if tricks_needed == 0:
                 # Already at goal, didn't need win
                 return -1.5
-            else:
-                # Over goal
-                return -2.0
-        else:
-            # Lost trick
-            if tricks_needed <= tricks_remaining:
-                # Still achievable
-                return 0.5
-            elif tricks_needed > tricks_remaining + 1:
-                # Goal now impossible
-                return -1.0
-            else:
-                # Close but risky
-                return 0.0
+            # Over goal
+            return -2.0
+        # Lost trick
+        if tricks_needed <= tricks_remaining:
+            # Still achievable
+            return 0.5
+        if tricks_needed > tricks_remaining + 1:
+            # Goal now impossible
+            return -1.0
+        # Close but risky
+        return 0.0
 
     def _get_worker_obs(self) -> np.ndarray:
         """Build observation for worker (card-play decision).
@@ -1168,7 +1289,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         # === HAND ENCODING (90 dims: 10 cards x 9 features) ===
         for i, card_id in enumerate(agent.hand[:10]):
             card = get_card(card_id)
-            obs[idx:idx + 9] = self._encode_card(card)
+            obs[idx : idx + 9] = self._encode_card(card)
             idx += 9
         idx = self.HAND_DIM  # 90
 
@@ -1177,7 +1298,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         if trick:
             for i, (player_id, card_id) in enumerate(trick.plays[:4]):
                 card = get_card(card_id)
-                obs[idx + i * 9:idx + i * 9 + 9] = self._encode_card(card)
+                obs[idx + i * 9 : idx + i * 9 + 9] = self._encode_card(card)
         idx += self.TRICK_DIM  # 36
 
         # === GOAL CONTEXT (20 dims) ===
@@ -1202,7 +1323,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
         # === PIRATE ABILITIES (18 dims) ===
         pirate_obs = self._encode_pirate_ability_state(agent.hand, current_round)
-        obs[idx:idx + 18] = pirate_obs
+        obs[idx : idx + 18] = pirate_obs
         idx += self.PIRATE_ABILITY_DIM  # 18
 
         # === GAME STATE (20 dims) ===
@@ -1239,6 +1360,11 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             obs[idx + self.current_round_num - 1] = 1.0
         idx += self.ROUND_ONEHOT_DIM  # 10
 
+        # === PHASE EMBEDDING (3 dims) ===
+        phase = get_phase(self.current_round_num)
+        obs[idx + phase] = 1.0
+        idx += self.PHASE_DIM  # 3
+
         # === ALLIANCE FEATURES (6 dims) ===
         loot_cards = sum(1 for c in agent.hand if get_card(c).is_loot())
         obs[idx] = 1.0 if loot_cards > 0 else 0.0
@@ -1251,9 +1377,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
         return obs
 
-    def _encode_pirate_ability_state(
-        self, hand: list[CardId], current_round: Round
-    ) -> np.ndarray:
+    def _encode_pirate_ability_state(self, hand: list[CardId], current_round: Round) -> np.ndarray:
         """Encode pirate ability state for card-play decisions.
 
         Returns 18-dim vector:
@@ -1385,9 +1509,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         trick = current_round.get_current_trick()
         if trick and pirate_count > 0:
             # Check if any pirate in trick
-            trick_has_pirate = any(
-                get_card(card_id).is_pirate() for _, card_id in trick.plays
-            )
+            trick_has_pirate = any(get_card(card_id).is_pirate() for _, card_id in trick.plays)
             if not trick_has_pirate:
                 features[17] = 0.8  # Our pirate would dominate
             else:

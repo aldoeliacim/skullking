@@ -248,13 +248,22 @@ class TrickEnv(gym.Env):
 
 ## Implementation Priority
 
-| Priority | Change | Effort | Impact |
-|----------|--------|--------|--------|
-| 1 | Round-weighted sampling | Low | Medium |
-| 2 | Phase-specific epochs | Low | Medium |
-| 3 | Hindsight bid relabeling | Medium | High |
-| 4 | Late-round curriculum | Low | Medium |
-| 5 | Trick-level episodes | High | Unknown |
+| Priority | Change | Effort | Impact | Status |
+|----------|--------|--------|--------|--------|
+| 1 | Round-weighted sampling | Low | Medium | ✅ Done |
+| 2 | Phase-specific epochs | Low | Medium | ✅ Done |
+| 3 | Phase embedding (early/mid/late) | Low | Medium | ✅ Done |
+| 4 | Late-round curriculum | Low | Medium | ✅ Done |
+| 5 | Round stats tracking | Low | Medium | ✅ Done |
+| 6 | Hindsight bid relabeling | Medium | High | 🔄 Callback ready |
+| 7 | Trick-level episodes | High | Unknown | ❌ Future |
+
+**Implemented in V9:**
+- `ROUND_WEIGHTS`: Late rounds (7-10) sampled 4x more than early rounds
+- `get_phase()`: Maps rounds to phases (0=early, 1=mid, 2=late)
+- `PhaseSchedulerCallback`: Progressive phase unlocking during training
+- `RoundStatsCallback`: Per-phase performance tracking
+- Phase embedding: 3-dim one-hot in observations (Manager: 171 dims, Worker: 203 dims)
 
 ---
 

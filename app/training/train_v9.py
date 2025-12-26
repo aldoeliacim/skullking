@@ -44,8 +44,15 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
-from app.gym_env.skullking_env_hierarchical import ManagerEnv, WorkerEnv
-from app.training.callbacks import MixedOpponentEvalCallback
+from app.gym_env.skullking_env_hierarchical import (
+    ManagerEnv,
+    WorkerEnv,
+)
+from app.training.callbacks import (
+    MixedOpponentEvalCallback,
+    PhaseSchedulerCallback,
+    RoundStatsCallback,
+)
 
 # V9 Configuration (benchmark-optimized for RTX 4080 SUPER + Ryzen 9 7900X)
 #
@@ -73,10 +80,18 @@ DEFAULT_N_STEPS = 1024  # More frequent updates for fresh data
 
 # Phase-specific epoch configuration
 MANAGER_N_EPOCHS = 25  # Higher: sparse reward (bid → round-end feedback)
-WORKER_N_EPOCHS = 12   # Lower: dense reward (trick-level shaping)
+WORKER_N_EPOCHS = 12  # Lower: dense reward (trick-level shaping)
 DEFAULT_N_EPOCHS = 15  # Fallback
 
 DEFAULT_SAVE_DIR = "./models/hierarchical_v9"
+
+# Phase curriculum schedule (phases: 0=early, 1=mid, 2=late)
+# Start with late rounds (complex), then progressively add earlier rounds
+PHASE_SCHEDULE = [
+    (0, (2,)),  # 0 steps: Late only (rounds 7-10)
+    (1_000_000, (1, 2)),  # 1M steps: Mid + Late (rounds 4-10)
+    (2_000_000, (0, 1, 2)),  # 2M steps: All rounds
+]
 
 # V9 Network Architecture (large network to maximize GPU utilization)
 # Benchmark: 79% GPU utilization with this config vs 30-46% with [512,512,256]
@@ -102,12 +117,24 @@ def worker_mask_fn(env: WorkerEnv):
 def create_manager_env(
     opponent_type: str = "rule_based",
     difficulty: str = "medium",
+    use_weighted_sampling: bool = True,
+    allowed_phases: tuple[int, ...] | None = None,
 ):
-    """Create Manager environment with action masking."""
+    """Create Manager environment with action masking.
+
+    Args:
+        opponent_type: Type of opponent bot
+        difficulty: Opponent difficulty level
+        use_weighted_sampling: Use round-weighted sampling (favor late rounds)
+        allowed_phases: Tuple of allowed phase indices for curriculum
+                       (0=early, 1=mid, 2=late). None means all phases.
+    """
     env = ManagerEnv(
         num_opponents=3,
         opponent_bot_type=opponent_type,
         opponent_difficulty=difficulty,
+        use_weighted_sampling=use_weighted_sampling,
+        allowed_phases=allowed_phases,
     )
     return ActionMasker(env, manager_mask_fn)
 
@@ -116,13 +143,26 @@ def create_worker_env(
     opponent_type: str = "rule_based",
     difficulty: str = "medium",
     fixed_goal: int | None = None,
+    use_weighted_sampling: bool = True,
+    allowed_phases: tuple[int, ...] | None = None,
 ):
-    """Create Worker environment with action masking."""
+    """Create Worker environment with action masking.
+
+    Args:
+        opponent_type: Type of opponent bot
+        difficulty: Opponent difficulty level
+        fixed_goal: If set, use this bid goal. None for random goals.
+        use_weighted_sampling: Use round-weighted sampling (favor late rounds)
+        allowed_phases: Tuple of allowed phase indices for curriculum
+                       (0=early, 1=mid, 2=late). None means all phases.
+    """
     env = WorkerEnv(
         num_opponents=3,
         opponent_bot_type=opponent_type,
         opponent_difficulty=difficulty,
         fixed_goal=fixed_goal,
+        use_weighted_sampling=use_weighted_sampling,
+        allowed_phases=allowed_phases,
     )
     return ActionMasker(env, worker_mask_fn)
 
@@ -136,17 +176,26 @@ def train_manager(
     use_subproc: bool = False,  # DummyVecEnv is faster for hierarchical envs
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
+    use_phase_curriculum: bool = True,
 ) -> str:
     """Train Manager (bidding) policy.
 
     Bidding has SPARSE reward (feedback only at round end), so we use more
     epochs to extract maximum learning signal from each batch of experiences.
 
+    Features:
+    - Round-weighted sampling: Late rounds sampled 4x more than early rounds
+    - Phase curriculum: Start with late rounds (complex), progressively add earlier
+    - Phase embedding: Explicit early/mid/late encoding in observations
+
     Returns path to trained model.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     vec_env_cls = SubprocVecEnv if use_subproc else DummyVecEnv
     vec_env_name = "SubprocVecEnv" if use_subproc else "DummyVecEnv"
+
+    # Initial phases for curriculum
+    initial_phases = PHASE_SCHEDULE[0][1] if use_phase_curriculum else None
 
     print("=" * 60)
     print("SKULL KING V9 - Manager (Bidding) Policy Training")
@@ -156,6 +205,8 @@ def train_manager(
     print(f"Parallel envs: {n_envs} ({vec_env_name})")
     print(f"Batch size: {batch_size}, n_steps: {n_steps}, n_epochs: {n_epochs}")
     print(f"Network: {POLICY_KWARGS['net_arch']['pi']}")
+    print(f"Phase curriculum: {use_phase_curriculum} (starting with phases {initial_phases})")
+    print("Round-weighted sampling: Enabled")
     print("=" * 60 + "\n")
 
     # Create directories
@@ -164,16 +215,26 @@ def train_manager(
     (save_path / "checkpoints").mkdir(exist_ok=True)
     (save_path / "best_model").mkdir(exist_ok=True)
 
-    # Create environments
+    # Create environments with weighted sampling and phase curriculum
     print(f"Creating {n_envs} manager environments...")
     vec_env = make_vec_env(
-        lambda: create_manager_env("rule_based", "medium"),
+        lambda: create_manager_env(
+            "rule_based",
+            "medium",
+            use_weighted_sampling=True,
+            allowed_phases=initial_phases,
+        ),
         n_envs=n_envs,
         vec_env_cls=vec_env_cls,
     )
 
     eval_env = make_vec_env(
-        lambda: create_manager_env("rule_based", "hard"),
+        lambda: create_manager_env(
+            "rule_based",
+            "hard",
+            use_weighted_sampling=False,  # Uniform for eval
+            allowed_phases=None,  # All phases for eval
+        ),
         n_envs=1,
         vec_env_cls=DummyVecEnv,
     )
@@ -204,11 +265,14 @@ def train_manager(
         )
 
     # Setup callbacks
+    callbacks = []
+
     checkpoint_cb = CheckpointCallback(
         save_freq=50_000 // n_envs,
         save_path=str(save_path / "checkpoints"),
         name_prefix="manager",
     )
+    callbacks.append(checkpoint_cb)
 
     eval_cb = MixedOpponentEvalCallback(
         eval_env,
@@ -223,12 +287,22 @@ def train_manager(
         plateau_threshold=5.0,
         min_evals_before_stopping=10,
     )
+    callbacks.append(eval_cb)
+
+    # Phase curriculum: progressively unlock rounds
+    if use_phase_curriculum:
+        phase_cb = PhaseSchedulerCallback(schedule=PHASE_SCHEDULE, verbose=1)
+        callbacks.append(phase_cb)
+
+    # Round statistics tracking
+    round_stats_cb = RoundStatsCallback(log_interval=50000, verbose=1)
+    callbacks.append(round_stats_cb)
 
     # Train
     print("\nStarting training...")
     model.learn(
         total_timesteps=total_timesteps,
-        callback=[checkpoint_cb, eval_cb],
+        callback=callbacks,
         progress_bar=True,
         reset_num_timesteps=load_path is None,
     )
@@ -254,21 +328,31 @@ def train_worker(
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
     fixed_goal: int | None = None,
+    use_phase_curriculum: bool = True,
 ) -> str:
     """Train Worker (card-playing) policy.
 
     Card play has DENSE reward (trick-level shaping), so we use fewer epochs
     to avoid overfitting to the current batch and collect more fresh data.
 
+    Features:
+    - Round-weighted sampling: Late rounds sampled 4x more than early rounds
+    - Phase curriculum: Start with late rounds (complex), progressively add earlier
+    - Phase embedding: Explicit early/mid/late encoding in observations
+
     Args:
         fixed_goal: If set, train worker for specific bid goal.
                    If None, randomly sample goals for generalization.
+        use_phase_curriculum: Enable progressive phase unlocking
 
     Returns path to trained model.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     vec_env_cls = SubprocVecEnv if use_subproc else DummyVecEnv
     vec_env_name = "SubprocVecEnv" if use_subproc else "DummyVecEnv"
+
+    # Initial phases for curriculum
+    initial_phases = PHASE_SCHEDULE[0][1] if use_phase_curriculum else None
 
     print("=" * 60)
     print("SKULL KING V9 - Worker (Card Play) Policy Training")
@@ -279,6 +363,8 @@ def train_worker(
     print(f"Batch size: {batch_size}, n_steps: {n_steps}, n_epochs: {n_epochs}")
     print(f"Network: {POLICY_KWARGS['net_arch']['pi']}")
     print(f"Fixed goal: {fixed_goal if fixed_goal is not None else 'random'}")
+    print(f"Phase curriculum: {use_phase_curriculum} (starting with phases {initial_phases})")
+    print("Round-weighted sampling: Enabled")
     print("=" * 60 + "\n")
 
     # Create directories
@@ -287,16 +373,28 @@ def train_worker(
     (save_path / "checkpoints").mkdir(exist_ok=True)
     (save_path / "best_model").mkdir(exist_ok=True)
 
-    # Create environments
+    # Create environments with weighted sampling and phase curriculum
     print(f"Creating {n_envs} worker environments...")
     vec_env = make_vec_env(
-        lambda: create_worker_env("rule_based", "medium", fixed_goal),
+        lambda: create_worker_env(
+            "rule_based",
+            "medium",
+            fixed_goal,
+            use_weighted_sampling=True,
+            allowed_phases=initial_phases,
+        ),
         n_envs=n_envs,
         vec_env_cls=vec_env_cls,
     )
 
     eval_env = make_vec_env(
-        lambda: create_worker_env("rule_based", "hard", fixed_goal),
+        lambda: create_worker_env(
+            "rule_based",
+            "hard",
+            fixed_goal,
+            use_weighted_sampling=False,  # Uniform for eval
+            allowed_phases=None,  # All phases for eval
+        ),
         n_envs=1,
         vec_env_cls=DummyVecEnv,
     )
@@ -327,11 +425,14 @@ def train_worker(
         )
 
     # Setup callbacks
+    callbacks = []
+
     checkpoint_cb = CheckpointCallback(
         save_freq=50_000 // n_envs,
         save_path=str(save_path / "checkpoints"),
         name_prefix="worker",
     )
+    callbacks.append(checkpoint_cb)
 
     eval_cb = MixedOpponentEvalCallback(
         eval_env,
@@ -346,12 +447,22 @@ def train_worker(
         plateau_threshold=3.0,
         min_evals_before_stopping=10,
     )
+    callbacks.append(eval_cb)
+
+    # Phase curriculum: progressively unlock rounds
+    if use_phase_curriculum:
+        phase_cb = PhaseSchedulerCallback(schedule=PHASE_SCHEDULE, verbose=1)
+        callbacks.append(phase_cb)
+
+    # Round statistics tracking
+    round_stats_cb = RoundStatsCallback(log_interval=50000, verbose=1)
+    callbacks.append(round_stats_cb)
 
     # Train
     print("\nStarting training...")
     model.learn(
         total_timesteps=total_timesteps,
-        callback=[checkpoint_cb, eval_cb],
+        callback=callbacks,
         progress_bar=True,
         reset_num_timesteps=load_path is None,
     )
@@ -477,9 +588,7 @@ def main():
     if args.command == "train-manager":
         train_manager(total_timesteps=args.timesteps, **kwargs)
     elif args.command == "train-worker":
-        train_worker(
-            total_timesteps=args.timesteps, fixed_goal=args.fixed_goal, **kwargs
-        )
+        train_worker(total_timesteps=args.timesteps, fixed_goal=args.fixed_goal, **kwargs)
     elif args.command == "train-both":
         train_both(
             manager_timesteps=args.manager_timesteps,

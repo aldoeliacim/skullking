@@ -38,9 +38,7 @@ class CurriculumCallback(BaseCallback):
     def _on_step(self) -> bool:
         """Check if we should advance curriculum."""
         if self.current_phase < len(self.curriculum_schedule) - 1:
-            next_step, next_type, next_diff = self.curriculum_schedule[
-                self.current_phase + 1
-            ]
+            next_step, next_type, next_diff = self.curriculum_schedule[self.current_phase + 1]
 
             if self.num_timesteps >= next_step:
                 print(f"\n{'=' * 60}")
@@ -51,9 +49,7 @@ class CurriculumCallback(BaseCallback):
 
                 # Update all sub-environments
                 for env_idx in range(self.vec_env.num_envs):
-                    self.vec_env.env_method(
-                        "set_opponent", next_type, next_diff, indices=[env_idx]
-                    )
+                    self.vec_env.env_method("set_opponent", next_type, next_diff, indices=[env_idx])
 
                 self.current_phase += 1
 
@@ -146,7 +142,7 @@ class MixedOpponentEvalCallback(BaseCallback):
             return False
 
         # Get recent evaluations
-        recent = self.eval_history[-self.plateau_window:]
+        recent = self.eval_history[-self.plateau_window :]
         if len(recent) < self.plateau_window:
             return False
 
@@ -207,7 +203,7 @@ class MixedOpponentEvalCallback(BaseCallback):
 
         # Training summary
         elapsed = time.time() - self.start_time if self.start_time else 0
-        print(f"Training duration: {elapsed/60:.1f} minutes ({elapsed/3600:.2f} hours)")
+        print(f"Training duration: {elapsed / 60:.1f} minutes ({elapsed / 3600:.2f} hours)")
         print(f"Total timesteps: {self.num_timesteps:,}")
         print(f"Total evaluations: {len(self.eval_history)}")
         print()
@@ -352,7 +348,7 @@ class MixedOpponentEvalCallback(BaseCallback):
         print("\n" + "=" * 60)
         print("TRAINING EFFICIENCY SUMMARY")
         print("=" * 60)
-        print(f"Total time: {total_hours:.2f} hours ({total_time/60:.1f} minutes)")
+        print(f"Total time: {total_hours:.2f} hours ({total_time / 60:.1f} minutes)")
         print(f"Total timesteps: {self.num_timesteps:,}")
         print(f"Average FPS: {self.num_timesteps / total_time:,.0f}")
         print(f"First eval reward: {first_eval['mean_reward']:.2f}")
@@ -431,3 +427,197 @@ class SelfPlayCallback(BaseCallback):
             )
 
         self.in_self_play = True
+
+
+# Phase definitions for curriculum learning
+EARLY_ROUNDS = (1, 2, 3)
+MID_ROUNDS = (4, 5, 6)
+LATE_ROUNDS = (7, 8, 9, 10)
+
+
+class PhaseSchedulerCallback(BaseCallback):
+    """Curriculum callback that progressively unlocks game phases.
+
+    Implements phase curriculum from EPISODE_DESIGN.md:
+    - Start with late rounds (7-10) - most complex, most decisions
+    - Add mid rounds (4-6) after N steps
+    - Add early rounds (1-3) for full game
+
+    This ensures the model first learns complex late-game scenarios
+    before moving to simpler early rounds.
+    """
+
+    def __init__(
+        self,
+        schedule: list[tuple[int, tuple[int, ...]]] | None = None,
+        verbose: int = 0,
+    ):
+        """Initialize phase scheduler.
+
+        Args:
+            schedule: List of (timestep, allowed_phases) tuples.
+                      Phases: 0=early, 1=mid, 2=late
+                      Default: [(0, (2,)), (1M, (1,2)), (2M, (0,1,2))]
+            verbose: Verbosity level
+        """
+        super().__init__(verbose)
+
+        self.schedule = schedule or [
+            (0, (2,)),  # Start with late rounds only
+            (1_000_000, (1, 2)),  # Add mid rounds
+            (2_000_000, (0, 1, 2)),  # Full game (all phases)
+        ]
+        self.current_phase_idx = 0
+        self.current_phases: tuple[int, ...] = self.schedule[0][1]
+        self.last_log_step = 0
+
+    def _on_training_start(self) -> None:
+        """Set initial phase configuration."""
+        self._update_phases()
+        if self.verbose > 0:
+            phase_names = {0: "early (1-3)", 1: "mid (4-6)", 2: "late (7-10)"}
+            phases_str = ", ".join(phase_names[p] for p in self.current_phases)
+            print(f"\n[PhaseScheduler] Starting with phases: [{phases_str}]")
+            print(f"[PhaseScheduler] Schedule: {self.schedule}\n")
+
+    def _on_step(self) -> bool:
+        """Check if we should unlock new phases."""
+        self._update_phases()
+        return True
+
+    def _update_phases(self) -> None:
+        """Update allowed phases based on current timestep."""
+        current_timestep = self.num_timesteps
+
+        # Find the appropriate schedule entry
+        new_idx = self.current_phase_idx
+        for i, (step_threshold, _) in enumerate(self.schedule):
+            if current_timestep >= step_threshold:
+                new_idx = i
+
+        if new_idx != self.current_phase_idx:
+            self.current_phase_idx = new_idx
+            self.current_phases = self.schedule[new_idx][1]
+
+            if self.verbose > 0:
+                phase_names = {0: "early (1-3)", 1: "mid (4-6)", 2: "late (7-10)"}
+                phases_str = ", ".join(phase_names[p] for p in self.current_phases)
+                print(
+                    f"\n{'=' * 60}\n"
+                    f"PHASE CURRICULUM UPDATE at {current_timestep:,} steps\n"
+                    f"Now training on: [{phases_str}]\n"
+                    f"{'=' * 60}\n"
+                )
+
+            # Update envs if possible
+            self._update_env_phases()
+
+    def _update_env_phases(self) -> None:
+        """Update environment phase settings.
+
+        This updates the allowed_phases in the vectorized environments.
+        """
+        env = self.training_env
+
+        # Try to access underlying envs
+        if hasattr(env, "envs"):
+            for e in env.envs:
+                self._set_env_phases(e)
+        elif hasattr(env, "env"):
+            self._set_env_phases(env.env)
+
+    def _set_env_phases(self, env) -> None:
+        """Set allowed_phases on a single env."""
+        # Handle wrappers
+        target = env
+        while hasattr(target, "env") and not hasattr(target, "allowed_phases"):
+            target = target.env
+
+        if hasattr(target, "allowed_phases"):
+            target.allowed_phases = self.current_phases
+
+
+class RoundStatsCallback(BaseCallback):
+    """Callback to track per-round performance statistics.
+
+    Tracks:
+    - Win rate by round number
+    - Bid accuracy by round number
+    - Reward distribution by phase
+    """
+
+    def __init__(self, log_interval: int = 50000, verbose: int = 0):
+        """Initialize round stats callback.
+
+        Args:
+            log_interval: How often to log statistics (in steps)
+            verbose: Verbosity level
+        """
+        super().__init__(verbose)
+        self.log_interval = log_interval
+
+        # Stats accumulators by round (1-10)
+        self.round_rewards: dict[int, list[float]] = {r: [] for r in range(1, 11)}
+        self.round_bid_accuracy: dict[int, list[bool]] = {r: [] for r in range(1, 11)}
+        self.round_counts: dict[int, int] = dict.fromkeys(range(1, 11), 0)
+        self.last_log_step = 0
+
+    def _on_step(self) -> bool:
+        """Collect per-round statistics."""
+        # Get infos from step
+        infos = self.locals.get("infos", [])
+
+        for info in infos:
+            if isinstance(info, dict):
+                round_num = info.get("round")
+                if round_num and 1 <= round_num <= 10:
+                    self.round_counts[round_num] += 1
+
+                    # Collect reward if available
+                    rewards = self.locals.get("rewards", [])
+                    if len(rewards) > 0:
+                        self.round_rewards[round_num].append(float(rewards[0]))
+
+                    if "bid_accuracy" in info:
+                        self.round_bid_accuracy[round_num].append(info["bid_accuracy"] == 1.0)
+
+        # Log periodically
+        if self.num_timesteps - self.last_log_step >= self.log_interval:
+            self._log_stats()
+            self.last_log_step = self.num_timesteps
+
+        return True
+
+    def _log_stats(self) -> None:
+        """Log accumulated statistics."""
+        if self.verbose < 1:
+            return
+
+        # Calculate per-phase stats
+        phase_stats = {
+            "early": {"rounds": range(1, 4), "rewards": [], "counts": 0},
+            "mid": {"rounds": range(4, 7), "rewards": [], "counts": 0},
+            "late": {"rounds": range(7, 11), "rewards": [], "counts": 0},
+        }
+
+        for phase, data in phase_stats.items():
+            for r in data["rounds"]:
+                if self.round_rewards[r]:
+                    data["rewards"].extend(self.round_rewards[r])
+                data["counts"] += self.round_counts[r]
+
+        # Build log message
+        parts = [f"[RoundStats] {self.num_timesteps:,} steps |"]
+        for phase, data in phase_stats.items():
+            if data["rewards"]:
+                avg = np.mean(data["rewards"])
+                parts.append(f"{phase}: {avg:.1f} ({data['counts']})")
+            else:
+                parts.append(f"{phase}: - ({data['counts']})")
+
+        print(" ".join(parts))
+
+        # Clear accumulators
+        self.round_rewards = {r: [] for r in range(1, 11)}
+        self.round_bid_accuracy = {r: [] for r in range(1, 11)}
+        self.round_counts = dict.fromkeys(range(1, 11), 0)
