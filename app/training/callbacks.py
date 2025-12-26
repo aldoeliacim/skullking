@@ -125,6 +125,29 @@ class MixedOpponentEvalCallback(BaseCallback):
         """Record training start time."""
         self.start_time = time.time()
 
+    def _set_opponent_on_envs(self, opp_type: str, opp_diff: str) -> None:
+        """Set opponent on all environments, traversing wrappers if needed."""
+        # Try direct env_method first
+        try:
+            self.eval_env.env_method("set_opponent", opp_type, opp_diff)
+            return
+        except AttributeError:
+            pass
+
+        # Traverse wrappers to find the underlying env
+        for env in self.eval_env.envs:
+            # Traverse wrapper chain
+            current = env
+            while hasattr(current, "env"):
+                if hasattr(current, "set_opponent"):
+                    current.set_opponent(opp_type, opp_diff)
+                    break
+                current = current.env
+            else:
+                # Check the innermost env
+                if hasattr(current, "set_opponent"):
+                    current.set_opponent(opp_type, opp_diff)
+
     def _on_step(self) -> bool:
         if self.num_timesteps - self.last_eval_timestep >= self.eval_freq:
             self._evaluate()
@@ -238,8 +261,8 @@ class MixedOpponentEvalCallback(BaseCallback):
         episodes_per_opponent = max(1, self.n_eval_episodes // len(self.opponent_configs))
 
         for opp_type, opp_diff in self.opponent_configs:
-            # Set opponent type
-            self.eval_env.env_method("set_opponent", opp_type, opp_diff)
+            # Set opponent type - traverse wrappers if needed
+            self._set_opponent_on_envs(opp_type, opp_diff)
             sync_envs_normalization(self.training_env, self.eval_env)
 
             rewards = []

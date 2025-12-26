@@ -837,6 +837,11 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             mask[i] = True
         return mask
 
+    def set_opponent(self, opponent_type: str, difficulty: str = "medium") -> None:
+        """Change opponent type and difficulty (for curriculum learning)."""
+        self.opponent_bot_type = opponent_type
+        self.opponent_difficulty = self._parse_difficulty(difficulty)
+
 
 class WorkerEnv(gym.Env[np.ndarray, int]):
     """Environment for the card-playing (Worker) policy.
@@ -1587,6 +1592,11 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             mask[0] = True
 
         return mask
+
+    def set_opponent(self, opponent_type: str, difficulty: str = "medium") -> None:
+        """Change opponent type and difficulty (for curriculum learning)."""
+        self.opponent_bot_type = opponent_type
+        self.opponent_difficulty = self._parse_difficulty(difficulty)
 
 
 def mask_fn_manager(env: ManagerEnv) -> np.ndarray:
