@@ -628,3 +628,93 @@ V1 had extreme reward variance (±792) causing unstable training.
 - Larger networks need more warmup time (explained variance starts low)
 - Separate pi/vf heads allow independent capacity tuning
 - [512, 512, 256] with ReLU works well for 50M+ step training
+
+---
+
+## V9 (December 26, 2024) - Hierarchical RL with Bug Fixes
+
+**Status:** Completed ✅
+
+### Motivation
+
+V8 flat policy struggled with the bidding-to-card-play credit assignment problem. V9 implements hierarchical RL:
+- **Manager (Bidding)**: Decides bid at round start, observes hand and game context
+- **Worker (Card Play)**: Plays cards to achieve Manager's bid goal
+
+### Bug Fixes Applied
+
+Before training, a comprehensive audit identified and fixed critical bugs:
+
+| Bug | Severity | Fix |
+|-----|----------|-----|
+| GAME_CONTEXT_DIM mismatch | Critical | Reduced from 28 to 24 dims |
+| RoundStats only tracked env 0 | High | Match rewards to environment indices |
+| Early stopping too aggressive | High | Disabled for curriculum learning |
+| Console.log in frontend | Low | Made dev-only |
+
+### Architecture
+
+**Manager (Bidding Policy):**
+- Observation: 167 dims (hand, game context, pirate abilities, opponent context)
+- Action: Bid 0-10
+- Reward: Bid accuracy at round end
+
+**Worker (Card Play Policy):**
+- Observation: 203 dims (hand, trick state, bid goal, progress)
+- Action: Card index 0-10
+- Reward: Trick-level shaping toward bid goal
+
+### Configuration
+
+| Parameter | Manager | Worker |
+|-----------|---------|--------|
+| Timesteps | 500,000 | 1,000,000 |
+| Parallel envs | 128 | 128 |
+| Batch size | 16,384 | 16,384 |
+| n_steps | 512 | 512 |
+| n_epochs | 15 | 15 |
+| Network | [2048, 2048, 1024] | [2048, 2048, 1024] |
+| Phase curriculum | late → mid+late | late → mid+late |
+
+### Step-Weighted Sampling
+
+Implemented round-weighted sampling where weight = round number:
+- Round 10: 18.2% probability (10 decisions per episode)
+- Round 1: 1.8% probability (1 decision per episode)
+
+This ensures each training STEP has equal probability of coming from any round, preventing short episodes from dominating the buffer.
+
+### Results
+
+**Manager Training:**
+- Total timesteps: 524,288
+- Final eval reward: 7.65
+- Average FPS: ~4,300
+- Late-phase training (rounds 7-10)
+
+**Worker Training:**
+- Total timesteps: 1,048,576
+- First eval reward: 2.40
+- Final eval reward: 4.05 (+68%)
+- Average FPS: ~6,400
+- Phase curriculum: late → mid+late at 1M steps
+
+### Analysis
+
+**Strengths:**
+- Hierarchical separation enables independent policy optimization
+- Phase curriculum works correctly (expanded at 1M steps)
+- Worker shows clear learning signal (2.40 → 4.05)
+- No early stopping interference with curriculum transitions
+
+**Observations:**
+- RoundStats now correctly tracks all parallel environments
+- Manager converges quickly (episode = 1 decision)
+- Worker shows variance in evaluation (±5-6 reward)
+
+### Model Files
+
+- `models/hierarchical_v9/manager/final_model.zip`
+- `models/hierarchical_v9/worker/final_model.zip`
+
+---
