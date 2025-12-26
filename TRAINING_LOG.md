@@ -234,68 +234,101 @@ Self-play activated at 2M steps, rotating through checkpoints:
 
 ---
 
-## V9 (Planned) - Hierarchical RL + Performance Optimizations
+## V9 (December 26, 2024) - Hierarchical RL + Performance Optimizations
 
-**Status:** Implementation Phase 🔧
+**Status:** Ready for Training ✅
 
 ### Motivation
 
-V8 plateaued at reward ~80-85 despite 5.5x faster training. Need algorithmic improvements to break through:
+V8 plateaued at reward ~80-85 despite 5.5x faster training. V9 introduces:
 
 1. **Hierarchical RL**: Separate bidding and card-play policies
-2. **Performance**: Numba/Cython for faster env stepping
-3. **GPU utilization**: Larger networks to use more VRAM
+2. **Numba JIT**: Accelerated observation encoding (581K enc/sec)
+3. **Large Networks**: Maximize GPU utilization (79% vs 30-46%)
 
 ### Architecture
 
 ```
 Manager Policy (Bidding)          Worker Policy (Card Play)
-├── Obs: Hand strength, position  ├── Obs: Current trick, bid goal
-├── Action: Bid 0-10              ├── Action: Card to play
-├── Horizon: 10 decisions/game    ├── Horizon: 1-10 per round
+├── Obs: 168 dims                 ├── Obs: 200 dims
+├── Action: Bid 0-10              ├── Action: Card index 0-10
+├── Network: [2048,2048,1024]     ├── Network: [2048,2048,1024]
 └── Reward: Round-end score       └── Reward: Trick-level shaping
 ```
 
-### Expected Benefits
+### Benchmark Results (December 26, 2024)
+
+**Environment Stepping Speed:**
+
+| Environment | Steps/sec | μs/step | vs Flat |
+|-------------|-----------|---------|---------|
+| ManagerEnv | 19,702 | 51 | 2.86x faster |
+| WorkerEnv | 18,315 | 55 | 2.66x faster |
+| SkullKingEnvMasked | 6,887 | 145 | baseline |
+
+**Key finding:** Hierarchical envs are ~2.8x faster than flat masked env!
+
+**GPU Utilization Optimization:**
+
+| Config | FPS | GPU% | VRAM |
+|--------|-----|------|------|
+| Standard [512,512,256] | 8-9K | 30-46% | 2.1GB |
+| **Large [2048,2048,1024]** | ~6K | **79%** | 3.7GB |
+
+**Optimal Configuration:**
+- **VecEnv:** DummyVecEnv (faster than SubprocVecEnv for fast-stepping envs)
+- **n_envs:** 256
+- **batch_size:** 16384
+- **n_steps:** 1024
+- **n_epochs:** 20
+- **Network:** [2048, 2048, 1024]
+- **Expected GPU:** 79%
+- **VRAM:** 3.7GB per model (17GB available = room for parallel training)
+
+### Changes Implemented
+
+1. **Fixed Hierarchical Env API Issues:**
+   - Added `_start_new_trick()` and `_get_play_order()` helper methods
+   - Replaced `Round.place_bid()` with `Round.add_bid()`
+   - ManagerEnv and WorkerEnv now work correctly
+
+2. **Numba-Accelerated Observation Encoding:**
+   - `observation_fast.py` with JIT-compiled encoders
+   - 581,000 encodings/sec (from benchmarks)
+   - Pre-computed card properties into numpy arrays
+
+3. **V9 Training Script:**
+   - `train_v9.py` with Manager/Worker commands
+   - Large network architecture [2048, 2048, 1024]
+   - DummyVecEnv default (faster for hierarchical envs)
+
+### Training Commands
+
+```bash
+# Train Manager (bidding) policy
+uv run python -m app.training.train_v9 train-manager --timesteps 5000000
+
+# Train Worker (card play) policy
+uv run python -m app.training.train_v9 train-worker --timesteps 5000000
+
+# Train both sequentially
+uv run python -m app.training.train_v9 train-both
+```
+
+### Expected Results
 
 | Metric | V8 | V9 (Expected) |
 |--------|-----|---------------|
 | Max reward | 85 | 90+ |
 | Sample efficiency | 1x | 2-3x |
-| FPS | 6,500 | 15,000+ (with Numba) |
-| GPU utilization | 50% | 70-80% |
-
-### Implementation Blockers (Must Fix)
-
-The hierarchical environment needs API refactoring:
-
-```python
-# Current issues in skullking_env_hierarchical.py:
-
-# 1. Round.start_trick() doesn't exist
-trick = current_round.start_trick()  # ❌ No such method
-
-# Fix: Create Trick manually (like skullking_env_masked.py)
-trick = Trick(number=trick_number, starter_player_index=starter_index)
-current_round.tricks.append(trick)  # ✅
-```
-
-**Files to fix:**
-- `app/gym_env/skullking_env_hierarchical.py` - 4 occurrences of `start_trick()`
-
-### Performance Optimizations
-
-See `V9_OPTIMIZATION_PLAN.md` for detailed plan:
-- Numba JIT for observation encoding
-- Cython for game logic hot paths
-- Larger network [1024, 512, 256]
-- EnvPool integration (long-term)
+| FPS | 6,500 | 6,000 (larger network) |
+| GPU utilization | 50% | 79% |
+| VRAM | 2.5GB | 3.7GB |
 
 ### References
 
-- `ADVANCED_RL_TECHNIQUES.md` Section 2: Hierarchical RL design
-- `V9_OPTIMIZATION_PLAN.md`: Performance optimization details
-- `archive/training_v8_experimental/train_hierarchical.py`: Training script template
+- `V9_OPTIMIZATION_PLAN.md` - Detailed optimization plan
+- `ADVANCED_RL_TECHNIQUES.md` - Hierarchical RL design
 
 ---
 

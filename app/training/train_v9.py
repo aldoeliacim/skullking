@@ -47,18 +47,25 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from app.gym_env.skullking_env_hierarchical import ManagerEnv, WorkerEnv
 from app.training.callbacks import MixedOpponentEvalCallback
 
-# V9 Configuration
+# V9 Configuration (benchmark-optimized for RTX 4080 SUPER + Ryzen 9 7900X)
+# Key findings from benchmarks:
+# - Hierarchical envs are 2.8x faster than flat masked env (51μs vs 145μs per step)
+# - DummyVecEnv outperforms SubprocVecEnv (env stepping too fast for subprocess overhead)
+# - Large network [2048,2048,1024] achieves 79% GPU vs 30-46% for standard network
+# - VRAM usage: ~3.7GB per model (17GB available)
 DEFAULT_TIMESTEPS = 5_000_000
-DEFAULT_N_ENVS = 256  # Reduced from 768 - hierarchical envs are heavier
+DEFAULT_N_ENVS = 256  # Optimal for hierarchical envs with DummyVecEnv
 DEFAULT_BATCH_SIZE = 16384
-DEFAULT_N_STEPS = 2048
+DEFAULT_N_STEPS = 1024  # Reduced from 2048 - more frequent updates
+DEFAULT_N_EPOCHS = 20  # Increased from 15 - more GPU work per rollout
 DEFAULT_SAVE_DIR = "./models/hierarchical_v9"
 
-# V9 Network Architecture (larger to use GPU headroom)
+# V9 Network Architecture (large network to maximize GPU utilization)
+# Benchmark: 79% GPU utilization with this config vs 30-46% with [512,512,256]
 POLICY_KWARGS = {
     "net_arch": {
-        "pi": [512, 512, 256],  # Policy network
-        "vf": [512, 512, 256],  # Value network
+        "pi": [2048, 2048, 1024],  # Large policy network
+        "vf": [2048, 2048, 1024],  # Large value network
     },
     "activation_fn": torch.nn.ReLU,
 }
@@ -107,7 +114,8 @@ def train_manager(
     n_envs: int = DEFAULT_N_ENVS,
     batch_size: int = DEFAULT_BATCH_SIZE,
     n_steps: int = DEFAULT_N_STEPS,
-    use_subproc: bool = True,
+    n_epochs: int = DEFAULT_N_EPOCHS,
+    use_subproc: bool = False,  # DummyVecEnv is faster for hierarchical envs
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
 ) -> str:
@@ -117,14 +125,16 @@ def train_manager(
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     vec_env_cls = SubprocVecEnv if use_subproc else DummyVecEnv
+    vec_env_name = "SubprocVecEnv" if use_subproc else "DummyVecEnv"
 
     print("=" * 60)
     print("SKULL KING V9 - Manager (Bidding) Policy Training")
     print("=" * 60)
     print(f"Device: {device.upper()}")
     print(f"Total timesteps: {total_timesteps:,}")
-    print(f"Parallel envs: {n_envs}")
-    print(f"Batch size: {batch_size}, n_steps: {n_steps}")
+    print(f"Parallel envs: {n_envs} ({vec_env_name})")
+    print(f"Batch size: {batch_size}, n_steps: {n_steps}, n_epochs: {n_epochs}")
+    print(f"Network: {POLICY_KWARGS['net_arch']['pi']}")
     print("=" * 60 + "\n")
 
     # Create directories
@@ -159,7 +169,7 @@ def train_manager(
             learning_rate=3e-4,
             n_steps=n_steps,
             batch_size=batch_size,
-            n_epochs=15,
+            n_epochs=n_epochs,
             gamma=0.99,
             gae_lambda=0.95,
             ent_coef=0.02,  # Higher entropy for bid exploration
@@ -218,7 +228,8 @@ def train_worker(
     n_envs: int = DEFAULT_N_ENVS,
     batch_size: int = DEFAULT_BATCH_SIZE,
     n_steps: int = DEFAULT_N_STEPS,
-    use_subproc: bool = True,
+    n_epochs: int = DEFAULT_N_EPOCHS,
+    use_subproc: bool = False,  # DummyVecEnv is faster for hierarchical envs
     save_dir: str = DEFAULT_SAVE_DIR,
     load_path: str | None = None,
     fixed_goal: int | None = None,
@@ -233,14 +244,16 @@ def train_worker(
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     vec_env_cls = SubprocVecEnv if use_subproc else DummyVecEnv
+    vec_env_name = "SubprocVecEnv" if use_subproc else "DummyVecEnv"
 
     print("=" * 60)
     print("SKULL KING V9 - Worker (Card Play) Policy Training")
     print("=" * 60)
     print(f"Device: {device.upper()}")
     print(f"Total timesteps: {total_timesteps:,}")
-    print(f"Parallel envs: {n_envs}")
-    print(f"Batch size: {batch_size}, n_steps: {n_steps}")
+    print(f"Parallel envs: {n_envs} ({vec_env_name})")
+    print(f"Batch size: {batch_size}, n_steps: {n_steps}, n_epochs: {n_epochs}")
+    print(f"Network: {POLICY_KWARGS['net_arch']['pi']}")
     print(f"Fixed goal: {fixed_goal if fixed_goal is not None else 'random'}")
     print("=" * 60 + "\n")
 
@@ -276,7 +289,7 @@ def train_worker(
             learning_rate=3e-4,
             n_steps=n_steps,
             batch_size=batch_size,
-            n_epochs=15,
+            n_epochs=n_epochs,
             gamma=0.99,
             gae_lambda=0.95,
             ent_coef=0.01,  # Lower entropy for card play
@@ -385,7 +398,10 @@ def main():
         "--n-steps", type=int, default=DEFAULT_N_STEPS, help="Steps per env before update"
     )
     common_parser.add_argument(
-        "--no-subproc", action="store_true", help="Use DummyVecEnv instead of SubprocVecEnv"
+        "--n-epochs", type=int, default=DEFAULT_N_EPOCHS, help="PPO epochs per rollout"
+    )
+    common_parser.add_argument(
+        "--subproc", action="store_true", help="Use SubprocVecEnv (default: DummyVecEnv)"
     )
     common_parser.add_argument(
         "--save-dir", type=str, default=DEFAULT_SAVE_DIR, help="Save directory"
@@ -428,7 +444,8 @@ def main():
         "n_envs": args.envs,
         "batch_size": args.batch_size,
         "n_steps": args.n_steps,
-        "use_subproc": not args.no_subproc,
+        "n_epochs": args.n_epochs,
+        "use_subproc": args.subproc,  # Default: False (DummyVecEnv is faster)
         "save_dir": args.save_dir,
         "load_path": args.load,
     }
