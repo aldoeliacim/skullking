@@ -57,6 +57,8 @@ class WebSocketClient {
   private currentUrl: string | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private heartbeatInterval = 30000;
+  private visibilityHandler: (() => void) | null = null;
+  private wasConnectedBeforeHidden = false;
 
   // Connect to WebSocket
   connect(gameId: string, playerId: string, isSpectator = false, username = 'Player'): void {
@@ -67,7 +69,47 @@ class WebSocketClient {
       username: username,
     });
     this.currentUrl = `${WS_BASE_URL}/games/${endpoint}?${params.toString()}`;
+    this.setupVisibilityHandler();
     this.doConnect();
+  }
+
+  // Setup visibility change handler for browser tab switching
+  private setupVisibilityHandler(): void {
+    if (typeof document === 'undefined') {
+      return; // Not in browser environment
+    }
+
+    // Remove existing handler if any
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+    }
+
+    this.visibilityHandler = () => {
+      if (document.hidden) {
+        // Tab is being hidden - remember if we were connected
+        this.wasConnectedBeforeHidden = this.connectionState === 'connected';
+      } else {
+        // Tab is visible again - check if we need to reconnect
+        if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
+          console.log('[WebSocket] Tab visible, attempting reconnect...');
+          this.reconnectAttempts = 0; // Reset attempts for fresh reconnect
+          this.attemptReconnect();
+        } else if (this.connectionState === 'connected') {
+          // Already connected - request game state refresh
+          this.requestGameState();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  // Remove visibility handler
+  private removeVisibilityHandler(): void {
+    if (typeof document !== 'undefined' && this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
   }
 
   private doConnect(): void {
@@ -163,6 +205,7 @@ class WebSocketClient {
     }
 
     this.stopHeartbeat();
+    this.removeVisibilityHandler();
 
     if (this.ws) {
       this.ws.close(1000, 'Client disconnect');
@@ -171,7 +214,13 @@ class WebSocketClient {
 
     this.currentUrl = null;
     this.reconnectAttempts = 0;
+    this.wasConnectedBeforeHidden = false;
     this.setConnectionState('disconnected');
+  }
+
+  // Request full game state from server (for reconnection recovery)
+  requestGameState(): boolean {
+    return this.send('SYNC_STATE');
   }
 
   // Send message

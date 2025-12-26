@@ -78,9 +78,9 @@ function handleInit(content: Record<string, unknown>, set: SetState): void {
 /**
  * Handle GAME_STATE message - full game state for reconnection.
  */
-function handleGameState(content: Record<string, unknown>, set: SetState): void {
+function handleGameState(content: Record<string, unknown>, set: SetState, get: GetState): void {
   const stateContent = content as {
-    id?: string;
+    game_id?: string;
     slug?: string;
     state?: string;
     players?: Array<{
@@ -89,16 +89,33 @@ function handleGameState(content: Record<string, unknown>, set: SetState): void 
       score: number;
       index: number;
       is_bot: boolean;
-      is_connected: boolean;
+      is_connected?: boolean;
       bid?: number | null;
       tricks_won?: number;
     }>;
     current_round?: {
+      number?: number;
       loot_alliances?: Record<string, string>;
+      tricks?: Array<{
+        number: number;
+        cards: Array<{ player_id: string; card_id: number }>;
+        winner_player_id?: string | null;
+      }>;
     };
+    hand?: number[];
+    picking_player_id?: string | null;
   };
+
+  const updates: Partial<GameState> = {};
+
+  // Update phase from game state
+  if (stateContent.state) {
+    updates.phase = stateContent.state as GamePhase;
+  }
+
+  // Update players
   if (stateContent.players) {
-    const players: Player[] = stateContent.players.map((p) => ({
+    updates.players = stateContent.players.map((p) => ({
       id: p.id,
       username: p.username,
       is_bot: p.is_bot,
@@ -106,15 +123,47 @@ function handleGameState(content: Record<string, unknown>, set: SetState): void 
       bid: p.bid ?? null,
       tricks_won: p.tricks_won ?? 0,
     }));
-    set({ players });
   }
-  // Parse loot alliances from current round
-  if (stateContent.current_round?.loot_alliances) {
-    const alliances = Object.entries(stateContent.current_round.loot_alliances).map(
-      ([lootPlayerId, allyPlayerId]) => ({ lootPlayerId, allyPlayerId }),
-    );
-    set({ lootAlliances: alliances });
+
+  // Update hand
+  if (stateContent.hand && stateContent.hand.length > 0) {
+    updates.hand = stateContent.hand.map((id) => parseCard(id));
   }
+
+  // Update current round info
+  if (stateContent.current_round) {
+    updates.currentRound = stateContent.current_round.number ?? 0;
+
+    // Get current trick from tricks array
+    const tricks = stateContent.current_round.tricks || [];
+    const lastTrick = tricks[tricks.length - 1];
+    if (lastTrick) {
+      updates.currentTrick = lastTrick.number;
+
+      // Restore trick cards
+      updates.trickCards = lastTrick.cards.map((c) => ({
+        player_id: c.player_id,
+        card_id: String(c.card_id),
+      }));
+    }
+
+    // Parse loot alliances
+    if (stateContent.current_round.loot_alliances) {
+      updates.lootAlliances = Object.entries(stateContent.current_round.loot_alliances).map(
+        ([lootPlayerId, allyPlayerId]) => ({ lootPlayerId, allyPlayerId }),
+      );
+    }
+  }
+
+  // Update picking player
+  if (stateContent.picking_player_id !== undefined) {
+    updates.pickingPlayerId = stateContent.picking_player_id;
+  }
+
+  // Apply all updates atomically
+  set(updates);
+
+  get().addLog('Game state restored');
 }
 
 /**
@@ -369,7 +418,7 @@ export function handleMessage(message: WebSocketMessage, set: SetState, get: Get
       break;
 
     case 'GAME_STATE':
-      handleGameState(content, set);
+      handleGameState(content, set, get);
       break;
 
     case 'STARTED':

@@ -2,6 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  AppState,
+  type AppStateStatus,
   ScrollView,
   type ScrollView as ScrollViewType,
   StyleSheet,
@@ -20,6 +22,8 @@ import {
   TigressModal,
   TrickArea,
 } from '../../src/components';
+import { sessionStorage } from '../../src/services/sessionStorage';
+import { websocket } from '../../src/services/websocket';
 import { type Card as CardType, useGameStore } from '../../src/stores/gameStore';
 import { borderRadius, colors, shadows, spacing, typography } from '../../src/styles/theme';
 
@@ -72,7 +76,7 @@ export default function GameScreen(): React.JSX.Element {
 
     // If we have a playerId from lobby and we're already connected, don't reconnect
     if (params.playerId && connectionState === 'connected') {
-      return;
+      return undefined;
     }
 
     // Only connect if not already connected
@@ -83,23 +87,41 @@ export default function GameScreen(): React.JSX.Element {
       connect(gameCode, playerIdToUse, playerNameToUse, isSpectatorMode);
     }
 
-    return () => {
-      disconnect();
-    };
-  }, [
-    gameCode,
-    params.spectator,
-    params.playerId,
-    params.playerName,
-    connectionState,
-    connect,
-    disconnect,
-  ]);
+    // Don't disconnect on cleanup - the game may still be in progress
+    // Session cleanup happens when game ends or user explicitly leaves
+    return undefined;
+  }, [gameCode, params.spectator, params.playerId, params.playerName, connectionState, connect]);
 
-  // Navigate away when game ends
+  // Handle app state changes (for mobile - lock screen, app switching)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus): void => {
+      if (nextAppState === 'active' && connectionState !== 'connected') {
+        // App came to foreground - attempt reconnection if we have session
+        sessionStorage.loadSession().then((session) => {
+          if (session && session.gameId === gameCode) {
+            connect(session.gameId, session.playerId, session.playerName, session.isSpectator);
+          }
+        });
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [gameCode, connectionState, connect]);
+
+  // Request game state refresh when reconnecting
+  useEffect(() => {
+    if (connectionState === 'connected' && phase !== 'PENDING' && phase !== 'ENDED') {
+      // We reconnected to an in-progress game - request fresh state
+      websocket.requestGameState();
+    }
+  }, [connectionState, phase]);
+
+  // Clear session when game ends
   useEffect(() => {
     if (phase === 'ENDED') {
-      // Stay on game screen to show results
+      // Clear the session so user doesn't try to reconnect to ended game
+      sessionStorage.clearSession();
     }
   }, [phase]);
 

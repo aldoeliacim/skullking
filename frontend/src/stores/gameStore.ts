@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { sessionStorage } from '../services/sessionStorage';
 import { type ConnectionState, websocket } from '../services/websocket';
 import { getCardNumber, getCardSuit, getCardType } from '../utils/cardUtils';
 import { handleMessage } from './messageHandlers';
@@ -133,9 +134,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({ gameId, playerId, playerName, isSpectator });
 
+    // Save session for reconnection after app background
+    sessionStorage.saveSession({ gameId, playerId, playerName, isSpectator });
+
     // Setup connection state handler
     const unsubscribeConnection = websocket.addConnectionStateHandler((state) => {
       set({ connectionState: state });
+
+      // Request full game state on reconnection
+      if (state === 'connected' && currentState.phase !== 'PENDING') {
+        websocket.requestGameState();
+      }
     });
 
     // Setup message handler
@@ -159,6 +168,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       cleanupFn = null;
     }
     websocket.disconnect();
+    sessionStorage.clearSession();
     set(initialState);
   },
 
