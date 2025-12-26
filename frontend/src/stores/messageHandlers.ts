@@ -429,7 +429,10 @@ export function handleMessage(message: WebSocketMessage, set: SetState, get: Get
       break;
 
     default:
-      console.log('[Game] Unhandled message:', type, content);
+      // Unhandled messages are silently ignored in production
+      if (__DEV__) {
+        console.warn('[Game] Unhandled message:', type, content);
+      }
   }
 
   // Validate state invariants after each message (dev mode only)
