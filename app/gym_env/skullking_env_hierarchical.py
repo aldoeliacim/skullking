@@ -183,7 +183,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             player = self.game.get_player(player_id)
             if player and player.hand:
                 bid = bot.make_bid(self.game, round_num, player.hand)
-                current_round.place_bid(player_id, bid)
+                current_round.add_bid(player_id, bid)
 
         # Agent bids randomly or based on hand
         agent = self.game.get_player(self.agent_player_id)
@@ -192,7 +192,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
                 bid = self.np_random.integers(0, round_num + 1)
             else:
                 bid = self._estimate_bid(agent.hand)
-            current_round.place_bid(self.agent_player_id, bid)
+            current_round.add_bid(self.agent_player_id, bid)
 
         # Play all tricks
         for _ in range(round_num):
@@ -213,6 +213,43 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
                 strength += 0.5
         return min(int(strength), len(hand))
 
+    def _start_new_trick(self, current_round: Round) -> Trick | None:
+        """Create and append a new trick to the round.
+
+        Determines the starter based on the last trick's winner or round starter.
+        """
+        if not self.game:
+            return None
+
+        trick_number = len(current_round.tricks) + 1
+        starter_index = current_round.starter_player_index
+
+        # If there are previous tricks, winner of last trick starts
+        if current_round.tricks:
+            last_trick = current_round.tricks[-1]
+            if last_trick.winner_player_id:
+                winner = self.game.get_player(last_trick.winner_player_id)
+                if winner:
+                    starter_index = winner.index
+
+        trick = Trick(number=trick_number, starter_player_index=starter_index)
+        trick.picking_player_id = self.game.players[starter_index].id
+        current_round.tricks.append(trick)
+        return trick
+
+    def _get_play_order(self, trick: Trick) -> list[str]:
+        """Get the order of player IDs for a trick starting from starter."""
+        if not self.game:
+            return []
+
+        starter_index = trick.starter_player_index
+        num_players = len(self.game.players)
+        order = []
+        for i in range(num_players):
+            player_index = (starter_index + i) % num_players
+            order.append(self.game.players[player_index].id)
+        return order
+
     def _make_bot_bids(self) -> None:
         """Make bids for all bots."""
         current_round = self.game.get_current_round()
@@ -223,7 +260,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
             player = self.game.get_player(player_id)
             if player and player.hand:
                 bid = bot.make_bid(self.game, self.current_round_num, player.hand)
-                current_round.place_bid(player_id, bid)
+                current_round.add_bid(player_id, bid)
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """Execute bid and simulate round with worker policy.
@@ -242,7 +279,7 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
         bid = min(action, self.current_round_num)
 
         # Place agent's bid
-        current_round.place_bid(self.agent_player_id, bid)
+        current_round.add_bid(self.agent_player_id, bid)
 
         # Simulate round with worker policy (or rule-based fallback)
         tricks_won = self._simulate_card_play(current_round)
@@ -270,11 +307,11 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
 
     def _play_trick_with_worker(self, current_round: Round) -> None:
         """Play a single trick using worker policy or fallback."""
-        trick = current_round.start_trick()
+        trick = self._start_new_trick(current_round)
         if not trick:
             return
 
-        play_order = current_round.get_play_order()
+        play_order = self._get_play_order(trick)
 
         for player_id in play_order:
             player = self.game.get_player(player_id)
@@ -348,11 +385,11 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
 
     def _play_trick_with_bots(self, current_round: Round) -> None:
         """Play trick with all bots (for fast-forward simulation)."""
-        trick = current_round.start_trick()
+        trick = self._start_new_trick(current_round)
         if not trick:
             return
 
-        play_order = current_round.get_play_order()
+        play_order = self._get_play_order(trick)
 
         for player_id in play_order:
             player = self.game.get_player(player_id)
@@ -842,6 +879,38 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             return RandomBot(player_id)
         return RuleBasedBot(player_id, self.opponent_difficulty)
 
+    def _start_new_trick(self, current_round: Round) -> Trick | None:
+        """Create and append a new trick to the round."""
+        if not self.game:
+            return None
+
+        trick_number = len(current_round.tricks) + 1
+        starter_index = current_round.starter_player_index
+
+        if current_round.tricks:
+            last_trick = current_round.tricks[-1]
+            if last_trick.winner_player_id:
+                winner = self.game.get_player(last_trick.winner_player_id)
+                if winner:
+                    starter_index = winner.index
+
+        trick = Trick(number=trick_number, starter_player_index=starter_index)
+        trick.picking_player_id = self.game.players[starter_index].id
+        current_round.tricks.append(trick)
+        return trick
+
+    def _get_play_order(self, trick: Trick) -> list[str]:
+        """Get the order of player IDs for a trick."""
+        if not self.game:
+            return []
+
+        starter_index = trick.starter_player_index
+        num_players = len(self.game.players)
+        return [
+            self.game.players[(starter_index + i) % num_players].id
+            for i in range(num_players)
+        ]
+
     def _simulate_full_round(self, round_num: int) -> None:
         """Simulate a complete round."""
         self.game.start_new_round()
@@ -854,12 +923,12 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             player = self.game.get_player(player_id)
             if player and player.hand:
                 bid = bot.make_bid(self.game, round_num, player.hand)
-                current_round.place_bid(player_id, bid)
+                current_round.add_bid(player_id, bid)
 
         agent = self.game.get_player(self.agent_player_id)
         if agent and agent.hand:
             bid = self.np_random.integers(0, round_num + 1)
-            current_round.place_bid(self.agent_player_id, bid)
+            current_round.add_bid(self.agent_player_id, bid)
 
         # Play all tricks
         for _ in range(round_num):
@@ -869,11 +938,11 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
     def _play_random_trick(self, current_round: Round) -> None:
         """Play trick with random agent moves."""
-        trick = current_round.start_trick()
+        trick = self._start_new_trick(current_round)
         if not trick:
             return
 
-        for player_id in current_round.get_play_order():
+        for player_id in self._get_play_order(trick):
             player = self.game.get_player(player_id)
             if not player or not player.hand:
                 continue
@@ -907,10 +976,10 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
             player = self.game.get_player(player_id)
             if player and player.hand:
                 bid = bot.make_bid(self.game, self.current_round_num, player.hand)
-                current_round.place_bid(player_id, bid)
+                current_round.add_bid(player_id, bid)
 
         # Agent bid (from goal)
-        current_round.place_bid(self.agent_player_id, self.goal_bid)
+        current_round.add_bid(self.agent_player_id, self.goal_bid)
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """Play a card and return result.
@@ -932,7 +1001,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
         # Get or create current trick
         trick = current_round.get_current_trick()
         if not trick or trick.is_complete():
-            trick = current_round.start_trick()
+            trick = self._start_new_trick(current_round)
 
         if not trick:
             return self._get_worker_obs(), 0.0, True, False, {}
@@ -994,7 +1063,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
     def _play_until_agent_turn(self, current_round: Round, trick: Trick) -> None:
         """Play bot cards until it's agent's turn."""
-        play_order = current_round.get_play_order()
+        play_order = self._get_play_order(trick)
         played_ids = {pid for pid, _ in trick.plays}
 
         for player_id in play_order:
@@ -1022,7 +1091,7 @@ class WorkerEnv(gym.Env[np.ndarray, int]):
 
     def _complete_trick(self, current_round: Round, trick: Trick) -> None:
         """Complete trick with remaining players after agent."""
-        play_order = current_round.get_play_order()
+        play_order = self._get_play_order(trick)
         played_ids = {pid for pid, _ in trick.plays}
 
         agent_played = False

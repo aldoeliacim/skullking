@@ -1,0 +1,451 @@
+#!/usr/bin/env python3
+"""Train Hierarchical RL agents for Skull King (V9).
+
+V9 Training Features:
+1. Hierarchical RL: Manager (bidding) + Worker (card play) policies
+2. Numba-accelerated observation encoding
+3. Larger network architecture (use GPU headroom)
+4. Action masking for valid moves only
+5. Mixed opponent evaluation
+6. Early stopping with plateau detection
+
+Manager Environment:
+- Observes: Hand strength, position, opponent patterns
+- Action: Bid 0-10
+- Horizon: 10 decisions per game (one per round)
+- Reward: Round-end score based on bid accuracy
+
+Worker Environment:
+- Observes: Current trick, bid goal, cards remaining
+- Action: Card to play from hand
+- Horizon: 1-10 cards per round
+- Reward: Trick-level shaping toward bid goal
+
+Usage:
+    # Train Manager policy
+    uv run python -m app.training.train_v9 train-manager --timesteps 5000000
+
+    # Train Worker policy
+    uv run python -m app.training.train_v9 train-worker --timesteps 5000000
+
+    # Train both sequentially
+    uv run python -m app.training.train_v9 train-both
+
+See TRAINING_LOG.md and V9_OPTIMIZATION_PLAN.md for details.
+"""
+
+import argparse
+from pathlib import Path
+
+import torch
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.wrappers import ActionMasker
+from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+
+from app.gym_env.skullking_env_hierarchical import ManagerEnv, WorkerEnv
+from app.training.callbacks import MixedOpponentEvalCallback
+
+# V9 Configuration
+DEFAULT_TIMESTEPS = 5_000_000
+DEFAULT_N_ENVS = 256  # Reduced from 768 - hierarchical envs are heavier
+DEFAULT_BATCH_SIZE = 16384
+DEFAULT_N_STEPS = 2048
+DEFAULT_SAVE_DIR = "./models/hierarchical_v9"
+
+# V9 Network Architecture (larger to use GPU headroom)
+POLICY_KWARGS = {
+    "net_arch": {
+        "pi": [512, 512, 256],  # Policy network
+        "vf": [512, 512, 256],  # Value network
+    },
+    "activation_fn": torch.nn.ReLU,
+}
+
+
+def manager_mask_fn(env: ManagerEnv):
+    """Extract action masks from ManagerEnv."""
+    return env.action_masks()
+
+
+def worker_mask_fn(env: WorkerEnv):
+    """Extract action masks from WorkerEnv."""
+    return env.action_masks()
+
+
+def create_manager_env(
+    opponent_type: str = "rule_based",
+    difficulty: str = "medium",
+):
+    """Create Manager environment with action masking."""
+    env = ManagerEnv(
+        num_opponents=3,
+        opponent_bot_type=opponent_type,
+        opponent_difficulty=difficulty,
+    )
+    return ActionMasker(env, manager_mask_fn)
+
+
+def create_worker_env(
+    opponent_type: str = "rule_based",
+    difficulty: str = "medium",
+    fixed_goal: int | None = None,
+):
+    """Create Worker environment with action masking."""
+    env = WorkerEnv(
+        num_opponents=3,
+        opponent_bot_type=opponent_type,
+        opponent_difficulty=difficulty,
+        fixed_goal=fixed_goal,
+    )
+    return ActionMasker(env, worker_mask_fn)
+
+
+def train_manager(
+    total_timesteps: int = DEFAULT_TIMESTEPS,
+    n_envs: int = DEFAULT_N_ENVS,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    n_steps: int = DEFAULT_N_STEPS,
+    use_subproc: bool = True,
+    save_dir: str = DEFAULT_SAVE_DIR,
+    load_path: str | None = None,
+) -> str:
+    """Train Manager (bidding) policy.
+
+    Returns path to trained model.
+    """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    vec_env_cls = SubprocVecEnv if use_subproc else DummyVecEnv
+
+    print("=" * 60)
+    print("SKULL KING V9 - Manager (Bidding) Policy Training")
+    print("=" * 60)
+    print(f"Device: {device.upper()}")
+    print(f"Total timesteps: {total_timesteps:,}")
+    print(f"Parallel envs: {n_envs}")
+    print(f"Batch size: {batch_size}, n_steps: {n_steps}")
+    print("=" * 60 + "\n")
+
+    # Create directories
+    save_path = Path(save_dir) / "manager"
+    save_path.mkdir(parents=True, exist_ok=True)
+    (save_path / "checkpoints").mkdir(exist_ok=True)
+    (save_path / "best_model").mkdir(exist_ok=True)
+
+    # Create environments
+    print(f"Creating {n_envs} manager environments...")
+    vec_env = make_vec_env(
+        lambda: create_manager_env("rule_based", "medium"),
+        n_envs=n_envs,
+        vec_env_cls=vec_env_cls,
+    )
+
+    eval_env = make_vec_env(
+        lambda: create_manager_env("rule_based", "hard"),
+        n_envs=1,
+        vec_env_cls=DummyVecEnv,
+    )
+
+    # Create or load model
+    if load_path:
+        print(f"Loading model from {load_path}...")
+        model = MaskablePPO.load(load_path, env=vec_env, device=device)
+    else:
+        print("Creating new MaskablePPO model...")
+        model = MaskablePPO(
+            "MlpPolicy",
+            vec_env,
+            learning_rate=3e-4,
+            n_steps=n_steps,
+            batch_size=batch_size,
+            n_epochs=15,
+            gamma=0.99,
+            gae_lambda=0.95,
+            ent_coef=0.02,  # Higher entropy for bid exploration
+            vf_coef=0.5,
+            max_grad_norm=0.5,
+            clip_range=0.2,
+            policy_kwargs=POLICY_KWARGS,
+            tensorboard_log=str(save_path / "tensorboard"),
+            verbose=1,
+            device=device,
+        )
+
+    # Setup callbacks
+    checkpoint_cb = CheckpointCallback(
+        save_freq=50_000 // n_envs,
+        save_path=str(save_path / "checkpoints"),
+        name_prefix="manager",
+    )
+
+    eval_cb = MixedOpponentEvalCallback(
+        eval_env,
+        opponent_configs=[("rule_based", "hard")],
+        n_eval_episodes=10,
+        eval_freq=100_000,
+        best_model_save_path=str(save_path / "best_model"),
+        log_path=str(save_path / "eval_logs"),
+        deterministic=True,
+        early_stopping=True,
+        plateau_window=5,
+        plateau_threshold=5.0,
+        min_evals_before_stopping=10,
+    )
+
+    # Train
+    print("\nStarting training...")
+    model.learn(
+        total_timesteps=total_timesteps,
+        callback=[checkpoint_cb, eval_cb],
+        progress_bar=True,
+        reset_num_timesteps=load_path is None,
+    )
+
+    # Save final model
+    final_path = str(save_path / "final_model.zip")
+    model.save(final_path)
+    print(f"\nManager training complete. Model saved to {final_path}")
+
+    vec_env.close()
+    eval_env.close()
+
+    return final_path
+
+
+def train_worker(
+    total_timesteps: int = DEFAULT_TIMESTEPS,
+    n_envs: int = DEFAULT_N_ENVS,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    n_steps: int = DEFAULT_N_STEPS,
+    use_subproc: bool = True,
+    save_dir: str = DEFAULT_SAVE_DIR,
+    load_path: str | None = None,
+    fixed_goal: int | None = None,
+) -> str:
+    """Train Worker (card-playing) policy.
+
+    Args:
+        fixed_goal: If set, train worker for specific bid goal.
+                   If None, randomly sample goals for generalization.
+
+    Returns path to trained model.
+    """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    vec_env_cls = SubprocVecEnv if use_subproc else DummyVecEnv
+
+    print("=" * 60)
+    print("SKULL KING V9 - Worker (Card Play) Policy Training")
+    print("=" * 60)
+    print(f"Device: {device.upper()}")
+    print(f"Total timesteps: {total_timesteps:,}")
+    print(f"Parallel envs: {n_envs}")
+    print(f"Batch size: {batch_size}, n_steps: {n_steps}")
+    print(f"Fixed goal: {fixed_goal if fixed_goal is not None else 'random'}")
+    print("=" * 60 + "\n")
+
+    # Create directories
+    save_path = Path(save_dir) / "worker"
+    save_path.mkdir(parents=True, exist_ok=True)
+    (save_path / "checkpoints").mkdir(exist_ok=True)
+    (save_path / "best_model").mkdir(exist_ok=True)
+
+    # Create environments
+    print(f"Creating {n_envs} worker environments...")
+    vec_env = make_vec_env(
+        lambda: create_worker_env("rule_based", "medium", fixed_goal),
+        n_envs=n_envs,
+        vec_env_cls=vec_env_cls,
+    )
+
+    eval_env = make_vec_env(
+        lambda: create_worker_env("rule_based", "hard", fixed_goal),
+        n_envs=1,
+        vec_env_cls=DummyVecEnv,
+    )
+
+    # Create or load model
+    if load_path:
+        print(f"Loading model from {load_path}...")
+        model = MaskablePPO.load(load_path, env=vec_env, device=device)
+    else:
+        print("Creating new MaskablePPO model...")
+        model = MaskablePPO(
+            "MlpPolicy",
+            vec_env,
+            learning_rate=3e-4,
+            n_steps=n_steps,
+            batch_size=batch_size,
+            n_epochs=15,
+            gamma=0.99,
+            gae_lambda=0.95,
+            ent_coef=0.01,  # Lower entropy for card play
+            vf_coef=0.5,
+            max_grad_norm=0.5,
+            clip_range=0.2,
+            policy_kwargs=POLICY_KWARGS,
+            tensorboard_log=str(save_path / "tensorboard"),
+            verbose=1,
+            device=device,
+        )
+
+    # Setup callbacks
+    checkpoint_cb = CheckpointCallback(
+        save_freq=50_000 // n_envs,
+        save_path=str(save_path / "checkpoints"),
+        name_prefix="worker",
+    )
+
+    eval_cb = MixedOpponentEvalCallback(
+        eval_env,
+        opponent_configs=[("rule_based", "hard")],
+        n_eval_episodes=10,
+        eval_freq=100_000,
+        best_model_save_path=str(save_path / "best_model"),
+        log_path=str(save_path / "eval_logs"),
+        deterministic=True,
+        early_stopping=True,
+        plateau_window=5,
+        plateau_threshold=3.0,
+        min_evals_before_stopping=10,
+    )
+
+    # Train
+    print("\nStarting training...")
+    model.learn(
+        total_timesteps=total_timesteps,
+        callback=[checkpoint_cb, eval_cb],
+        progress_bar=True,
+        reset_num_timesteps=load_path is None,
+    )
+
+    # Save final model
+    final_path = str(save_path / "final_model.zip")
+    model.save(final_path)
+    print(f"\nWorker training complete. Model saved to {final_path}")
+
+    vec_env.close()
+    eval_env.close()
+
+    return final_path
+
+
+def train_both(
+    manager_timesteps: int = 3_000_000,
+    worker_timesteps: int = 5_000_000,
+    **kwargs,
+) -> tuple[str, str]:
+    """Train both Manager and Worker policies sequentially.
+
+    Manager is trained first, then Worker.
+    """
+    print("=" * 60)
+    print("SKULL KING V9 - Full Hierarchical Training")
+    print("=" * 60)
+    print(f"Manager timesteps: {manager_timesteps:,}")
+    print(f"Worker timesteps: {worker_timesteps:,}")
+    print("=" * 60 + "\n")
+
+    # Train Manager
+    manager_path = train_manager(total_timesteps=manager_timesteps, **kwargs)
+
+    print("\n" + "=" * 60)
+    print("Manager training complete. Starting Worker training...")
+    print("=" * 60 + "\n")
+
+    # Train Worker
+    worker_path = train_worker(total_timesteps=worker_timesteps, **kwargs)
+
+    print("\n" + "=" * 60)
+    print("Full hierarchical training complete!")
+    print(f"Manager model: {manager_path}")
+    print(f"Worker model: {worker_path}")
+    print("=" * 60)
+
+    return manager_path, worker_path
+
+
+def main():
+    """Parse arguments and run training."""
+    parser = argparse.ArgumentParser(description="Train Skull King V9 Hierarchical RL")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Common arguments
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument(
+        "--timesteps", type=int, default=DEFAULT_TIMESTEPS, help="Total timesteps"
+    )
+    common_parser.add_argument(
+        "--envs", type=int, default=DEFAULT_N_ENVS, help="Number of parallel envs"
+    )
+    common_parser.add_argument(
+        "--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Batch size"
+    )
+    common_parser.add_argument(
+        "--n-steps", type=int, default=DEFAULT_N_STEPS, help="Steps per env before update"
+    )
+    common_parser.add_argument(
+        "--no-subproc", action="store_true", help="Use DummyVecEnv instead of SubprocVecEnv"
+    )
+    common_parser.add_argument(
+        "--save-dir", type=str, default=DEFAULT_SAVE_DIR, help="Save directory"
+    )
+    common_parser.add_argument("--load", type=str, default=None, help="Load model path")
+
+    # train-manager command
+    manager_parser = subparsers.add_parser(
+        "train-manager", parents=[common_parser], help="Train Manager policy"
+    )
+
+    # train-worker command
+    worker_parser = subparsers.add_parser(
+        "train-worker", parents=[common_parser], help="Train Worker policy"
+    )
+    worker_parser.add_argument(
+        "--fixed-goal", type=int, default=None, help="Fixed bid goal for training"
+    )
+
+    # train-both command
+    both_parser = subparsers.add_parser(
+        "train-both", parents=[common_parser], help="Train both Manager and Worker"
+    )
+    both_parser.add_argument(
+        "--manager-timesteps",
+        type=int,
+        default=3_000_000,
+        help="Manager timesteps",
+    )
+    both_parser.add_argument(
+        "--worker-timesteps",
+        type=int,
+        default=5_000_000,
+        help="Worker timesteps",
+    )
+
+    args = parser.parse_args()
+
+    kwargs = {
+        "n_envs": args.envs,
+        "batch_size": args.batch_size,
+        "n_steps": args.n_steps,
+        "use_subproc": not args.no_subproc,
+        "save_dir": args.save_dir,
+        "load_path": args.load,
+    }
+
+    if args.command == "train-manager":
+        train_manager(total_timesteps=args.timesteps, **kwargs)
+    elif args.command == "train-worker":
+        train_worker(
+            total_timesteps=args.timesteps, fixed_goal=args.fixed_goal, **kwargs
+        )
+    elif args.command == "train-both":
+        train_both(
+            manager_timesteps=args.manager_timesteps,
+            worker_timesteps=args.worker_timesteps,
+            **kwargs,
+        )
+
+
+if __name__ == "__main__":
+    main()
