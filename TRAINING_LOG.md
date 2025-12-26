@@ -234,7 +234,7 @@ Self-play activated at 2M steps, rotating through checkpoints:
 
 ---
 
-## V9 (December 26, 2024) - Hierarchical RL + Performance Optimizations
+## V9 (December 26, 2024) - Hierarchical RL + Episode Design Optimizations
 
 **Status:** Ready for Training ✅
 
@@ -243,17 +243,50 @@ Self-play activated at 2M steps, rotating through checkpoints:
 V8 plateaued at reward ~80-85 despite 5.5x faster training. V9 introduces:
 
 1. **Hierarchical RL**: Separate bidding and card-play policies
-2. **Numba JIT**: Accelerated observation encoding (581K enc/sec)
+2. **Episode Design**: Phase curriculum, round-weighted sampling, phase embedding
 3. **Large Networks**: Maximize GPU utilization (79% vs 30-46%)
 
 ### Architecture
 
 ```
 Manager Policy (Bidding)          Worker Policy (Card Play)
-├── Obs: 168 dims                 ├── Obs: 200 dims
+├── Obs: 171 dims (+3 phase)      ├── Obs: 203 dims (+3 phase)
 ├── Action: Bid 0-10              ├── Action: Card index 0-10
 ├── Network: [2048,2048,1024]     ├── Network: [2048,2048,1024]
+├── Epochs: 25 (sparse reward)    ├── Epochs: 12 (dense reward)
 └── Reward: Round-end score       └── Reward: Trick-level shaping
+```
+
+### Episode Design Optimizations
+
+Based on game flow analysis (see `EPISODE_DESIGN.md`):
+
+**Game Phase Analysis:**
+- Early (rounds 1-3): 14% of decisions, simple (special cards dominate)
+- Mid (rounds 4-6): 28% of decisions, medium complexity
+- Late (rounds 7-10): 58% of decisions, complex (multi-trick planning)
+
+**Optimizations Implemented:**
+
+| Feature | Description | Impact |
+|---------|-------------|--------|
+| **Round-weighted sampling** | Late rounds sampled 4x more than early | Focus on complex scenarios |
+| **Phase curriculum** | Start late-only, unlock mid at 1M, all at 2M | Master complex first |
+| **Phase embedding** | 3-dim one-hot (early/mid/late) in observations | Phase-aware learning |
+| **Phase-specific epochs** | Manager: 25, Worker: 12 | Match reward density |
+| **Round stats tracking** | Per-phase reward logging | Performance visibility |
+
+**Round Sampling Weights:**
+```
+Round:  1    2    3    4    5    6    7    8    9   10
+Weight: 0.5  0.6  0.7  0.8  0.9  1.0  1.2  1.4  1.6  2.0
+```
+
+**Phase Curriculum Schedule:**
+```
+0 steps:   Late only (rounds 7-10)
+1M steps:  Mid + Late (rounds 4-10)
+2M steps:  All rounds
 ```
 
 ### Benchmark Results (December 26, 2024)
@@ -325,8 +358,16 @@ uv run python -m app.training.train_v9 train-both
 | GPU utilization | 50% | 79% |
 | VRAM | 2.5GB | 3.7GB |
 
+### New Callbacks
+
+| Callback | Purpose |
+|----------|---------|
+| `PhaseSchedulerCallback` | Progressively unlock game phases during training |
+| `RoundStatsCallback` | Track per-phase performance metrics |
+
 ### References
 
+- `EPISODE_DESIGN.md` - Game flow analysis and episode design decisions
 - `V9_OPTIMIZATION_PLAN.md` - Detailed optimization plan
 - `ADVANCED_RL_TECHNIQUES.md` - Hierarchical RL design
 
