@@ -71,10 +71,8 @@ export function AbilityModal({
     return (
       <>
         <Text style={styles.emoji}>🌹</Text>
-        <Text style={styles.title}>{t('ability.rosie.title', "Rosie's Ability")}</Text>
-        <Text style={styles.subtitle}>
-          {t('ability.rosie.description', 'Choose who will start the next trick:')}
-        </Text>
+        <Text style={styles.title}>{t('ability.rosie.title')}</Text>
+        <Text style={styles.subtitle}>{t('ability.rosie.description')}</Text>
         <View style={styles.optionsContainer}>
           {options.map((option) => (
             <Pressable
@@ -109,7 +107,7 @@ export function AbilityModal({
           <Text
             style={[styles.confirmButtonText, !selectedPlayer && styles.confirmButtonTextDisabled]}
           >
-            {t('common.confirm', 'Confirm')}
+            {t('common.confirm')}
           </Text>
         </Pressable>
       </>
@@ -136,13 +134,8 @@ export function AbilityModal({
     return (
       <>
         <Text style={styles.emoji}>🃏</Text>
-        <Text style={styles.title}>{t('ability.bendt.title', "Bendt's Ability")}</Text>
-        <Text style={styles.subtitle}>
-          {t(
-            'ability.bendt.description',
-            `You drew ${drawnCards.length} cards. Select ${mustDiscard} cards from your hand to discard:`,
-          )}
-        </Text>
+        <Text style={styles.title}>{t('ability.bendt.title')}</Text>
+        <Text style={styles.subtitle}>{t('ability.bendt.description')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -156,19 +149,21 @@ export function AbilityModal({
                 selected={selectedCards.includes(card.id)}
                 onPress={() => handleCardSelect(card.id)}
               />
-              {drawnCardIds.has(card.id) && <Text style={styles.newCardBadge}>NEW</Text>}
+              {drawnCardIds.has(card.id) && (
+                <Text style={styles.newCardBadge}>{t('ability.newCard')}</Text>
+              )}
             </View>
           ))}
         </ScrollView>
         <Text style={styles.selectionInfo}>
-          {t('ability.selected', 'Selected')}: {selectedCards.length}/{mustDiscard}
+          {t('ability.selected')}: {selectedCards.length}/{mustDiscard}
         </Text>
         <View style={styles.buttonRow}>
           <Pressable
             onPress={handleSkip}
             style={({ pressed }) => [styles.skipButton, pressed && styles.skipButtonPressed]}
           >
-            <Text style={styles.skipButtonText}>{t('ability.skip', 'Skip (auto-discard)')}</Text>
+            <Text style={styles.skipButtonText}>{t('ability.skip')}</Text>
           </Pressable>
           <Pressable
             onPress={handleConfirmDiscard}
@@ -185,7 +180,7 @@ export function AbilityModal({
                 selectedCards.length !== mustDiscard && styles.confirmButtonTextDisabled,
               ]}
             >
-              {t('ability.discard', 'Discard Cards')}
+              {t('ability.discard')}
             </Text>
           </Pressable>
         </View>
@@ -198,10 +193,8 @@ export function AbilityModal({
     return (
       <>
         <Text style={styles.emoji}>🎰</Text>
-        <Text style={styles.title}>{t('ability.roatan.title', "Roatán's Ability")}</Text>
-        <Text style={styles.subtitle}>
-          {t('ability.roatan.description', 'Declare an extra bet for bonus points:')}
-        </Text>
+        <Text style={styles.title}>{t('ability.roatan.title')}</Text>
+        <Text style={styles.subtitle}>{t('ability.roatan.description')}</Text>
         <View style={styles.bidOptionsContainer}>
           {options.map((bet) => (
             <Pressable
@@ -216,7 +209,7 @@ export function AbilityModal({
               <Text
                 style={[styles.bidButtonText, selectedBid === bet && styles.bidButtonTextSelected]}
               >
-                {bet === 0 ? t('ability.noBet', 'No Bet') : `+${bet}`}
+                {bet === 0 ? t('ability.noBet') : `+${bet}`}
               </Text>
             </Pressable>
           ))}
@@ -236,7 +229,7 @@ export function AbilityModal({
               selectedBid === null && styles.confirmButtonTextDisabled,
             ]}
           >
-            {t('common.confirm', 'Confirm')}
+            {t('common.confirm')}
           </Text>
         </Pressable>
       </>
@@ -250,10 +243,8 @@ export function AbilityModal({
     return (
       <>
         <Text style={styles.emoji}>🔮</Text>
-        <Text style={styles.title}>{t('ability.jade.title', "Jade's Ability")}</Text>
-        <Text style={styles.subtitle}>
-          {t('ability.jade.description', 'Cards remaining in the deck:')}
-        </Text>
+        <Text style={styles.title}>{t('ability.jade.title')}</Text>
+        <Text style={styles.subtitle}>{t('ability.jade.description')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -267,7 +258,7 @@ export function AbilityModal({
           onPress={() => onResolve({})}
           style={({ pressed }) => [styles.confirmButton, pressed && styles.confirmButtonPressed]}
         >
-          <Text style={styles.confirmButtonText}>{t('common.close', 'Close')}</Text>
+          <Text style={styles.confirmButtonText}>{t('common.close')}</Text>
         </Pressable>
       </>
     );
@@ -280,26 +271,21 @@ export function AbilityModal({
     const options = (data?.options as number[]) || [-1, 0, 1];
 
     const getOptionLabel = (modifier: number): string => {
-      if (modifier === -1) return t('ability.harry.decrease', '-1');
-      if (modifier === 1) return t('ability.harry.increase', '+1');
-      return t('ability.harry.keep', 'Keep');
+      if (modifier === -1) return t('ability.harry.decrease');
+      if (modifier === 1) return t('ability.harry.increase');
+      return t('ability.harry.keep');
     };
 
     const getOptionDescription = (modifier: number): string => {
       const newBid = Math.max(0, currentBid + modifier);
-      return `${t('ability.harry.newBid', 'Bid')}: ${newBid}`;
+      return `${t('ability.harry.newBid')}: ${newBid}`;
     };
 
     return (
       <>
         <Text style={styles.emoji}>💪</Text>
-        <Text style={styles.title}>{t('ability.harry.title', "Harry's Ability")}</Text>
-        <Text style={styles.subtitle}>
-          {t(
-            'ability.harry.description',
-            `Current bid: ${currentBid}, Tricks won: ${tricksWon}. Adjust your bid:`,
-          )}
-        </Text>
+        <Text style={styles.title}>{t('ability.harry.title')}</Text>
+        <Text style={styles.subtitle}>{t('ability.harry.description')}</Text>
         <View style={styles.bidOptionsContainer}>
           {options.map((modifier) => (
             <Pressable
@@ -339,7 +325,7 @@ export function AbilityModal({
               selectedBid === null && styles.confirmButtonTextDisabled,
             ]}
           >
-            {t('common.confirm', 'Confirm')}
+            {t('common.confirm')}
           </Text>
         </Pressable>
       </>
@@ -362,10 +348,8 @@ export function AbilityModal({
         return (
           <>
             <Text style={styles.emoji}>⚔️</Text>
-            <Text style={styles.title}>{t('ability.unknown.title', 'Pirate Ability')}</Text>
-            <Text style={styles.subtitle}>
-              {t('ability.unknown.description', `Ability: ${type}`)}
-            </Text>
+            <Text style={styles.title}>{t('ability.unknown.title')}</Text>
+            <Text style={styles.subtitle}>{t('ability.unknown.description')}</Text>
             <Pressable
               onPress={() => onResolve({})}
               style={({ pressed }) => [
@@ -373,7 +357,7 @@ export function AbilityModal({
                 pressed && styles.confirmButtonPressed,
               ]}
             >
-              <Text style={styles.confirmButtonText}>{t('common.continue', 'Continue')}</Text>
+              <Text style={styles.confirmButtonText}>{t('common.continue')}</Text>
             </Pressable>
           </>
         );

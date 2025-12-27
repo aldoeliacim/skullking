@@ -11,7 +11,7 @@ This module handles the resolution of pirate abilities:
 import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
-from app.api.responses import Command, ServerMessage
+from app.api.responses import Command, ErrorCode, ServerMessage
 from app.models.card import CardId
 from app.models.pirate_ability import AbilityType, PendingAbility
 
@@ -103,16 +103,16 @@ class AbilityHandlers:
         """Handle RESOLVE_ROSIE command - choose who starts next trick."""
         current_round = game.get_current_round()
         if not current_round:
-            await self._send_error(game.id, player_id, "No active round")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_ROUND)
             return
 
         chosen_player_id = content.get("chosen_player_id")
         if not chosen_player_id or not game.get_player(chosen_player_id):
-            await self._send_error(game.id, player_id, "Invalid player chosen")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_PLAYER_CHOSEN)
             return
 
         if not current_round.ability_state.resolve_rosie(player_id, chosen_player_id):
-            await self._send_error(game.id, player_id, "Cannot resolve Rosie ability")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_RESOLVE_ABILITY)
             return
 
         logger.info("Player %s chose %s to start next trick (Rosie)", player_id, chosen_player_id)
@@ -134,31 +134,31 @@ class AbilityHandlers:
         """Handle RESOLVE_BENDT command - discard cards after drawing."""
         current_round = game.get_current_round()
         if not current_round:
-            await self._send_error(game.id, player_id, "No active round")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_ROUND)
             return
 
         discard_ids = content.get("discard_cards", [])
         try:
             discard_cards = [CardId(card_id) for card_id in discard_ids]
         except (ValueError, TypeError):
-            await self._send_error(game.id, player_id, "Invalid card IDs")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_CARD_IDS)
             return
 
         # Get the pending ability
         ability = current_round.ability_state.get_pending_ability(player_id)
         if not ability or ability.ability_type != AbilityType.DRAW_DISCARD:
-            await self._send_error(game.id, player_id, "No pending Bendt ability")
+            await self._send_error(game.id, player_id, ErrorCode.NO_PENDING_ABILITY)
             return
 
         # Verify player has these cards
         player = game.get_player(player_id)
         if not player:
-            await self._send_error(game.id, player_id, "Player not found")
+            await self._send_error(game.id, player_id, ErrorCode.PLAYER_NOT_FOUND)
             return
 
         for card_id in discard_cards:
             if card_id not in player.hand:
-                await self._send_error(game.id, player_id, "Card not in hand")
+                await self._send_error(game.id, player_id, ErrorCode.CARD_NOT_IN_HAND)
                 return
 
         # Remove discarded cards from hand
@@ -168,7 +168,7 @@ class AbilityHandlers:
         if not current_round.ability_state.resolve_bendt(
             player_id, ability.drawn_cards, discard_cards
         ):
-            await self._send_error(game.id, player_id, "Cannot resolve Bendt ability")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_RESOLVE_ABILITY)
             return
 
         logger.info("Player %s discarded %d cards (Bendt)", player_id, len(discard_cards))
@@ -183,16 +183,16 @@ class AbilityHandlers:
         """Handle RESOLVE_ROATAN command - declare extra bet."""
         current_round = game.get_current_round()
         if not current_round:
-            await self._send_error(game.id, player_id, "No active round")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_ROUND)
             return
 
         extra_bet = content.get("extra_bet")
         if extra_bet not in (0, 10, 20):
-            await self._send_error(game.id, player_id, "Invalid bet amount (must be 0, 10, or 20)")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_BET_AMOUNT)
             return
 
         if not current_round.ability_state.resolve_roatan(player_id, extra_bet):
-            await self._send_error(game.id, player_id, "Cannot resolve Roatan ability")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_RESOLVE_ABILITY)
             return
 
         logger.info("Player %s declared extra bet of %d (Roatan)", player_id, extra_bet)
@@ -214,18 +214,18 @@ class AbilityHandlers:
         """Handle RESOLVE_JADE command - acknowledge deck view."""
         current_round = game.get_current_round()
         if not current_round:
-            await self._send_error(game.id, player_id, "No active round")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_ROUND)
             return
 
         # Get the pending ability
         ability = current_round.ability_state.get_pending_ability(player_id)
         if not ability or ability.ability_type != AbilityType.VIEW_DECK:
-            await self._send_error(game.id, player_id, "No pending Jade ability")
+            await self._send_error(game.id, player_id, ErrorCode.NO_PENDING_ABILITY)
             return
 
         # Resolve and continue game
         if not current_round.ability_state.resolve_jade(player_id):
-            await self._send_error(game.id, player_id, "Cannot resolve Jade ability")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_RESOLVE_ABILITY)
             return
 
         logger.info("Player %s acknowledged deck view (Jade)", player_id)
@@ -240,16 +240,16 @@ class AbilityHandlers:
         """Handle RESOLVE_HARRY command - modify bid at end of round."""
         current_round = game.get_current_round()
         if not current_round:
-            await self._send_error(game.id, player_id, "No active round")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_ROUND)
             return
 
         modifier = content.get("modifier")
         if modifier not in (-1, 0, 1):
-            await self._send_error(game.id, player_id, "Invalid modifier (must be -1, 0, or 1)")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_MODIFIER)
             return
 
         if not current_round.ability_state.resolve_harry(player_id, modifier):
-            await self._send_error(game.id, player_id, "Cannot resolve Harry ability")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_RESOLVE_ABILITY)
             return
 
         logger.info("Player %s modified bid by %d (Harry)", player_id, modifier)

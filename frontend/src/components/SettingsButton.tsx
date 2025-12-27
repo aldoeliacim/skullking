@@ -79,7 +79,7 @@ export function SettingsButton({ style }: SettingsButtonProps): React.JSX.Elemen
             </View>
 
             <View style={styles.footer}>
-              <Text style={styles.version}>v1.0.0</Text>
+              <Text style={styles.version}>{t('settings.version', { version: '1.0.0' })}</Text>
             </View>
           </Animated.View>
         </Animated.View>

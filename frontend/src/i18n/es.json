@@ -18,7 +18,8 @@
     "errorEnterName": "Por favor ingresa tu nombre",
     "errorEnterGameId": "Por favor ingresa un codigo",
     "errorCreateFailed": "Error al crear partida",
-    "errorConnection": "Error de conexion"
+    "errorConnection": "Error de conexion",
+    "tip": "Consejo: Comparte tu codigo de 4 letras con amigos para jugar juntos!"
   },
   "history": {
     "title": "Historial de Partidas",
@@ -26,7 +27,8 @@
     "noGames": "No hay partidas completadas aun",
     "noGamesHint": "Juega partidas para ver tu historial!",
     "error": "Error al cargar historial",
-    "description": "Ver partidas anteriores y puntajes"
+    "description": "Ver partidas anteriores y puntajes",
+    "points": "{{score}} pts"
   },
   "browse": {
     "title": "Partidas Activas",
@@ -40,7 +42,9 @@
     "statePending": "En Sala",
     "stateBidding": "Apostando",
     "statePlaying": "Jugando",
-    "description": "Buscar y unirse a partidas activas"
+    "description": "Buscar y unirse a partidas activas",
+    "playerCount": "{{count}} jugadores",
+    "spectatorCount": "{{count}} viendo"
   },
   "lobby": {
     "title": "Sala de Espera",
@@ -109,7 +113,8 @@
     "waitingForPlayers": "Esperando jugadores...",
     "ready": "listo",
     "scoreboard": "Marcador",
-    "rules": "Reglas"
+    "rules": "Reglas",
+    "spectator": "Espectador"
   },
   "results": {
     "title": "Fin del Juego!",
@@ -140,10 +145,12 @@
   "ability": {
     "rosie": {
       "name": "Rosie",
+      "title": "Habilidad de Rosie",
       "description": "Elige quien empezara la siguiente baza:"
     },
     "bendt": {
       "name": "Bendt el Bandido",
+      "title": "Habilidad de Bendt",
       "description": "Robaste 2 cartas. Selecciona 2 cartas para descartar:",
       "drawnCards": "Cartas robadas:",
       "yourHand": "Tu mano:",
@@ -151,20 +158,42 @@
     },
     "roatan": {
       "name": "Roatan",
-      "description": "Elige tu apuesta extra:",
+      "title": "Habilidad de Roatan",
+      "description": "Declara una apuesta extra por puntos bonus:",
       "noBet": "Sin Apuesta",
       "hint": "Si ganas esta baza y cumples tu apuesta, obtienes el bono. De lo contrario, pierdes los puntos!"
     },
     "jade": {
       "name": "Jade",
-      "description": "Estas cartas no fueron repartidas esta ronda:",
+      "title": "Habilidad de Jade",
+      "description": "Cartas restantes en el mazo:",
       "gotIt": "Entendido!"
     },
     "harry": {
       "name": "Harry el Gigante",
+      "title": "Habilidad de Harry",
       "description": "Ajusta tu apuesta en +1 o -1:",
-      "noChange": "Sin cambio"
+      "noChange": "Sin cambio",
+      "decrease": "-1",
+      "increase": "+1",
+      "keep": "Mantener",
+      "newBid": "Apuesta"
+    },
+    "newCard": "NUEVA",
+    "selected": "Seleccionado",
+    "skip": "Saltar (descarte automatico)",
+    "discard": "Descartar Cartas",
+    "noBet": "Sin Apuesta",
+    "unknown": {
+      "title": "Habilidad de Pirata",
+      "description": "Tipo de habilidad desconocido"
     }
+  },
+  "common": {
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "continue": "Continuar"
   },
   "scoreboard": {
     "title": "Marcador",
@@ -191,6 +220,38 @@
     "sound": "Sonido",
     "vibration": "Vibración",
     "on": "Sí",
-    "off": "No"
+    "off": "No",
+    "version": "v{{version}}"
+  },
+  "error": {
+    "gameAlreadyStarted": "La partida ya inicio",
+    "notEnoughPlayers": "No hay suficientes jugadores",
+    "notInBiddingPhase": "No estas en fase de apuestas",
+    "notInPickingPhase": "No estas en fase de juego",
+    "noActiveTrick": "No hay baza activa",
+    "noActiveRound": "No hay ronda activa",
+    "playerNotFound": "Jugador no encontrado",
+    "notYourTurn": "No es tu turno",
+    "alreadyPlacedBid": "Ya hiciste tu apuesta",
+    "alreadyPlayed": "Ya jugaste en esta baza",
+    "missingBidValue": "Falta valor de apuesta",
+    "bidMustBeNumber": "La apuesta debe ser un numero",
+    "invalidBid": "Valor de apuesta invalido",
+    "invalidCard": "Carta invalida",
+    "cardNotInHand": "Carta no esta en tu mano",
+    "tigressRequiresChoice": "Tigresa requiere eleccion: pirata o huida",
+    "mustFollowSuit": "Debes seguir el palo si tienes cartas de ese palo",
+    "noPendingAbility": "No hay habilidad pendiente",
+    "unknownAbility": "Tipo de habilidad desconocido",
+    "cannotAddBotAfterStart": "No puedes agregar bot despues de iniciar",
+    "gameIsFull": "La partida esta llena",
+    "cannotRemoveBotAfterStart": "No puedes quitar bot despues de iniciar",
+    "missingBotId": "Falta ID del bot",
+    "botNotFound": "Bot no encontrado",
+    "invalidPlayerChosen": "Jugador elegido invalido",
+    "cannotResolveAbility": "No se puede resolver la habilidad",
+    "invalidCardIds": "Seleccion de cartas invalida",
+    "invalidBetAmount": "Cantidad de apuesta invalida",
+    "invalidModifier": "Modificador invalido"
   }
 }

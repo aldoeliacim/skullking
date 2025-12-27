@@ -1,6 +1,7 @@
 """Response models and DTOs."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ __all__ = [
     "Command",
     "CreateGameRequest",
     "CreateGameResponse",
+    "ErrorCode",
     "ErrorResponse",
     "GameInfo",
     "PlayerInfo",
@@ -21,6 +23,53 @@ __all__ = [
     "TableCard",
     "TrickWinnerInfo",
 ]
+
+
+class ErrorCode(StrEnum):
+    """Error codes for i18n translation on the frontend."""
+
+    # Game state errors
+    GAME_ALREADY_STARTED = "error.gameAlreadyStarted"
+    NOT_ENOUGH_PLAYERS = "error.notEnoughPlayers"
+    NOT_IN_BIDDING_PHASE = "error.notInBiddingPhase"
+    NOT_IN_PICKING_PHASE = "error.notInPickingPhase"
+    NO_ACTIVE_TRICK = "error.noActiveTrick"
+    NO_ACTIVE_ROUND = "error.noActiveRound"
+
+    # Player errors
+    PLAYER_NOT_FOUND = "error.playerNotFound"
+    NOT_YOUR_TURN = "error.notYourTurn"
+    ALREADY_PLACED_BID = "error.alreadyPlacedBid"
+    ALREADY_PLAYED = "error.alreadyPlayed"
+
+    # Bid errors
+    MISSING_BID_VALUE = "error.missingBidValue"
+    BID_MUST_BE_NUMBER = "error.bidMustBeNumber"
+    INVALID_BID = "error.invalidBid"
+
+    # Card errors
+    INVALID_CARD = "error.invalidCard"
+    CARD_NOT_IN_HAND = "error.cardNotInHand"
+    TIGRESS_REQUIRES_CHOICE = "error.tigressRequiresChoice"
+    MUST_FOLLOW_SUIT = "error.mustFollowSuit"
+
+    # Ability errors
+    NO_PENDING_ABILITY = "error.noPendingAbility"
+    UNKNOWN_ABILITY = "error.unknownAbility"
+
+    # Bot errors
+    CANNOT_ADD_BOT_AFTER_START = "error.cannotAddBotAfterStart"
+    GAME_IS_FULL = "error.gameIsFull"
+    CANNOT_REMOVE_BOT_AFTER_START = "error.cannotRemoveBotAfterStart"
+    MISSING_BOT_ID = "error.missingBotId"
+    BOT_NOT_FOUND = "error.botNotFound"
+
+    # Ability-specific errors
+    INVALID_PLAYER_CHOSEN = "error.invalidPlayerChosen"
+    CANNOT_RESOLVE_ABILITY = "error.cannotResolveAbility"
+    INVALID_CARD_IDS = "error.invalidCardIds"
+    INVALID_BET_AMOUNT = "error.invalidBetAmount"
+    INVALID_MODIFIER = "error.invalidModifier"
 
 
 class TableCard(BaseModel):

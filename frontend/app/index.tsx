@@ -157,8 +157,9 @@ function BrowseGamesModal({
                       </View>
                       <View style={styles.gameCardInfo}>
                         <Text style={styles.gameInfoText}>
-                          👥 {game.player_count} players
-                          {game.spectator_count > 0 && ` • 👁 ${game.spectator_count} watching`}
+                          👥 {t('browse.playerCount', { count: game.player_count })}
+                          {game.spectator_count > 0 &&
+                            ` • 👁 ${t('browse.spectatorCount', { count: game.spectator_count })}`}
                         </Text>
                         <Text style={styles.gamePlayersText}>
                           {game.players.map((p) => p.username).join(', ')}
@@ -167,7 +168,7 @@ function BrowseGamesModal({
                       <View style={styles.gameCardActions}>
                         {game.state === 'PENDING' ? (
                           <Button
-                            title="Join"
+                            title={t('browse.join')}
                             onPress={() => onSelectGame(game, false)}
                             size="sm"
                             fullWidth
@@ -287,7 +288,9 @@ function HistoryModal({ visible, onClose }: { visible: boolean; onClose: () => v
                               {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
                             </Text>
                             <Text style={styles.historyPlayerName}>{score.username}</Text>
-                            <Text style={styles.historyScore}>{score.score} pts</Text>
+                            <Text style={styles.historyScore}>
+                              {t('history.points', { score: score.score })}
+                            </Text>
                           </View>
                         ))}
                       </View>
@@ -550,9 +553,7 @@ export default function HomeScreen(): React.JSX.Element {
               {isDesktop && (
                 <View style={styles.tipCard}>
                   <Text style={styles.tipIcon}>💡</Text>
-                  <Text style={styles.tipText}>
-                    Tip: Share your 4-letter game code with friends to play together!
-                  </Text>
+                  <Text style={styles.tipText}>{t('login.tip')}</Text>
                 </View>
               )}
             </Animated.View>

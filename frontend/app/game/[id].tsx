@@ -239,7 +239,7 @@ export default function GameScreen(): React.JSX.Element {
           <Text style={styles.roundText}>
             {t('game.round')} {currentRound}/10
           </Text>
-          {isSpectator && <Text style={styles.spectatorBadge}>👁️ Spectator</Text>}
+          {isSpectator && <Text style={styles.spectatorBadge}>👁️ {t('game.spectator')}</Text>}
         </View>
 
         <View style={styles.headerCenter}>

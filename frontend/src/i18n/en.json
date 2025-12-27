@@ -18,7 +18,8 @@
     "errorEnterName": "Please enter your name",
     "errorEnterGameId": "Please enter a game code",
     "errorCreateFailed": "Failed to create game",
-    "errorConnection": "Connection failed"
+    "errorConnection": "Connection failed",
+    "tip": "Tip: Share your 4-letter game code with friends to play together!"
   },
   "history": {
     "title": "Game History",
@@ -26,7 +27,8 @@
     "noGames": "No completed games yet",
     "noGamesHint": "Play some games to see your history!",
     "error": "Failed to load history",
-    "description": "View past games and scores"
+    "description": "View past games and scores",
+    "points": "{{score}} pts"
   },
   "browse": {
     "title": "Active Games",
@@ -40,7 +42,9 @@
     "statePending": "In Lobby",
     "stateBidding": "Bidding",
     "statePlaying": "Playing",
-    "description": "Find and join active games"
+    "description": "Find and join active games",
+    "playerCount": "{{count}} players",
+    "spectatorCount": "{{count}} watching"
   },
   "lobby": {
     "title": "Game Lobby",
@@ -109,7 +113,8 @@
     "waitingForPlayers": "Waiting for players...",
     "ready": "ready",
     "scoreboard": "Scoreboard",
-    "rules": "Rules"
+    "rules": "Rules",
+    "spectator": "Spectator"
   },
   "results": {
     "title": "Game Over!",
@@ -140,10 +145,12 @@
   "ability": {
     "rosie": {
       "name": "Rosie",
+      "title": "Rosie's Ability",
       "description": "Choose who will start the next trick:"
     },
     "bendt": {
       "name": "Bendt the Bandit",
+      "title": "Bendt's Ability",
       "description": "You drew 2 cards. Select 2 cards to discard:",
       "drawnCards": "Drawn cards:",
       "yourHand": "Your hand:",
@@ -151,20 +158,42 @@
     },
     "roatan": {
       "name": "Roatan",
-      "description": "Choose your extra bet amount:",
+      "title": "Roatán's Ability",
+      "description": "Declare an extra bet for bonus points:",
       "noBet": "No Bet",
       "hint": "If you win this trick and make your bid, you get the bonus. Otherwise, lose the points!"
     },
     "jade": {
       "name": "Jade",
-      "description": "These cards were not dealt this round:",
+      "title": "Jade's Ability",
+      "description": "Cards remaining in the deck:",
       "gotIt": "Got it!"
     },
     "harry": {
       "name": "Harry the Giant",
+      "title": "Harry's Ability",
       "description": "Adjust your bid by +1 or -1:",
-      "noChange": "No change"
+      "noChange": "No change",
+      "decrease": "-1",
+      "increase": "+1",
+      "keep": "Keep",
+      "newBid": "Bid"
+    },
+    "newCard": "NEW",
+    "selected": "Selected",
+    "skip": "Skip (auto-discard)",
+    "discard": "Discard Cards",
+    "noBet": "No Bet",
+    "unknown": {
+      "title": "Pirate Ability",
+      "description": "Unknown ability type"
     }
+  },
+  "common": {
+    "confirm": "Confirm",
+    "close": "Close",
+    "cancel": "Cancel",
+    "continue": "Continue"
   },
   "scoreboard": {
     "title": "Scoreboard",
@@ -191,6 +220,38 @@
     "sound": "Sound",
     "vibration": "Vibration",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "version": "v{{version}}"
+  },
+  "error": {
+    "gameAlreadyStarted": "Game already started",
+    "notEnoughPlayers": "Not enough players",
+    "notInBiddingPhase": "Not in bidding phase",
+    "notInPickingPhase": "Not in picking phase",
+    "noActiveTrick": "No active trick",
+    "noActiveRound": "No active round",
+    "playerNotFound": "Player not found",
+    "notYourTurn": "Not your turn",
+    "alreadyPlacedBid": "Already placed bid",
+    "alreadyPlayed": "Already played in this trick",
+    "missingBidValue": "Missing bid value",
+    "bidMustBeNumber": "Bid must be a number",
+    "invalidBid": "Invalid bid value",
+    "invalidCard": "Invalid card",
+    "cardNotInHand": "Card not in hand",
+    "tigressRequiresChoice": "Scary Mary requires choice: pirate or escape",
+    "mustFollowSuit": "Must follow suit if you have cards of that suit",
+    "noPendingAbility": "No pending ability",
+    "unknownAbility": "Unknown ability type",
+    "cannotAddBotAfterStart": "Cannot add bot after game started",
+    "gameIsFull": "Game is full",
+    "cannotRemoveBotAfterStart": "Cannot remove bot after game started",
+    "missingBotId": "Missing bot ID",
+    "botNotFound": "Bot not found",
+    "invalidPlayerChosen": "Invalid player chosen",
+    "cannotResolveAbility": "Cannot resolve ability",
+    "invalidCardIds": "Invalid card selection",
+    "invalidBetAmount": "Invalid bet amount",
+    "invalidModifier": "Invalid modifier"
   }
 }

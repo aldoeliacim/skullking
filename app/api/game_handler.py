@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.api.ability_handlers import AbilityHandlers
-from app.api.responses import Command, ServerMessage
+from app.api.responses import Command, ErrorCode, ServerMessage
 from app.bots import RandomBot, RuleBasedBot
 from app.bots.base_bot import BaseBot, BotDifficulty
 from app.bots.rl_bot import RLBot
@@ -133,11 +133,11 @@ class GameHandler:
     ) -> None:
         """Handle START_GAME command - initiates the game."""
         if game.state != GameState.PENDING:
-            await self._send_error(game.id, player_id, "Game already started")
+            await self._send_error(game.id, player_id, ErrorCode.GAME_ALREADY_STARTED)
             return
 
         if not game.can_start():
-            await self._send_error(game.id, player_id, "Not enough players")
+            await self._send_error(game.id, player_id, ErrorCode.NOT_ENOUGH_PLAYERS)
             return
 
         # Start the game
@@ -172,25 +172,25 @@ class GameHandler:
 
         """
         if game.state != GameState.BIDDING:
-            await self._send_error(game.id, player_id, "Not in bidding phase")
+            await self._send_error(game.id, player_id, ErrorCode.NOT_IN_BIDDING_PHASE)
             return
 
         player = game.get_player(player_id)
         if not player:
-            await self._send_error(game.id, player_id, "Player not found")
+            await self._send_error(game.id, player_id, ErrorCode.PLAYER_NOT_FOUND)
             return
 
         if player.bid is not None:
-            await self._send_error(game.id, player_id, "Already placed bid")
+            await self._send_error(game.id, player_id, ErrorCode.ALREADY_PLACED_BID)
             return
 
         if "bid" not in content:
-            await self._send_error(game.id, player_id, "Missing bid value")
+            await self._send_error(game.id, player_id, ErrorCode.MISSING_BID_VALUE)
             return
 
         bid_amount = content.get("bid")
         if not isinstance(bid_amount, int):
-            await self._send_error(game.id, player_id, "Bid must be a number")
+            await self._send_error(game.id, player_id, ErrorCode.BID_MUST_BE_NUMBER)
             return
 
         current_round = game.get_current_round()
@@ -198,7 +198,7 @@ class GameHandler:
         # Validate bid
         max_bid = current_round.number if current_round else 0
         if not current_round or not (0 <= bid_amount <= max_bid):
-            await self._send_error(game.id, player_id, f"Invalid bid: must be 0-{max_bid}")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_BID)
             return
 
         # Record bid
@@ -333,13 +333,13 @@ class GameHandler:
     ) -> None:
         """Send appropriate error for pick validation failure."""
         if game.state != GameState.PICKING:
-            await self._send_error(game.id, player_id, "Not in picking phase")
+            await self._send_error(game.id, player_id, ErrorCode.NOT_IN_PICKING_PHASE)
         elif not current_round or not current_trick:
-            await self._send_error(game.id, player_id, "No active trick")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_TRICK)
         elif current_trick.picking_player_id != player_id:
-            await self._send_error(game.id, player_id, "Not your turn")
+            await self._send_error(game.id, player_id, ErrorCode.NOT_YOUR_TURN)
         else:
-            await self._send_error(game.id, player_id, "Player not found")
+            await self._send_error(game.id, player_id, ErrorCode.PLAYER_NOT_FOUND)
 
     async def _send_card_validation_error(
         self, game: Game, player: Player, player_id: str, content: dict[str, Any]
@@ -347,18 +347,18 @@ class GameHandler:
         """Send appropriate error for card validation failure."""
         card_id_raw = content.get("card_id")
         if not isinstance(card_id_raw, int):
-            await self._send_error(game.id, player_id, "Invalid card ID")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_CARD)
             return
         try:
             card_id = CardId(card_id_raw)
             if card_id not in player.hand:
-                await self._send_error(game.id, player_id, "Card not in hand")
+                await self._send_error(game.id, player_id, ErrorCode.CARD_NOT_IN_HAND)
             else:
                 await self._send_error(
                     game.id, player_id, "Tigress requires choice: pirate or escape"
                 )
         except ValueError:
-            await self._send_error(game.id, player_id, "Invalid card ID")
+            await self._send_error(game.id, player_id, ErrorCode.INVALID_CARD)
 
     async def _handle_pick(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """Handle PICK command from a player.
@@ -398,7 +398,7 @@ class GameHandler:
             return
 
         if not await self._execute_pick(game, player, current_trick, card_id, tigress_choice):
-            await self._send_error(game.id, player_id, "Already played in this trick")
+            await self._send_error(game.id, player_id, ErrorCode.ALREADY_PLAYED)
             return
 
         # Check if trick is complete
@@ -1016,13 +1016,22 @@ class GameHandler:
             game.id,
         )
 
-    async def _send_error(self, game_id: str, player_id: str, message: str) -> None:
-        """Send error message to a specific player."""
+    async def _send_error(
+        self, game_id: str, player_id: str, error_code: ErrorCode | str
+    ) -> None:
+        """Send error message to a specific player.
+
+        Args:
+            game_id: Game identifier
+            player_id: Player to send error to
+            error_code: ErrorCode enum value for i18n translation on frontend
+
+        """
         await self.manager.send_personal_message(
             ServerMessage(
                 command=Command.REPORT_ERROR,
                 game_id=game_id,
-                content={"error": message},
+                content={"error": str(error_code)},
             ),
             game_id,
             player_id,
@@ -1038,7 +1047,7 @@ class GameHandler:
         """
         current_round = game.get_current_round()
         if not current_round:
-            await self._send_error(game.id, player_id, "No active round")
+            await self._send_error(game.id, player_id, ErrorCode.NO_ACTIVE_ROUND)
             return
 
         ability = current_round.ability_state.get_pending_ability(player_id)
@@ -1062,7 +1071,7 @@ class GameHandler:
             return
 
         if not ability:
-            await self._send_error(game.id, player_id, "No pending ability")
+            await self._send_error(game.id, player_id, ErrorCode.NO_PENDING_ABILITY)
             return
 
         # Route to specific handler based on ability type
@@ -1080,7 +1089,7 @@ class GameHandler:
             transformed = self._transform_ability_content(ability.ability_type, content)
             await handler(game, player_id, transformed)
         else:
-            await self._send_error(game.id, player_id, "Unknown ability type")
+            await self._send_error(game.id, player_id, ErrorCode.UNKNOWN_ABILITY)
 
     def _transform_ability_content(
         self, ability_type: AbilityType, content: dict[str, Any]
@@ -1215,11 +1224,11 @@ class GameHandler:
     async def _handle_add_bot(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """Handle ADD_BOT command - adds an AI opponent to the game."""
         if game.state != GameState.PENDING:
-            await self._send_error(game.id, player_id, "Cannot add bot after game started")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_ADD_BOT_AFTER_START)
             return
 
         if len(game.players) >= MAX_PLAYERS:
-            await self._send_error(game.id, player_id, "Game is full")
+            await self._send_error(game.id, player_id, ErrorCode.GAME_IS_FULL)
             return
 
         # Get bot type from content (default to rl if model exists, else rule_based)
@@ -1310,18 +1319,18 @@ class GameHandler:
     async def _handle_remove_bot(self, game: Game, player_id: str, content: dict[str, Any]) -> None:
         """Handle REMOVE_BOT command - removes an AI opponent from the game."""
         if game.state != GameState.PENDING:
-            await self._send_error(game.id, player_id, "Cannot remove bot after game started")
+            await self._send_error(game.id, player_id, ErrorCode.CANNOT_REMOVE_BOT_AFTER_START)
             return
 
         bot_id = content.get("bot_id")
         if not bot_id:
-            await self._send_error(game.id, player_id, "Missing bot_id")
+            await self._send_error(game.id, player_id, ErrorCode.MISSING_BOT_ID)
             return
 
         # Check if bot exists
         bot_player = game.get_player(bot_id)
         if not bot_player or not bot_player.is_bot:
-            await self._send_error(game.id, player_id, "Bot not found")
+            await self._send_error(game.id, player_id, ErrorCode.BOT_NOT_FOUND)
             return
 
         # Remove from game
