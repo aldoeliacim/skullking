@@ -7,7 +7,14 @@ import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, SettingsButton } from '../../src/components';
 import { useGameStore } from '../../src/stores/gameStore';
-import { borderRadius, colors, shadows, spacing, typography } from '../../src/styles/theme';
+import {
+  borderRadius,
+  colors,
+  shadows,
+  spacing,
+  textShadows,
+  typography,
+} from '../../src/styles/theme';
 
 // Bot presets - simplified from separate type + difficulty
 // Only rule-based bots actually use difficulty; RL and Random ignore it
@@ -346,9 +353,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     fontFamily: typography.fontFamilyDisplay,
     color: colors.accentGold,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    ...textShadows.sm,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -404,9 +409,7 @@ const styles = StyleSheet.create({
     color: colors.accentGold,
     letterSpacing: 6,
     marginRight: spacing.md,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    ...textShadows.sm,
   },
   copyButton: {
     fontSize: typography.fontSize.sm,

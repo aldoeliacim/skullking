@@ -168,7 +168,9 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   cardDisabled: {
-    opacity: 0.5,
+    opacity: 0.35,
+    borderColor: colors.textDark,
+    borderWidth: 1,
   },
   cardSelected: {
     borderColor: colors.accentGold,
