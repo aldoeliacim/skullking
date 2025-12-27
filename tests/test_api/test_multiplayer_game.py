@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.api.game_handler import GameHandler
-from app.api.responses import Command
+from app.api.responses import Command, ErrorCode
 from app.models.enums import GameState
 from app.models.game import Game
 from app.models.player import Player
@@ -253,7 +253,7 @@ class TestMultiplayerInteractions:
         error_call = mock_manager.send_personal_message.call_args
         assert error_call is not None, "Expected error message to be sent"
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "Not your turn" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.NOT_YOUR_TURN
 
     async def test_player_hands_are_private(self, game_handler, mock_manager):
         """Test that DEAL only sends hand to each player individually."""

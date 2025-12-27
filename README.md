@@ -102,7 +102,7 @@ skullking/
 ├── scripts/          # Utility scripts (see scripts/README.md)
 ├── static/           # Standalone web client for local play
 ├── archive/          # Legacy code preserved for reference
-└── tests/            # Pytest test suite (288 tests)
+└── tests/            # Pytest test suite (319 tests)
 ```
 
 ## Training RL Agents

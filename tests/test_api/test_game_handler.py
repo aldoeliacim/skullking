@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.api.game_handler import GameHandler
-from app.api.responses import Command
+from app.api.responses import Command, ErrorCode
 from app.models.enums import GameState
 from app.models.game import Game
 from app.models.player import Player
@@ -85,7 +85,7 @@ class TestStartGame:
         # Error should be sent to player
         error_call = mock_manager.send_personal_message.call_args
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "already started" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.GAME_ALREADY_STARTED
 
     async def test_start_game_not_enough_players(self, game_handler, mock_manager):
         """Starting with 1 player should send error."""
@@ -98,7 +98,7 @@ class TestStartGame:
 
         error_call = mock_manager.send_personal_message.call_args
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "Not enough players" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.NOT_ENOUGH_PLAYERS
 
 
 class TestBidding:
@@ -132,7 +132,7 @@ class TestBidding:
 
         error_call = mock_manager.send_personal_message.call_args
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "Invalid bid" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.INVALID_BID
 
     async def test_bid_not_in_bidding_phase(self, game_handler, game_with_players, mock_manager):
         """Bid during wrong phase should send error."""
@@ -143,7 +143,7 @@ class TestBidding:
 
         error_call = mock_manager.send_personal_message.call_args
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "Not in bidding phase" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.NOT_IN_BIDDING_PHASE
 
     async def test_bid_already_placed(self, game_handler, game_with_players, mock_manager):
         """Double bid should send error."""
@@ -157,7 +157,7 @@ class TestBidding:
 
         error_call = mock_manager.send_personal_message.call_args
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "Already placed bid" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.ALREADY_PLACED_BID
 
     async def test_all_bids_triggers_picking(self, game_handler, game_with_players, mock_manager):
         """All players bidding should trigger picking phase."""
@@ -236,7 +236,7 @@ class TestPicking:
 
         error_call = mock_manager.send_personal_message.call_args
         assert error_call[0][0].command == Command.REPORT_ERROR
-        assert "Not your turn" in error_call[0][0].content["error"]
+        assert error_call[0][0].content["error"] == ErrorCode.NOT_YOUR_TURN
 
     async def test_pick_card_not_in_hand(self, game_handler, game_with_players, mock_manager):
         """Picking a card not in hand should send error."""

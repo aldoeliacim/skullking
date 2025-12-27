@@ -174,10 +174,12 @@ class Trick:
             card = get_card(card_id)
             if card.is_special():
                 special_cards.append(card_id)
-            elif card.is_roger():
-                trump_cards.append(card_id)
             elif card.card_type == lead_suit:
+                # Must follow suit - includes Roger when Roger is led
                 suit_cards.append(card_id)
+            elif card.is_roger():
+                # Roger is trump when another suit leads
+                trump_cards.append(card_id)
         return suit_cards, special_cards, trump_cards
 
     def get_valid_cards(self, hand: list[CardId], cards_in_trick: list[CardId]) -> list[CardId]:
