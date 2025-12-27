@@ -6,8 +6,8 @@
  */
 
 import type { WebSocketMessage } from '../services/websocket';
-import type { GamePhase, GameState, LootAlliance, Player, TrickCard } from './gameStore';
-import { parseCard } from './gameStore';
+import type { GamePhase, GameState, LootAlliance, Player, TrickCard } from '../types/game';
+import { parseCard } from '../utils/cardUtils';
 import { logValidationErrors, validateGameState } from './stateValidator';
 
 // Type for the set/get functions from Zustand
@@ -78,7 +78,7 @@ function handleInit(content: Record<string, unknown>, set: SetState): void {
 /**
  * Handle GAME_STATE message - full game state for reconnection.
  */
-function handleGameState(content: Record<string, unknown>, set: SetState, get: GetState): void {
+function handleGameState(content: Record<string, unknown>, set: SetState, _get: GetState): void {
   const stateContent = content as {
     game_id?: string;
     slug?: string;
@@ -162,8 +162,6 @@ function handleGameState(content: Record<string, unknown>, set: SetState, get: G
 
   // Apply all updates atomically
   set(updates);
-
-  get().addLog('Game state restored');
 }
 
 /**
@@ -253,15 +251,26 @@ function handleStartPicking(content: Record<string, unknown>, set: SetState): vo
 function handlePicked(content: Record<string, unknown>, set: SetState, get: GetState): void {
   // Convert card_id to string (backend sends integer)
   const cardIdStr = String(content.card_id);
-  const trickCard: TrickCard = {
-    player_id: content.player_id as string,
-    card_id: cardIdStr,
-    tigress_choice: content.tigress_choice as 'pirate' | 'escape' | undefined,
-  };
+  const playerId = content.player_id as string;
 
   // Get current state BEFORE updating
   const currentTrickCards = get().trickCards;
   const currentHand = get().hand;
+
+  // Guard: prevent duplicate cards from same player in same trick
+  const alreadyPlayed = currentTrickCards.some(
+    (tc) => tc.player_id === playerId && tc.card_id === cardIdStr,
+  );
+  if (alreadyPlayed) {
+    console.warn('[Game] Duplicate PICKED message ignored:', playerId, cardIdStr);
+    return;
+  }
+
+  const trickCard: TrickCard = {
+    player_id: playerId,
+    card_id: cardIdStr,
+    tigress_choice: content.tigress_choice as 'pirate' | 'escape' | undefined,
+  };
 
   // Single atomic update for all state changes
   set({

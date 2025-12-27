@@ -1,5 +1,9 @@
 import { type PickPayload, toCardIdNumeric } from '../types/api';
+import type { ConnectionState } from '../types/game';
 import { WS_BASE_URL } from './api';
+
+// Re-export ConnectionState from centralized types
+export type { ConnectionState } from '../types/game';
 
 // WebSocket message types (matching backend Command enum)
 export type MessageType =
@@ -40,9 +44,6 @@ export interface WebSocketMessage {
 }
 
 export type MessageHandler = (message: WebSocketMessage) => void;
-
-// WebSocket connection state
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
 // WebSocket client class
 class WebSocketClient {

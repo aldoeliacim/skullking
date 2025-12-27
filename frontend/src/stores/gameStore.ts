@@ -1,91 +1,20 @@
 import { create } from 'zustand';
 import { sessionStorage } from '../services/sessionStorage';
-import { type ConnectionState, websocket } from '../services/websocket';
-import { getCardNumber, getCardSuit, getCardType } from '../utils/cardUtils';
+import { websocket } from '../services/websocket';
 import { handleMessage } from './messageHandlers';
 
-// Types
-export interface Player {
-  id: string;
-  username: string;
-  is_bot: boolean;
-  bot_type?: string;
-  bot_difficulty?: string;
-  score: number;
-  bid: number | null;
-  tricks_won: number;
-  is_host?: boolean;
-}
-
-export interface Card {
-  id: string;
-  suit?: string;
-  number?: number;
-  type?: string;
-  name?: string;
-  image?: string;
-}
-
-export interface TrickCard {
-  player_id: string;
-  card_id: string;
-  tigress_choice?: 'pirate' | 'escape' | undefined;
-}
-
-export interface AbilityData {
-  type: string;
-  pirate?: string;
-  data?: Record<string, unknown>;
-}
-
-export type GamePhase = 'PENDING' | 'BIDDING' | 'PICKING' | 'ENDED';
-
-// Alliance between loot player and trick winner
-export interface LootAlliance {
-  lootPlayerId: string;
-  allyPlayerId: string;
-}
-
-export interface GameState {
-  // Connection
-  connectionState: ConnectionState;
-  gameId: string | null;
-  playerId: string | null;
-  playerName: string | null;
-  isSpectator: boolean;
-
-  // Game state
-  phase: GamePhase;
-  players: Player[];
-  currentRound: number;
-  currentTrick: number;
-  hand: Card[];
-  trickCards: TrickCard[];
-  pickingPlayerId: string | null;
-  lootAlliances: LootAlliance[];
-
-  // UI state
-  showBidding: boolean;
-  showResults: boolean;
-  showAbility: boolean;
-  abilityData: AbilityData | null;
-  trickWinner: { playerId: string; playerName: string } | null;
-  logs: Array<{ message: string; type: string; timestamp: number }>;
-
-  // Actions
-  connect: (gameId: string, playerId: string, playerName: string, isSpectator?: boolean) => void;
-  disconnect: () => void;
-  placeBid: (bid: number) => void;
-  playCard: (cardId: string, tigressChoice?: 'pirate' | 'escape') => void;
-  addBot: (botType: string, difficulty: string) => void;
-  removeBot: (botId: string) => void;
-  startGame: () => void;
-  continueReady: () => void;
-  resolveAbility: (data: Record<string, unknown>) => void;
-  addLog: (message: string, type?: string) => void;
-  clearTrickWinner: () => void;
-  reset: () => void;
-}
+// Re-export types from shared types file for backward compatibility
+export type {
+  Player,
+  Card,
+  TrickCard,
+  AbilityData,
+  GamePhase,
+  LootAlliance,
+  ConnectionState,
+  GameState,
+} from '../types/game';
+import type { ConnectionState, GamePhase, GameState, LootAlliance } from '../types/game';
 
 const initialState = {
   connectionState: 'disconnected' as ConnectionState,
@@ -220,81 +149,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 }));
 
-// Pirate image names matching backend PIRATE_IDENTITY order
-const PIRATE_IMAGES = ['rosie', 'bendt', 'rascal', 'juanita', 'harry'];
-const PIRATE_NAMES: Record<number, string> = {
-  6: 'Harry the Giant',
-  7: 'Tortuga Jack',
-  8: 'Bendt the Bandit',
-  9: 'Bahij the Bandit',
-  10: "Rosie D'Laney",
-};
-
-// Suit to image mapping (indexed by Suit type from cardUtils)
-const SUIT_IMAGES = {
-  roger: 'black.png',
-  parrot: 'green.png',
-  map: 'purple.png',
-  chest: 'yellow.png',
-} as const;
-
-// Parse card ID to card object using centralized card utilities
-export function parseCard(cardIdInput: string | number): Card {
-  const numId = typeof cardIdInput === 'number' ? cardIdInput : parseInt(cardIdInput, 10);
-  const card: Card = { id: String(numId) };
-
-  const cardType = getCardType(numId);
-  const suit = getCardSuit(numId);
-  const number = getCardNumber(numId);
-
-  if (suit && number) {
-    // Suit card
-    card.type = 'suit';
-    card.suit = suit;
-    card.number = number;
-    card.image = SUIT_IMAGES[suit];
-  } else if (cardType) {
-    // Special card
-    card.type = cardType;
-    switch (cardType) {
-      case 'skull_king':
-        card.name = 'Skull King';
-        card.image = 'skullking.png';
-        break;
-      case 'white_whale':
-        card.name = 'White Whale';
-        card.image = 'whale.png';
-        break;
-      case 'kraken':
-        card.name = 'Kraken';
-        card.image = 'kraken.png';
-        break;
-      case 'mermaid':
-        card.name = `Mermaid ${numId - 3}`;
-        card.image = 'siren.png';
-        break;
-      case 'pirate':
-        card.name = PIRATE_NAMES[numId] || 'Pirate';
-        card.image = `${PIRATE_IMAGES[numId - 6]}.png`;
-        break;
-      case 'escape':
-        card.name = 'Escape';
-        card.image = 'flee.png';
-        break;
-      case 'tigress':
-        card.name = 'Scary Mary';
-        card.image = 'tigress.png';
-        break;
-      case 'loot':
-        card.name = 'Loot';
-        card.image = 'loot.png';
-        break;
-    }
-  } else {
-    card.image = 'back.png';
-  }
-
-  return card;
-}
+// Re-export parseCard from cardUtils for backward compatibility
+export { parseCard } from '../utils/cardUtils';
 
 export default useGameStore;

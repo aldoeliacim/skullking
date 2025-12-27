@@ -16,7 +16,7 @@
  * - 73-74: Loot
  */
 
-import type { Card, TrickCard } from '../stores/gameStore';
+import type { Card, TrickCard } from '../types/game';
 
 export type Suit = 'roger' | 'parrot' | 'map' | 'chest';
 export type CardType =
@@ -52,13 +52,6 @@ export function isSpecialCard(cardId: number): boolean {
  */
 export function isTrumpCard(cardId: number): boolean {
   return cardId >= 11 && cardId <= 24;
-}
-
-/**
- * Check if a card can always be played regardless of suit (special or trump).
- */
-export function isAlwaysPlayable(cardId: number): boolean {
-  return isSpecialCard(cardId) || isTrumpCard(cardId);
 }
 
 /**
@@ -124,6 +117,7 @@ export function getLedSuit(trickCards: TrickCard[]): Suit | null {
  * - If no suit has been led, any card can be played
  * - If a suit has been led and player has cards of that suit, they must play that suit
  * - If player doesn't have the led suit, they can play any card
+ * - Trump (Roger) can always be played EXCEPT when Roger is the led suit
  */
 export function getValidCardIds(hand: Card[], trickCards: TrickCard[]): string[] {
   // If no cards in trick yet, all cards are valid
@@ -139,25 +133,109 @@ export function getValidCardIds(hand: Card[], trickCards: TrickCard[]): string[]
     return hand.map((c) => c.id);
   }
 
-  // Separate always-playable cards (special + trump) and cards of the led suit
-  const alwaysPlayableCards: string[] = [];
+  // Separate cards by category
+  const specialCards: string[] = [];
   const suitCards: string[] = [];
+  const trumpCards: string[] = [];
 
   for (const card of hand) {
     const cardId = parseInt(card.id, 10);
-    if (isAlwaysPlayable(cardId)) {
-      // Special cards and trump cards can always be played
-      alwaysPlayableCards.push(card.id);
+    if (isSpecialCard(cardId)) {
+      // Special cards can always be played
+      specialCards.push(card.id);
     } else if (getCardSuit(cardId) === ledSuit) {
+      // Card matches led suit (includes Roger when Roger leads)
       suitCards.push(card.id);
+    } else if (isTrumpCard(cardId)) {
+      // Roger is trump only when another suit leads
+      trumpCards.push(card.id);
     }
   }
 
-  // If player has cards of led suit, must play those (or always-playable cards)
+  // If player has cards of led suit, must play those (or special/trump)
   if (suitCards.length > 0) {
-    return [...suitCards, ...alwaysPlayableCards];
+    return [...suitCards, ...specialCards, ...trumpCards];
   }
 
   // Player doesn't have led suit, can play anything
   return hand.map((c) => c.id);
+}
+
+// Pirate image names matching backend PIRATE_IDENTITY order
+const PIRATE_IMAGES = ['rosie', 'bendt', 'rascal', 'juanita', 'harry'];
+const PIRATE_NAMES: Record<number, string> = {
+  6: 'Harry the Giant',
+  7: 'Tortuga Jack',
+  8: 'Bendt the Bandit',
+  9: 'Bahij the Bandit',
+  10: "Rosie D'Laney",
+};
+
+// Suit to image mapping (indexed by Suit type from cardUtils)
+const SUIT_IMAGES: Record<Suit, string> = {
+  roger: 'black.png',
+  parrot: 'green.png',
+  map: 'purple.png',
+  chest: 'yellow.png',
+};
+
+/**
+ * Parse card ID to card object.
+ */
+export function parseCard(cardIdInput: string | number): Card {
+  const numId = typeof cardIdInput === 'number' ? cardIdInput : parseInt(cardIdInput, 10);
+  const card: Card = { id: String(numId) };
+
+  const cardType = getCardType(numId);
+  const suit = getCardSuit(numId);
+  const number = getCardNumber(numId);
+
+  if (suit && number) {
+    // Suit card
+    card.type = 'suit';
+    card.suit = suit;
+    card.number = number;
+    card.image = SUIT_IMAGES[suit];
+  } else if (cardType) {
+    // Special card
+    card.type = cardType;
+    switch (cardType) {
+      case 'skull_king':
+        card.name = 'Skull King';
+        card.image = 'skullking.png';
+        break;
+      case 'white_whale':
+        card.name = 'White Whale';
+        card.image = 'whale.png';
+        break;
+      case 'kraken':
+        card.name = 'Kraken';
+        card.image = 'kraken.png';
+        break;
+      case 'mermaid':
+        card.name = `Mermaid ${numId - 3}`;
+        card.image = 'siren.png';
+        break;
+      case 'pirate':
+        card.name = PIRATE_NAMES[numId] || 'Pirate';
+        card.image = `${PIRATE_IMAGES[numId - 6]}.png`;
+        break;
+      case 'escape':
+        card.name = 'Escape';
+        card.image = 'flee.png';
+        break;
+      case 'tigress':
+        card.name = 'Scary Mary';
+        card.image = 'tigress.png';
+        break;
+      case 'loot':
+        card.name = 'Loot';
+        card.image = 'loot.png';
+        break;
+    }
+  } else {
+    card.image = 'back.png';
+  }
+
+  return card;
 }
