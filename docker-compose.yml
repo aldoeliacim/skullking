@@ -1,23 +1,13 @@
 services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "${FRONTEND_PORT:-8000}:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - skullking-network
+  # Frontend is served directly by PVE nginx (see scripts/deploy.sh)
+  # No frontend container needed - simplifies architecture
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    expose:
-      - "8000"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"  # Expose to host for PVE nginx
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - MONGODB_HOST=mongo
