@@ -23,6 +23,7 @@ from enum import IntEnum
 from typing import Any
 
 import numpy as np
+from beartype import beartype
 from gymnasium import spaces
 from sb3_contrib.common.wrappers import ActionMasker
 
@@ -139,6 +140,7 @@ class AbilityAwareEnv(WorkerEnv):
             "harry": [],
         }
 
+    @beartype
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[np.ndarray, dict[str, Any]]:
@@ -160,7 +162,10 @@ class AbilityAwareEnv(WorkerEnv):
         extended_obs = self._extend_observation(obs)
         return extended_obs, info
 
-    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+    @beartype
+    def step(
+        self, action: int | np.integer
+    ) -> tuple[np.ndarray, float, bool | np.bool_, bool | np.bool_, dict[str, Any]]:
         """Execute action based on current decision phase.
 
         Routes to appropriate handler based on phase:
@@ -608,6 +613,7 @@ class AbilityAwareEnv(WorkerEnv):
 
         return 0.0
 
+    @beartype
     def action_masks(self) -> np.ndarray:
         """Return valid action mask based on current decision phase."""
         # Delegate to parent for playing phase
@@ -741,16 +747,19 @@ class AbilityAwareEnv(WorkerEnv):
         features[8] = self._card_strength(card)
         return features
 
+    @beartype
     def _get_extended_obs(self) -> np.ndarray:
         """Get extended observation including phase and ability context."""
         base_obs = self._get_worker_obs()
         return self._extend_observation(base_obs)
 
+    @beartype
     def set_abilities_enabled(self, enabled: bool) -> None:
         """Enable or disable ability decisions (for curriculum)."""
         self.enable_abilities = enabled
 
 
+@beartype
 def create_ability_env(
     opponent_type: str = "rule_based",
     difficulty: str = "medium",

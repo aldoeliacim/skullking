@@ -38,6 +38,60 @@ repos:
         # Exclude tests, scripts (non-production code)
         exclude: ^(tests/|scripts/|\.venv/|run_game\.py|test_current_agent\.py)
 
+  # Pyright - stricter type checking
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.390
+    hooks:
+      - id: pyright
+        additional_dependencies:
+          - pydantic
+          - pydantic-settings
+          - fastapi
+          - gymnasium
+          - numpy
+          - stable-baselines3
+          - sb3-contrib
+        exclude: ^(tests/|scripts/|\.venv/|run_game\.py|test_current_agent\.py)
+
+  # Vulture - dead code detection
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: v2.14
+    hooks:
+      - id: vulture
+        args: [app/, --min-confidence, "90"]
+        pass_filenames: false
+
+  # Bandit - security scanner
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^(tests/|scripts/)
+
+  # Xenon - code complexity threshold (D=acceptable for RL observation encoding)
+  - repo: local
+    hooks:
+      - id: xenon
+        name: Check code complexity (xenon)
+        entry: xenon --max-absolute D --max-modules B --max-average B app/ --exclude app/gym_env/skullking_env_hierarchical.py
+        language: python
+        additional_dependencies: [xenon]
+        pass_filenames: false
+        always_run: true
+
+  # Import-linter - architecture enforcement
+  - repo: local
+    hooks:
+      - id: import-linter
+        name: Check import rules (import-linter)
+        entry: lint-imports
+        language: python
+        additional_dependencies: [import-linter]
+        pass_filenames: false
+        always_run: true
+
   # Secrets detection
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0

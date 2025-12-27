@@ -38,10 +38,20 @@ sb3-contrib = "^2.7.1"
 pytest = "^8.3.0"
 pytest-asyncio = "^0.25.0"
 pytest-cov = "^6.0.0"
+pytest-randomly = "^3.16.0"
 httpx = "^0.28.0"
 ruff = "^0.8.0"
 mypy = "^1.14.0"
+pyright = "^1.1.390"
 ipython = "^8.31.0"
+# Code quality tools
+vulture = "^2.14"
+bandit = {extras = ["toml"], version = "^1.8.0"}
+radon = "^6.0.1"
+xenon = "^0.9.3"
+import-linter = "^2.1"
+hypothesis = "^6.122.0"
+beartype = "^0.19.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -69,7 +79,7 @@ ignore = [
 "scripts/**/*.py" = ["T201", "INP001", "PTH", "PLR", "BLE001", "E501", "NPY002", "S", "ARG", "N806", "FBT", "C901", "RUF059", "TD", "FIX", "PLC0415", "SIM102"]  # Scripts
 "run_game.py" = ["PTH", "S104", "S110", "BLE001"]  # Simple runner script
 "test_current_agent.py" = ["BLE001", "NPY002", "S101"]  # Test script
-"app/gym_env/**/*.py" = ["S101", "TC001"]  # Gym envs: assert for validation, imports needed at runtime
+"app/gym_env/**/*.py" = ["S101", "TC001", "PLR0913", "PLR0912", "PLR0915", "PLR2004", "C901", "FBT"]  # Gym envs: assert, complexity, boolean args
 
 [tool.ruff.format]
 quote-style = "double"
@@ -95,3 +105,54 @@ filterwarnings = [
     "ignore::DeprecationWarning:httpx._client",
     "ignore:Unknown config option:pytest.PytestConfigWarning",
 ]
+
+# Pyright - stricter type checking than mypy
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportShadowedImports = "error"
+reportIncompatibleVariableOverride = "error"
+reportMissingTypeStubs = "warning"
+exclude = ["tests", "scripts", ".venv", "**/__pycache__"]
+
+# Bandit - security scanner
+[tool.bandit]
+exclude_dirs = ["tests", "scripts", ".venv"]
+skips = ["B101"]  # assert is fine in gym envs
+
+# Coverage - enforce minimum test coverage
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = ["app/training/*", "app/gym_env/wrappers.py"]
+
+[tool.coverage.report]
+fail_under = 50
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+# Import-Linter - architecture enforcement
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "Gym envs should not import training"
+type = "forbidden"
+source_modules = ["app.gym_env"]
+forbidden_modules = ["app.training"]
+
+[[tool.importlinter.contracts]]
+name = "Models should not import API"
+type = "forbidden"
+source_modules = ["app.models"]
+forbidden_modules = ["app.api"]
+
+[[tool.importlinter.contracts]]
+name = "Bots should not import API"
+type = "forbidden"
+source_modules = ["app.bots"]
+forbidden_modules = ["app.api"]
