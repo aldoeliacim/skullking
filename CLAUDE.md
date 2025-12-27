@@ -96,6 +96,19 @@ Backend uses `ErrorCode` enum (`app/api/responses.py`) for i18n-ready error mess
 - Frontend looks up localized strings in `src/i18n/{en,es}.json`
 - All game handler errors use `await self._send_error(game_id, player_id, ErrorCode.ENUM_VALUE)`
 
+## Git Conventions
+
+**Atomic commits**: Each commit should represent a single logical change. Don't mix unrelated changes in one commit. When fixing a bug, refactoring code, and adding a feature, make separate commits for each.
+
+Good examples:
+- "Fix suit-following when Roger leads" (single bug fix)
+- "Add ErrorCode enum for i18n errors" (single feature)
+- "Refactor trick winner determination" (single refactor)
+
+Bad examples:
+- "Fix bug, refactor code, add feature" (multiple unrelated changes)
+- "Various fixes" (unclear scope)
+
 ## Testing Patterns
 
 Tests use NumPy boolean compatibility: use `assert mask[0]` not `assert mask[0] is True`.

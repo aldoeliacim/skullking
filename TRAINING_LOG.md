@@ -6,6 +6,208 @@ Training history and results for the MaskablePPO agent.
 
 ---
 
+## V1 (December 2024)
+
+**Status:** Deprecated
+
+### Initial Implementation
+
+- MaskablePPO with action masking
+- Dense reward shaping (bid quality, trick outcomes)
+- 171-dim observation space
+- Basic curriculum (random → rule-based)
+
+### Problems Identified
+
+- Extreme reward variance: ±792
+- Poor value learning: explained variance 0.158
+- Unstable training due to reward scale mismatch
+
+### Results @ 150k steps
+
+| Metric | Value |
+|--------|-------|
+| Training reward | 190 |
+| Eval reward | 358 ± 391 |
+| Explained variance | 0.158 |
+| Value loss | 973 |
+
+---
+
+## V2 (December 2024)
+
+**Status:** Completed ✅
+
+### Problem Solved
+
+V1 had extreme reward variance (±792) causing unstable training.
+
+**Root cause:** Reward scale mismatch
+
+- Dense rewards: -0.5 to +3 per step
+- Round penalties: -80 for bad bids (40x larger!)
+- One bad round undid 40 good trick rewards
+
+### Changes from V1
+
+1. **Normalized rewards**
+   - Round completion: -80/+20 → -5/+5
+   - Game completion: -35/+80 → -5/+10
+
+2. **Hyperparameter tuning**
+   - n_epochs: 15 → 20
+   - vf_coef: 0.5 → 1.0
+   - gae_lambda: 0.98 → 0.99
+
+### Results @ 50k steps
+
+| Metric | V1 @ 150k | V2 @ 50k | Change |
+|--------|-----------|----------|--------|
+| Explained Variance | 0.158 | 0.443 | +180% |
+| Value Loss | 973 | 43.7 | -94% |
+| Eval Variance | ±391 | ±109 | -72% |
+| Reward Variance | ±792 | ±13 | -98% |
+
+---
+
+## V3 (December 2024)
+
+**Status:** Completed ✅
+
+### Changes from V2
+
+- Extended training to 1.5M steps
+- Continued with normalized rewards
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Training time | 38 min |
+| Explained variance | 0.89 |
+| Value loss | 27.1 |
+| Eval reward | 226 |
+| vs Rule-based MEDIUM | 100% win rate (20 games) |
+| vs Rule-based HARD | 100% win rate (50 games) |
+
+---
+
+## V4 (December 24, 2024)
+
+**Status:** Completed ✅
+
+### Changes from V3
+
+- Extended training: 1.5M → 5M timesteps
+- Larger network: [256, 256]
+- More parallel envs: 32
+- Optimized batch size: 1024 for GPU utilization
+- 8-phase curriculum schedule
+
+### Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Timesteps | 5,000,000 |
+| Training time | ~45 min |
+| Throughput | ~1,870 fps |
+| Explained variance | 0.906 |
+
+### Curriculum
+
+| Steps | Opponent | Difficulty |
+|-------|----------|------------|
+| 0 | random | easy |
+| 50k | random | medium |
+| 150k | random | hard |
+| 250k | rule_based | easy |
+| 400k | rule_based | medium |
+| 600k | rule_based | hard |
+| 850k | rule_based | medium |
+| 1.1M | rule_based | hard |
+
+### Results
+
+| Opponent | Avg Reward | Result |
+|----------|------------|--------|
+| Random (easy) | 65.8 ± 10.1 | WIN |
+| Random (medium) | 61.2 ± 7.6 | WIN |
+| Random (hard) | 67.7 ± 7.9 | WIN |
+| Rule-based (easy) | 67.1 ± 9.8 | WIN |
+| Rule-based (medium) | 60.2 ± 2.6 | WIN |
+| Rule-based (hard) | 63.7 ± 2.8 | WIN |
+
+### Model Files
+
+- `models/masked_ppo/masked_ppo_final.zip` (2.7 MB)
+- `models/masked_ppo/best_model/best_model.zip`
+
+---
+
+## V5 (December 25, 2024)
+
+**Status:** Completed ✅
+
+### Changes from V4
+
+- Extended training: 5M → 10M timesteps
+- Mixed opponent evaluation: 21 episodes across easy/medium/hard
+- Self-play callback: activates at 2M steps, updates every 200k
+- Observation space: 171 → 182 dims (round one-hot, bid goal)
+- Action mask verification logging
+
+### Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Timesteps | 10,000,000 |
+| Training time | 2h 24m |
+| Throughput | ~1,155 fps |
+| Parallel envs | 32 |
+| Learning rate | 3e-4 |
+| Batch size | 1024 |
+| Network | [256, 256] |
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Final reward (mean) | 79.9 - 81.8 |
+| Explained variance | 0.902 - 0.904 |
+| Value loss | 22.6 - 23.3 |
+| Entropy loss | -0.316 to -0.32 |
+| Clip fraction | 0.089 - 0.091 |
+
+**Evaluation (21 episodes, mixed opponents):**
+
+| Phase | Avg Reward | Std Dev |
+|-------|------------|---------|
+| Pre-selfplay (9.9M) | 78-83 | ±8-12 |
+| Post-selfplay (10M+) | 77-85 | ±7-13 |
+
+### Analysis
+
+**Strengths:**
+- Excellent value learning (explained variance >0.9)
+- Stable training (low KL divergence ~0.011)
+- Consistent performance across opponent types
+
+**Observations:**
+- Self-play activated at 10M with 4.6M checkpoint
+- Reward variance ±8-13 is acceptable
+- No overfitting to specific opponent types
+
+**Limitations:**
+- No awareness of loot alliance mechanics
+- Cannot optimize for +20 alliance bonus
+
+### Model Files
+
+- `models/masked_ppo/masked_ppo_final.zip`
+- `models/masked_ppo/best_model/best_model.zip`
+
+---
+
 ## V6 (December 25, 2024) - Loot Alliances & Enhanced Observations
 
 **Status:** Completed ✅
@@ -151,7 +353,7 @@ Optimal configuration applied to V8 training script (`app/training/train_ppo.py`
 
 ## V8 (December 25, 2024) - Optimized Training at Scale
 
-**Status:** In Progress 🔄
+**Status:** Completed ✅
 
 ### Motivation
 
@@ -183,9 +385,7 @@ uv run python -m app.training.train_ppo train --timesteps 50000000
 # Uses: 768 envs, batch 32768, n_steps 2048, SubprocVecEnv
 ```
 
-### Final Results
-
-**Status:** Completed (stopped at plateau) ✅
+### Results
 
 **Training duration:** 79.1 minutes (1.32 hours)
 **Total timesteps:** 31,045,632
@@ -234,17 +434,15 @@ Self-play activated at 2M steps, rotating through checkpoints:
 
 ---
 
-## V9 (December 26, 2024) - Hierarchical RL + Episode Design Optimizations
+## V9 (December 26, 2024) - Hierarchical RL
 
-**Status:** Ready for Training ✅
+**Status:** Completed ✅
 
 ### Motivation
 
-V8 plateaued at reward ~80-85 despite 5.5x faster training. V9 introduces:
-
-1. **Hierarchical RL**: Separate bidding and card-play policies
-2. **Episode Design**: Phase curriculum, round-weighted sampling, phase embedding
-3. **Large Networks**: Maximize GPU utilization (79% vs 30-46%)
+V8 flat policy struggled with the bidding-to-card-play credit assignment problem. V9 implements hierarchical RL:
+- **Manager (Bidding)**: Decides bid at round start, observes hand and game context
+- **Worker (Card Play)**: Plays cards to achieve Manager's bid goal
 
 ### Architecture
 
@@ -289,7 +487,18 @@ Weight: 0.5  0.6  0.7  0.8  0.9  1.0  1.2  1.4  1.6  2.0
 2M steps:  All rounds
 ```
 
-### Benchmark Results (December 26, 2024)
+### Bug Fixes Applied
+
+Before training, a comprehensive audit identified and fixed critical bugs:
+
+| Bug | Severity | Fix |
+|-----|----------|-----|
+| GAME_CONTEXT_DIM mismatch | Critical | Reduced from 28 to 24 dims |
+| RoundStats only tracked env 0 | High | Match rewards to environment indices |
+| Early stopping too aggressive | High | Disabled for curriculum learning |
+| Console.log in frontend | Low | Made dev-only |
+
+### Benchmark Results
 
 **Environment Stepping Speed:**
 
@@ -308,32 +517,17 @@ Weight: 0.5  0.6  0.7  0.8  0.9  1.0  1.2  1.4  1.6  2.0
 | Standard [512,512,256] | 8-9K | 30-46% | 2.1GB |
 | **Large [2048,2048,1024]** | ~6K | **79%** | 3.7GB |
 
-**Optimal Configuration:**
-- **VecEnv:** DummyVecEnv (faster than SubprocVecEnv for fast-stepping envs)
-- **n_envs:** 256
-- **batch_size:** 16384
-- **n_steps:** 1024
-- **n_epochs:** 20
-- **Network:** [2048, 2048, 1024]
-- **Expected GPU:** 79%
-- **VRAM:** 3.7GB per model (17GB available = room for parallel training)
+### Configuration
 
-### Changes Implemented
-
-1. **Fixed Hierarchical Env API Issues:**
-   - Added `_start_new_trick()` and `_get_play_order()` helper methods
-   - Replaced `Round.place_bid()` with `Round.add_bid()`
-   - ManagerEnv and WorkerEnv now work correctly
-
-2. **Numba-Accelerated Observation Encoding:**
-   - `observation_fast.py` with JIT-compiled encoders
-   - 581,000 encodings/sec (from benchmarks)
-   - Pre-computed card properties into numpy arrays
-
-3. **V9 Training Script:**
-   - `train_v9.py` with Manager/Worker commands
-   - Large network architecture [2048, 2048, 1024]
-   - DummyVecEnv default (faster for hierarchical envs)
+| Parameter | Manager | Worker |
+|-----------|---------|--------|
+| Timesteps | 500,000 | 1,000,000 |
+| Parallel envs | 128 | 128 |
+| Batch size | 16,384 | 16,384 |
+| n_steps | 512 | 512 |
+| n_epochs | 15 | 15 |
+| Network | [2048, 2048, 1024] | [2048, 2048, 1024] |
+| Phase curriculum | late → mid+late | late → mid+late |
 
 ### Training Commands
 
@@ -348,230 +542,44 @@ uv run python -m app.training.train_v9 train-worker --timesteps 5000000
 uv run python -m app.training.train_v9 train-both
 ```
 
-### Expected Results
+### Results
 
-| Metric | V8 | V9 (Expected) |
-|--------|-----|---------------|
-| Max reward | 85 | 90+ |
-| Sample efficiency | 1x | 2-3x |
-| FPS | 6,500 | 6,000 (larger network) |
-| GPU utilization | 50% | 79% |
-| VRAM | 2.5GB | 3.7GB |
+**Manager Training:**
+- Total timesteps: 524,288
+- Final eval reward: 7.65
+- Average FPS: ~4,300
+- Late-phase training (rounds 7-10)
 
-### New Callbacks
+**Worker Training:**
+- Total timesteps: 1,048,576
+- First eval reward: 2.40
+- Final eval reward: 4.05 (+68%)
+- Average FPS: ~6,400
+- Phase curriculum: late → mid+late at 1M steps
 
-| Callback | Purpose |
-|----------|---------|
-| `PhaseSchedulerCallback` | Progressively unlock game phases during training |
-| `RoundStatsCallback` | Track per-phase performance metrics |
+### Analysis
+
+**Strengths:**
+- Hierarchical separation enables independent policy optimization
+- Phase curriculum works correctly (expanded at 1M steps)
+- Worker shows clear learning signal (2.40 → 4.05)
+- No early stopping interference with curriculum transitions
+
+**Observations:**
+- RoundStats now correctly tracks all parallel environments
+- Manager converges quickly (episode = 1 decision)
+- Worker shows variance in evaluation (±5-6 reward)
+
+### Model Files
+
+- `models/hierarchical_v9/manager/final_model.zip`
+- `models/hierarchical_v9/worker/final_model.zip`
 
 ### References
 
 - `EPISODE_DESIGN.md` - Game flow analysis and episode design decisions
 - `V9_OPTIMIZATION_PLAN.md` - Detailed optimization plan
 - `ADVANCED_RL_TECHNIQUES.md` - Hierarchical RL design
-
----
-
-## V5 (December 25, 2024) - Completed
-
-**Status:** Completed ✅
-
-### Changes from V4
-
-- Extended training: 5M → 10M timesteps
-- Mixed opponent evaluation: 21 episodes across easy/medium/hard
-- Self-play callback: activates at 2M steps, updates every 200k
-- Observation space: 171 → 182 dims (round one-hot, bid goal)
-- Action mask verification logging
-
-### Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Timesteps | 10,000,000 |
-| Training time | 2h 24m |
-| Throughput | ~1,155 fps |
-| Parallel envs | 32 |
-| Learning rate | 3e-4 |
-| Batch size | 1024 |
-| Network | [256, 256] |
-
-### Results
-
-| Metric | Value |
-|--------|-------|
-| Final reward (mean) | 79.9 - 81.8 |
-| Explained variance | 0.902 - 0.904 |
-| Value loss | 22.6 - 23.3 |
-| Entropy loss | -0.316 to -0.32 |
-| Clip fraction | 0.089 - 0.091 |
-
-**Evaluation (21 episodes, mixed opponents):**
-
-| Phase | Avg Reward | Std Dev |
-|-------|------------|---------|
-| Pre-selfplay (9.9M) | 78-83 | ±8-12 |
-| Post-selfplay (10M+) | 77-85 | ±7-13 |
-
-### Analysis
-
-**Strengths:**
-- Excellent value learning (explained variance >0.9)
-- Stable training (low KL divergence ~0.011)
-- Consistent performance across opponent types
-
-**Observations:**
-- Self-play activated at 10M with 4.6M checkpoint
-- Reward variance ±8-13 is acceptable
-- No overfitting to specific opponent types
-
-**Limitations:**
-- No awareness of loot alliance mechanics
-- Cannot optimize for +20 alliance bonus
-
-### Model Files
-
-- `models/masked_ppo/masked_ppo_final.zip`
-- `models/masked_ppo/best_model/best_model.zip`
-
----
-
-## V4 (December 24, 2024)
-
-**Status:** Completed
-
-### Changes from V3
-
-- Extended training: 1.5M → 5M timesteps
-- Larger network: [256, 256]
-- More parallel envs: 32
-- Optimized batch size: 1024 for GPU utilization
-- 8-phase curriculum schedule
-
-### Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Timesteps | 5,000,000 |
-| Training time | ~45 min |
-| Throughput | ~1,870 fps |
-| Explained variance | 0.906 |
-
-### Curriculum
-
-| Steps | Opponent | Difficulty |
-|-------|----------|------------|
-| 0 | random | easy |
-| 50k | random | medium |
-| 150k | random | hard |
-| 250k | rule_based | easy |
-| 400k | rule_based | medium |
-| 600k | rule_based | hard |
-| 850k | rule_based | medium |
-| 1.1M | rule_based | hard |
-
-### Results
-
-| Opponent | Avg Reward | Result |
-|----------|------------|--------|
-| Random (easy) | 65.8 ± 10.1 | WIN |
-| Random (medium) | 61.2 ± 7.6 | WIN |
-| Random (hard) | 67.7 ± 7.9 | WIN |
-| Rule-based (easy) | 67.1 ± 9.8 | WIN |
-| Rule-based (medium) | 60.2 ± 2.6 | WIN |
-| Rule-based (hard) | 63.7 ± 2.8 | WIN |
-
-### Model Files
-
-- `models/masked_ppo/masked_ppo_final.zip` (2.7 MB)
-- `models/masked_ppo/best_model/best_model.zip`
-
----
-
-## V3 (December 2024)
-
-**Status:** Completed
-
-### Changes from V2
-
-- Extended training to 1.5M steps
-- Continued with normalized rewards
-
-### Results
-
-| Metric | Value |
-|--------|-------|
-| Training time | 38 min |
-| Explained variance | 0.89 |
-| Value loss | 27.1 |
-| Eval reward | 226 |
-| vs Rule-based MEDIUM | 100% win rate (20 games) |
-| vs Rule-based HARD | 100% win rate (50 games) |
-
----
-
-## V2 (December 2024)
-
-**Status:** Completed
-
-### Problem Solved
-
-V1 had extreme reward variance (±792) causing unstable training.
-
-**Root cause:** Reward scale mismatch
-
-- Dense rewards: -0.5 to +3 per step
-- Round penalties: -80 for bad bids (40x larger!)
-- One bad round undid 40 good trick rewards
-
-### Changes from V1
-
-1. **Normalized rewards**
-   - Round completion: -80/+20 → -5/+5
-   - Game completion: -35/+80 → -5/+10
-
-2. **Hyperparameter tuning**
-   - n_epochs: 15 → 20
-   - vf_coef: 0.5 → 1.0
-   - gae_lambda: 0.98 → 0.99
-
-### Results @ 50k steps
-
-| Metric | V1 @ 150k | V2 @ 50k | Change |
-|--------|-----------|----------|--------|
-| Explained Variance | 0.158 | 0.443 | +180% |
-| Value Loss | 973 | 43.7 | -94% |
-| Eval Variance | ±391 | ±109 | -72% |
-| Reward Variance | ±792 | ±13 | -98% |
-
----
-
-## V1 (December 2024)
-
-**Status:** Deprecated
-
-### Initial Implementation
-
-- MaskablePPO with action masking
-- Dense reward shaping (bid quality, trick outcomes)
-- 171-dim observation space
-- Basic curriculum (random → rule-based)
-
-### Problems Identified
-
-- Extreme reward variance: ±792
-- Poor value learning: explained variance 0.158
-- Unstable training due to reward scale mismatch
-
-### Results @ 150k steps
-
-| Metric | Value |
-|--------|-------|
-| Training reward | 190 |
-| Eval reward | 358 ± 391 |
-| Explained variance | 0.158 |
-| Value loss | 973 |
 
 ---
 
@@ -628,93 +636,3 @@ V1 had extreme reward variance (±792) causing unstable training.
 - Larger networks need more warmup time (explained variance starts low)
 - Separate pi/vf heads allow independent capacity tuning
 - [512, 512, 256] with ReLU works well for 50M+ step training
-
----
-
-## V9 (December 26, 2024) - Hierarchical RL with Bug Fixes
-
-**Status:** Completed ✅
-
-### Motivation
-
-V8 flat policy struggled with the bidding-to-card-play credit assignment problem. V9 implements hierarchical RL:
-- **Manager (Bidding)**: Decides bid at round start, observes hand and game context
-- **Worker (Card Play)**: Plays cards to achieve Manager's bid goal
-
-### Bug Fixes Applied
-
-Before training, a comprehensive audit identified and fixed critical bugs:
-
-| Bug | Severity | Fix |
-|-----|----------|-----|
-| GAME_CONTEXT_DIM mismatch | Critical | Reduced from 28 to 24 dims |
-| RoundStats only tracked env 0 | High | Match rewards to environment indices |
-| Early stopping too aggressive | High | Disabled for curriculum learning |
-| Console.log in frontend | Low | Made dev-only |
-
-### Architecture
-
-**Manager (Bidding Policy):**
-- Observation: 167 dims (hand, game context, pirate abilities, opponent context)
-- Action: Bid 0-10
-- Reward: Bid accuracy at round end
-
-**Worker (Card Play Policy):**
-- Observation: 203 dims (hand, trick state, bid goal, progress)
-- Action: Card index 0-10
-- Reward: Trick-level shaping toward bid goal
-
-### Configuration
-
-| Parameter | Manager | Worker |
-|-----------|---------|--------|
-| Timesteps | 500,000 | 1,000,000 |
-| Parallel envs | 128 | 128 |
-| Batch size | 16,384 | 16,384 |
-| n_steps | 512 | 512 |
-| n_epochs | 15 | 15 |
-| Network | [2048, 2048, 1024] | [2048, 2048, 1024] |
-| Phase curriculum | late → mid+late | late → mid+late |
-
-### Step-Weighted Sampling
-
-Implemented round-weighted sampling where weight = round number:
-- Round 10: 18.2% probability (10 decisions per episode)
-- Round 1: 1.8% probability (1 decision per episode)
-
-This ensures each training STEP has equal probability of coming from any round, preventing short episodes from dominating the buffer.
-
-### Results
-
-**Manager Training:**
-- Total timesteps: 524,288
-- Final eval reward: 7.65
-- Average FPS: ~4,300
-- Late-phase training (rounds 7-10)
-
-**Worker Training:**
-- Total timesteps: 1,048,576
-- First eval reward: 2.40
-- Final eval reward: 4.05 (+68%)
-- Average FPS: ~6,400
-- Phase curriculum: late → mid+late at 1M steps
-
-### Analysis
-
-**Strengths:**
-- Hierarchical separation enables independent policy optimization
-- Phase curriculum works correctly (expanded at 1M steps)
-- Worker shows clear learning signal (2.40 → 4.05)
-- No early stopping interference with curriculum transitions
-
-**Observations:**
-- RoundStats now correctly tracks all parallel environments
-- Manager converges quickly (episode = 1 decision)
-- Worker shows variance in evaluation (±5-6 reward)
-
-### Model Files
-
-- `models/hierarchical_v9/manager/final_model.zip`
-- `models/hierarchical_v9/worker/final_model.zip`
-
----
