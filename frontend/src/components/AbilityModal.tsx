@@ -266,7 +266,7 @@ export function AbilityModal({
 
   const renderModifyBid = (): React.JSX.Element => {
     const currentBid = (data?.current_bid as number) || 0;
-    const tricksWon = (data?.tricks_won as number) || 0;
+    const _tricksWon = (data?.tricks_won as number) || 0; // May be used for display
     // Harry's options are -1 (decrease), 0 (keep), 1 (increase)
     const options = (data?.options as number[]) || [-1, 0, 1];
 

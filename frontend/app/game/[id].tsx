@@ -25,7 +25,14 @@ import {
 import { sessionStorage } from '../../src/services/sessionStorage';
 import { websocket } from '../../src/services/websocket';
 import { type Card as CardType, useGameStore } from '../../src/stores/gameStore';
-import { borderRadius, colors, shadows, spacing, typography } from '../../src/styles/theme';
+import {
+  borderRadius,
+  colors,
+  shadows,
+  spacing,
+  textShadows,
+  typography,
+} from '../../src/styles/theme';
 
 export default function GameScreen(): React.JSX.Element {
   const { t } = useTranslation();
@@ -58,7 +65,7 @@ export default function GameScreen(): React.JSX.Element {
     trickWinner,
     isSpectator,
     connect,
-    disconnect,
+    disconnect: _disconnect,
     placeBid,
     playCard,
     resolveAbility,
@@ -210,19 +217,29 @@ export default function GameScreen(): React.JSX.Element {
 
           <View style={styles.finalScores}>
             <Text style={styles.finalScoresTitle}>{t('results.finalScores')}</Text>
-            {sortedPlayers.map((player, index) => (
-              <View
-                key={player.id}
-                style={[
-                  styles.finalScoreRow,
-                  player.id === playerId && styles.finalScoreRowHighlight,
-                ]}
-              >
-                <Text style={styles.finalScoreRank}>#{index + 1}</Text>
-                <Text style={styles.finalScoreName}>{player.username}</Text>
-                <Text style={styles.finalScoreValue}>{player.score}</Text>
-              </View>
-            ))}
+            {sortedPlayers.map((player, index) => {
+              const medals = ['🥇', '🥈', '🥉'];
+              const medal = index < 3 ? medals[index] : null;
+              const topScore = sortedPlayers[0]?.score ?? 0;
+              const scoreDiff = index > 0 ? topScore - player.score : 0;
+
+              return (
+                <View
+                  key={player.id}
+                  style={[
+                    styles.finalScoreRow,
+                    player.id === playerId && styles.finalScoreRowHighlight,
+                  ]}
+                >
+                  <Text style={styles.finalScoreRank}>{medal || `#${index + 1}`}</Text>
+                  <Text style={styles.finalScoreName}>{player.username}</Text>
+                  <View style={styles.finalScoreStats}>
+                    <Text style={styles.finalScoreValue}>{player.score}</Text>
+                    {scoreDiff > 0 && <Text style={styles.finalScoreDiff}>-{scoreDiff}</Text>}
+                  </View>
+                </View>
+              );
+            })}
           </View>
 
           <Button title={t('results.playAgain')} onPress={handlePlayAgain} size="lg" fullWidth />
@@ -372,9 +389,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     fontFamily: typography.fontFamilyDisplay,
     color: colors.accentGold,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    ...textShadows.sm,
   },
   spectatorBadge: {
     fontSize: typography.fontSize.xs,
@@ -461,9 +476,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyDisplay,
     color: colors.accentGold,
     marginBottom: spacing.sm,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    ...textShadows.md,
   },
   gameOverSubtitle: {
     fontSize: typography.fontSize.xl,
@@ -508,9 +521,18 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.text,
   },
+  finalScoreStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   finalScoreValue: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.accentGold,
+  },
+  finalScoreDiff: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textMuted,
   },
 });
