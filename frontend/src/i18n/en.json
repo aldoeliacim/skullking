@@ -24,18 +24,23 @@
     "title": "Game History",
     "loading": "Loading...",
     "noGames": "No completed games yet",
-    "error": "Failed to load history"
+    "noGamesHint": "Play some games to see your history!",
+    "error": "Failed to load history",
+    "description": "View past games and scores"
   },
   "browse": {
     "title": "Active Games",
     "loading": "Loading...",
     "noGames": "No active games right now",
+    "noGamesHint": "Create a new game to get started!",
     "error": "Failed to load games",
     "refresh": "Refresh",
     "watch": "Watch",
+    "join": "Join",
     "statePending": "In Lobby",
     "stateBidding": "Bidding",
-    "statePlaying": "Playing"
+    "statePlaying": "Playing",
+    "description": "Find and join active games"
   },
   "lobby": {
     "title": "Game Lobby",

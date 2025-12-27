@@ -24,18 +24,23 @@
     "title": "Historial de Partidas",
     "loading": "Cargando...",
     "noGames": "No hay partidas completadas aun",
-    "error": "Error al cargar historial"
+    "noGamesHint": "Juega partidas para ver tu historial!",
+    "error": "Error al cargar historial",
+    "description": "Ver partidas anteriores y puntajes"
   },
   "browse": {
     "title": "Partidas Activas",
     "loading": "Cargando...",
     "noGames": "No hay partidas activas ahora",
+    "noGamesHint": "Crea una nueva partida para empezar!",
     "error": "Error al cargar partidas",
     "refresh": "Actualizar",
     "watch": "Ver",
+    "join": "Unirse",
     "statePending": "En Sala",
     "stateBidding": "Apostando",
-    "statePlaying": "Jugando"
+    "statePlaying": "Jugando",
+    "description": "Buscar y unirse a partidas activas"
   },
   "lobby": {
     "title": "Sala de Espera",
