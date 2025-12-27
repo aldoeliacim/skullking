@@ -217,6 +217,35 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
 
         return mask
 
+    # -------------------------------------------------------------------------
+    # Public interface for external use (e.g., RLBot)
+    # -------------------------------------------------------------------------
+
+    def sync_game_state(self, game: Game, agent_player_id: str) -> None:
+        """Sync the environment with an external game state.
+
+        This allows RLBot to use the environment for observation building
+        without running the full simulation loop.
+
+        Args:
+            game: The current game state to sync with
+            agent_player_id: The player ID to use as the agent
+
+        """
+        self.game = game
+        self.agent_player_id = agent_player_id
+
+    def get_observation(self) -> np.ndarray:
+        """Get current observation array.
+
+        Public wrapper around _get_observation for external use.
+
+        Returns:
+            Observation array of shape (190,)
+
+        """
+        return self._get_observation()
+
     def _mask_bidding_actions(self, mask: np.ndarray) -> None:
         """Set mask for valid bidding actions."""
         current_round = self.game.get_current_round() if self.game else None
@@ -595,7 +624,7 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
 
         return base_reward + alliance_reward
 
-    def _calculate_alliance_reward(self, agent_player: Player, current_round: Round) -> float:
+    def _calculate_alliance_reward(self, _agent_player: Player, current_round: Round) -> float:
         """Calculate alliance bonus reward at round end.
 
         Backend awards +20 to each player if both loot player and ally made their bids.
@@ -611,14 +640,18 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         alliance_bonus = 0.0
         for loot_player_id, ally_player_id in current_round.loot_alliances.items():
             # Check if agent is involved in this alliance
-            if loot_player_id == self.agent_player_id:
-                # Agent played loot, check if ally made their bid
-                if self._check_bid_correct(ally_player_id, current_round):
-                    alliance_bonus += 2.0  # +20 normalized to +2.0
-            elif ally_player_id == self.agent_player_id:
-                # Agent won the loot, check if loot player made their bid
-                if self._check_bid_correct(loot_player_id, current_round):
-                    alliance_bonus += 2.0  # +20 normalized to +2.0
+            if (
+                loot_player_id == self.agent_player_id
+                and self._check_bid_correct(ally_player_id, current_round)
+            ):
+                # Agent played loot and ally made their bid
+                alliance_bonus += 2.0  # +20 normalized to +2.0
+            elif (
+                ally_player_id == self.agent_player_id
+                and self._check_bid_correct(loot_player_id, current_round)
+            ):
+                # Agent won the loot and loot player made their bid
+                alliance_bonus += 2.0  # +20 normalized to +2.0
 
         return alliance_bonus
 

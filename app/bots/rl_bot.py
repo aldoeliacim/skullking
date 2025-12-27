@@ -48,15 +48,25 @@ class RLBot(BaseBot):
         self.model = model
         self._fallback = RuleBasedBot(player_id, BotDifficulty.HARD)
         self._gym_env: Any = None
+        self._gym_env_available = True  # Track if import succeeded
 
         if model is None:
             logger.warning("RLBot initialized without model, using rule-based fallback")
 
-    def _get_gym_env(self) -> Any:
-        """Lazily create gym environment for observation building."""
+    def _get_gym_env(self) -> Any | None:
+        """Lazily create gym environment for observation building.
+
+        Returns:
+            SkullKingEnvMasked instance or None if import failed
+
+        """
+        if not self._gym_env_available:
+            return None
+
         if self._gym_env is None:
             try:
-                from app.gym_env import SkullKingEnvMasked
+                # Late import to avoid circular dependency and heavy torch import
+                from app.gym_env import SkullKingEnvMasked  # noqa: PLC0415
 
                 self._gym_env = SkullKingEnvMasked(
                     num_opponents=3,
@@ -65,6 +75,8 @@ class RLBot(BaseBot):
                 )
             except ImportError:
                 logger.warning("Could not import SkullKingEnvMasked")
+                self._gym_env_available = False
+                return None
         return self._gym_env
 
     def make_bid(self, game: "Game", round_number: int, hand: list[CardId]) -> int:
@@ -82,26 +94,24 @@ class RLBot(BaseBot):
         if self.model is None:
             return self._fallback.make_bid(game, round_number, hand)
 
-        try:
-            # Get observation from gym env
-            env = self._get_gym_env()
-            if env is None:
-                return self._fallback.make_bid(game, round_number, hand)
+        env = self._get_gym_env()
+        if env is None:
+            return self._fallback.make_bid(game, round_number, hand)
 
-            # Sync gym env with current game state
-            env._game = game
-            env.agent_player_id = self.player_id
+        try:
+            # Sync env with current game state using public interface
+            env.sync_game_state(game, self.player_id)
 
             # Get observation and action mask
-            obs = env._get_observation()
-            mask = env._get_bid_action_mask(round_number)
+            obs = env.get_observation()
+            mask = env.action_masks()
 
             # Predict action
             action, _ = self.model.predict(obs, deterministic=True, action_masks=mask)
             bid = int(action.item() if hasattr(action, "item") else action)
             return max(0, min(round_number, bid))
 
-        except Exception as e:
+        except (ValueError, IndexError, AttributeError) as e:
             logger.warning("RL bid failed: %s, using fallback", e)
             return self._fallback.make_bid(game, round_number, hand)
 
@@ -127,19 +137,17 @@ class RLBot(BaseBot):
         if self.model is None:
             return self._fallback.pick_card(game, hand, cards_in_trick, valid_cards)
 
+        env = self._get_gym_env()
+        if env is None:
+            return self._fallback.pick_card(game, hand, cards_in_trick, valid_cards)
+
         try:
-            # Get observation from gym env
-            env = self._get_gym_env()
-            if env is None:
-                return self._fallback.pick_card(game, hand, cards_in_trick, valid_cards)
+            # Sync env with current game state using public interface
+            env.sync_game_state(game, self.player_id)
 
-            # Sync gym env with current game state
-            env._game = game
-            env.agent_player_id = self.player_id
-
-            # Get observation and action mask for picking
-            obs = env._get_observation()
-            mask = env._get_pick_action_mask(hand, cards_in_trick)
+            # Get observation and action mask
+            obs = env.get_observation()
+            mask = env.action_masks()
 
             # Predict action (card index)
             action, _ = self.model.predict(obs, deterministic=True, action_masks=mask)
@@ -151,11 +159,11 @@ class RLBot(BaseBot):
 
             # Fallback if action is out of range
             logger.warning("RL action %d out of range, using fallback", card_idx)
-            return self._fallback.pick_card(game, hand, cards_in_trick, valid_cards)
 
-        except Exception as e:
+        except (ValueError, IndexError, AttributeError) as e:
             logger.warning("RL pick failed: %s, using fallback", e)
-            return self._fallback.pick_card(game, hand, cards_in_trick, valid_cards)
+
+        return self._fallback.pick_card(game, hand, cards_in_trick, valid_cards)
 
     def choose_tigress_mode(
         self, game: "Game", hand: list[CardId], cards_in_trick: list[CardId]

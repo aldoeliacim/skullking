@@ -67,7 +67,7 @@ def get_gpu_stats() -> tuple[float, float]:
         return 0.0, 0.0
 
 
-def make_env(rank: int) -> callable:
+def make_env(_rank: int) -> callable:
     """Create SkullKingEnvMasked environment factory."""
 
     def _init() -> ActionMasker:
