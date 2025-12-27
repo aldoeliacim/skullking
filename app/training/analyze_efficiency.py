@@ -14,7 +14,7 @@ def parse_log(log_path: str) -> list[dict]:
     """Extract eval results and timing from training log."""
     results = []
 
-    with open(log_path) as f:
+    with Path(log_path).open() as f:
         content = f.read()
 
     # Find all eval blocks with rewards
@@ -39,10 +39,10 @@ def parse_log(log_path: str) -> list[dict]:
     # For each eval, find the closest timestep in time_map
     sorted_times = sorted(time_map.keys())
 
-    for timesteps, reward, std in evals:
-        timesteps = int(timesteps)
-        reward = float(reward)
-        std = float(std)
+    for ts_str, reward_str, std_str in evals:
+        timesteps = int(ts_str)
+        reward = float(reward_str)
+        std = float(std_str)
 
         # Find closest iteration timestep
         elapsed = 0
@@ -90,7 +90,6 @@ def analyze(results: list[dict]) -> None:
     print("-" * 70)
 
     first = results[0]
-    prev = first
 
     for r in results:
         elapsed_min = r["elapsed_minutes"]
@@ -116,8 +115,6 @@ def analyze(results: list[dict]) -> None:
             f"{reward_per_hour:>+9.1f}"
         )
 
-        prev = r
-
     print("-" * 70)
 
     # Summary
@@ -139,10 +136,7 @@ def analyze(results: list[dict]) -> None:
 
 
 def main():
-    if len(sys.argv) < 2:
-        log_path = "training_v8.log"
-    else:
-        log_path = sys.argv[1]
+    log_path = "training_v8.log" if len(sys.argv) < 2 else sys.argv[1]
 
     if not Path(log_path).exists():
         print(f"Log file not found: {log_path}")

@@ -640,15 +640,13 @@ class SkullKingEnvMasked(gym.Env["np.ndarray", int]):
         alliance_bonus = 0.0
         for loot_player_id, ally_player_id in current_round.loot_alliances.items():
             # Check if agent is involved in this alliance
-            if (
-                loot_player_id == self.agent_player_id
-                and self._check_bid_correct(ally_player_id, current_round)
+            if loot_player_id == self.agent_player_id and self._check_bid_correct(
+                ally_player_id, current_round
             ):
                 # Agent played loot and ally made their bid
                 alliance_bonus += 2.0  # +20 normalized to +2.0
-            elif (
-                ally_player_id == self.agent_player_id
-                and self._check_bid_correct(loot_player_id, current_round)
+            elif ally_player_id == self.agent_player_id and self._check_bid_correct(
+                loot_player_id, current_round
             ):
                 # Agent won the loot and loot player made their bid
                 alliance_bonus += 2.0  # +20 normalized to +2.0

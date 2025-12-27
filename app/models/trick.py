@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
-from app.models.card import CardId, determine_winner, get_card
+from app.models.card import CardId, CardType, determine_winner, get_card
 
 
 class TigressChoice(Enum):
@@ -155,37 +155,18 @@ class Trick:
         """Check if all players have picked a card."""
         return len(self.picked_cards) == num_players
 
-    def get_valid_cards(self, hand: list[CardId], cards_in_trick: list[CardId]) -> list[CardId]:
-        """Get valid cards that can be played from the hand.
-
-        In Skull King, the rules are:
-        - Special cards (Pirates, Mermaids, Escapes, etc.) can always be played
-        - If leading, any card can be played
-        - If following, must follow the lead suit if possible (unless playing special)
-
-        For simplicity, we allow all cards and let the game rules handle it.
-        This is a basic implementation - full rules would require suit matching.
-        """
-        if not hand:
-            return []
-
-        # If leading (no cards in trick), can play anything
-        if not cards_in_trick:
-            return list(hand)
-
-        # Get the lead card (first non-escape, non-special card determines suit)
-        lead_suit = None
+    def _get_lead_suit(self, cards_in_trick: list[CardId]) -> CardType | None:
+        """Get the lead suit from cards in trick (first suit card played)."""
         for card_id in cards_in_trick:
             card = get_card(card_id)
-            if card.is_suit():  # Standard suit or Roger
-                lead_suit = card.card_type
-                break
+            if card.is_suit():
+                return card.card_type
+        return None
 
-        # If no suit was led (all special cards), can play anything
-        if lead_suit is None:
-            return list(hand)
-
-        # Check if player has cards of the lead suit
+    def _categorize_hand(
+        self, hand: list[CardId], lead_suit: CardType
+    ) -> tuple[list[CardId], list[CardId], list[CardId]]:
+        """Categorize hand into suit cards, special cards, and trump cards."""
         suit_cards = []
         special_cards = []
         trump_cards = []
@@ -194,10 +175,33 @@ class Trick:
             if card.is_special():
                 special_cards.append(card_id)
             elif card.is_roger():
-                # Trump (Jolly Roger) can always be played
                 trump_cards.append(card_id)
             elif card.card_type == lead_suit:
                 suit_cards.append(card_id)
+        return suit_cards, special_cards, trump_cards
+
+    def get_valid_cards(self, hand: list[CardId], cards_in_trick: list[CardId]) -> list[CardId]:
+        """Get valid cards that can be played from the hand.
+
+        In Skull King, the rules are:
+        - Special cards (Pirates, Mermaids, Escapes, etc.) can always be played
+        - If leading, any card can be played
+        - If following, must follow the lead suit if possible (unless playing special)
+        """
+        if not hand:
+            return []
+
+        # If leading (no cards in trick), can play anything
+        if not cards_in_trick:
+            return list(hand)
+
+        # Get the lead suit - if no suit was led, can play anything
+        lead_suit = self._get_lead_suit(cards_in_trick)
+        if lead_suit is None:
+            return list(hand)
+
+        # Categorize hand and apply suit-following rules
+        suit_cards, special_cards, trump_cards = self._categorize_hand(hand, lead_suit)
 
         # Must follow suit if possible, but can always play special cards or trump
         if suit_cards:

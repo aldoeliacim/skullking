@@ -1,7 +1,6 @@
 """Tests for ability-aware RL environment."""
 
 import numpy as np
-import pytest
 
 from app.gym_env.skullking_env_ability import (
     AbilityAwareEnv,
@@ -276,7 +275,7 @@ class TestAbilityRewards:
         env.goal_bid = 3
         env.tricks_won = 0  # Need wins
 
-        from app.models.card import get_card, CardId
+        from app.models.card import CardId, get_card
 
         escape_card = get_card(CardId.ESCAPE1)
         reward = env._evaluate_bendt_discard(escape_card)
@@ -292,7 +291,7 @@ class TestAbilityRewards:
         env.goal_bid = 3
         env.tricks_won = 0  # Need wins
 
-        from app.models.card import get_card, CardId
+        from app.models.card import CardId, get_card
 
         high_card = get_card(CardId.PARROT14)
         reward = env._evaluate_bendt_discard(high_card)
@@ -313,7 +312,7 @@ class TestPhaseTransitions:
         env.decision_phase = DecisionPhase.ABILITY_ROSIE
         current_round = env.game.get_current_round()
         if current_round:
-            from app.models.pirate_ability import PendingAbility, PirateType, AbilityType
+            from app.models.pirate_ability import AbilityType, PendingAbility, PirateType
 
             env.pending_ability = PendingAbility(
                 player_id=env.agent_player_id,
@@ -346,7 +345,7 @@ class TestPhaseTransitions:
 
         current_round = env.game.get_current_round()
         if current_round:
-            from app.models.pirate_ability import PendingAbility, PirateType, AbilityType
+            from app.models.pirate_ability import AbilityType, PendingAbility, PirateType
 
             env.pending_ability = PendingAbility(
                 player_id=env.agent_player_id,

@@ -7,7 +7,8 @@ space dimensions were incorrect.
 
 import numpy as np
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from app.gym_env.skullking_env_ability import (
     AbilityAwareEnv,
@@ -212,8 +213,7 @@ class TestObservationSpaceConsistency:
 
         expected_shape = env.observation_space.shape
         assert obs.shape == expected_shape, (
-            f"Observation shape {obs.shape} doesn't match "
-            f"observation_space.shape {expected_shape}"
+            f"Observation shape {obs.shape} doesn't match observation_space.shape {expected_shape}"
         )
 
     def test_parent_dimensions_not_overwritten(self) -> None:

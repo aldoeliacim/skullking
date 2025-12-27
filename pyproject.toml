@@ -75,11 +75,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "PLR2004", "SLF001", "PLC0415", "ARG"]  # Tests: assert, magic values, late imports
-"scripts/**/*.py" = ["T201", "INP001", "PTH", "PLR", "BLE001", "E501", "NPY002", "S", "ARG", "N806", "FBT", "C901", "RUF059", "TD", "FIX", "PLC0415", "SIM102"]  # Scripts
-"run_game.py" = ["PTH", "S104", "S110", "BLE001"]  # Simple runner script
-"test_current_agent.py" = ["BLE001", "NPY002", "S101"]  # Test script
-"app/gym_env/**/*.py" = ["S101", "TC001", "PLR0913", "PLR0912", "PLR0915", "PLR0911", "PLR2004", "C901", "FBT", "RET504"]  # Gym envs: assert, complexity, boolean args, return clarity
+# Tests: assert, magic values, private access, late imports, unused args/vars, numpy random
+"tests/**/*.py" = ["S101", "PLR2004", "SLF001", "PLC0415", "ARG", "RUF059", "PT018", "INP001", "NPY002"]
+# Scripts: print, implicit namespace, legacy numpy, complexity, late imports, magic values
+"scripts/**/*.py" = ["T201", "INP001", "NPY002", "C901", "PTH123", "PLC0415", "PLR2004", "RUF059"]
+# Gym environments: assert for state validation, many args (gym interface),
+# complexity (game logic), boolean config flags, magic values (round/card counts)
+"app/gym_env/**/*.py" = ["S101", "PLR0913", "PLR0912", "PLR0915", "PLR0911", "PLR2004", "C901", "FBT"]
+# Training scripts: print for progress, complexity, random for ML, magic values (thresholds)
+"app/training/**/*.py" = ["T201", "PLR0913", "PLR0915", "C901", "FBT", "S311", "PLR2004"]
 
 [tool.ruff.format]
 quote-style = "double"

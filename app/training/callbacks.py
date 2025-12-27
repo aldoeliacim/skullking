@@ -1,7 +1,6 @@
 """Training callbacks for MaskablePPO curriculum learning."""
 
 import json
-import os
 import random
 import time
 from pathlib import Path
@@ -143,9 +142,10 @@ class MixedOpponentEvalCallback(BaseCallback):
         # Try direct env_method first
         try:
             self.eval_env.env_method("set_opponent", opp_type, opp_diff)
-            return
         except AttributeError:
             pass
+        else:
+            return
 
         # Traverse wrappers to find the underlying env
         for env in self.eval_env.envs:
@@ -187,13 +187,13 @@ class MixedOpponentEvalCallback(BaseCallback):
 
         # Check 1: Plateau detection (reward not improving)
         reward_range = max(recent_rewards) - min(recent_rewards)
-        best_in_window = max(recent_rewards)
         improvement_from_start = current_reward - self.eval_history[0]["mean_reward"]
 
         if reward_range < self.plateau_threshold and improvement_from_start > 10:
             self.stop_reason = (
                 f"PLATEAU DETECTED: Reward range {reward_range:.2f} < {self.plateau_threshold} "
-                f"over last {self.plateau_window} evals (rewards: {min(recent_rewards):.1f}-{max(recent_rewards):.1f})"
+                f"over last {self.plateau_window} evals "
+                f"(rewards: {min(recent_rewards):.1f}-{max(recent_rewards):.1f})"
             )
             self._print_stop_analysis(recent)
             return True
@@ -206,8 +206,8 @@ class MixedOpponentEvalCallback(BaseCallback):
             if all(r < self.reward_per_hour_threshold for r in last_5_rates):
                 avg_rate = np.mean(last_5_rates)
                 self.stop_reason = (
-                    f"DIMINISHING RETURNS: Δreward/hour {avg_rate:.1f} < {self.reward_per_hour_threshold} "
-                    f"for last 5 evals"
+                    f"DIMINISHING RETURNS: Δreward/hour {avg_rate:.1f} "
+                    f"< {self.reward_per_hour_threshold} for last 5 evals"
                 )
                 self._print_stop_analysis(recent)
                 return True
@@ -358,15 +358,15 @@ class MixedOpponentEvalCallback(BaseCallback):
         if mean_reward > self.best_mean_reward:
             self.best_mean_reward = mean_reward
             if self.best_model_save_path:
-                os.makedirs(self.best_model_save_path, exist_ok=True)
+                Path(self.best_model_save_path).mkdir(parents=True, exist_ok=True)
                 self.model.save(f"{self.best_model_save_path}/best_model")
                 print("New best mean reward!")
 
         # Save eval history to JSON
         if self.log_path:
-            os.makedirs(self.log_path, exist_ok=True)
+            Path(self.log_path).mkdir(parents=True, exist_ok=True)
             history_file = Path(self.log_path) / "eval_history.json"
-            with open(history_file, "w") as f:
+            with history_file.open("w") as f:
                 json.dump(self.eval_history, f, indent=2, cls=NumpyEncoder)
 
     def _on_training_end(self) -> None:
@@ -636,7 +636,7 @@ class RoundStatsCallback(BaseCallback):
             "late": {"rounds": range(7, 11), "rewards": [], "counts": 0},
         }
 
-        for phase, data in phase_stats.items():
+        for data in phase_stats.values():
             for r in data["rounds"]:
                 if self.round_rewards[r]:
                     data["rewards"].extend(self.round_rewards[r])

@@ -133,10 +133,7 @@ class AbilityCurriculumCallback(BaseCallback):
         for i, (timestep, config) in enumerate(self.CURRICULUM):
             if self.num_timesteps >= timestep and i > self.current_stage:
                 self.current_stage = i
-                logger.info(
-                    "Curriculum stage %d at %d steps: %s",
-                    i, self.num_timesteps, config
-                )
+                logger.info("Curriculum stage %d at %d steps: %s", i, self.num_timesteps, config)
                 self._apply_config(config)
                 break
 
@@ -204,10 +201,7 @@ def create_vectorized_envs(
     use_subproc: bool = False,
 ) -> DummyVecEnv | SubprocVecEnv:
     """Create vectorized environments for training."""
-    env_fns = [
-        make_env(opponent_type, difficulty, enable_abilities, seed=i)
-        for i in range(n_envs)
-    ]
+    env_fns = [make_env(opponent_type, difficulty, enable_abilities, seed=i) for i in range(n_envs)]
 
     if use_subproc and n_envs > 1:
         return SubprocVecEnv(env_fns)
@@ -264,18 +258,20 @@ def train(
     )
 
     # Callbacks
-    callbacks = CallbackList([
-        AbilityMetricsCallback(verbose=1),
-        AbilityCurriculumCallback(train_envs, verbose=1),
-        MaskableEvalCallback(
-            eval_env,
-            best_model_save_path=str(output_path / "best_model"),
-            log_path=str(output_path / "eval_logs"),
-            eval_freq=TRAINING_CONFIG["eval_freq"] // n_envs,
-            n_eval_episodes=TRAINING_CONFIG["n_eval_episodes"],
-            deterministic=True,
-        ),
-    ])
+    callbacks = CallbackList(
+        [
+            AbilityMetricsCallback(verbose=1),
+            AbilityCurriculumCallback(train_envs, verbose=1),
+            MaskableEvalCallback(
+                eval_env,
+                best_model_save_path=str(output_path / "best_model"),
+                log_path=str(output_path / "eval_logs"),
+                eval_freq=TRAINING_CONFIG["eval_freq"] // n_envs,
+                n_eval_episodes=TRAINING_CONFIG["n_eval_episodes"],
+                deterministic=True,
+            ),
+        ]
+    )
 
     logger.info("Starting training for %d timesteps...", timesteps)
     start_time = datetime.now(tz=UTC)
@@ -330,9 +326,11 @@ def resume(
 
     model.set_env(train_envs)
 
-    callbacks = CallbackList([
-        AbilityMetricsCallback(verbose=1),
-    ])
+    callbacks = CallbackList(
+        [
+            AbilityMetricsCallback(verbose=1),
+        ]
+    )
 
     logger.info("Resuming training for %d additional timesteps...", timesteps)
 

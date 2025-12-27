@@ -18,7 +18,8 @@ Usage:
     uv run python -m app.training.train_ppo train --timesteps 10000000
 
     # Resume training from checkpoint
-    uv run python -m app.training.train_ppo resume --load models/masked_ppo/best_model/best_model.zip
+    uv run python -m app.training.train_ppo resume \
+        --load models/masked_ppo/best_model/best_model.zip
 
     # Quick test
     uv run python -m app.training.train_ppo train --timesteps 100000 --envs 8 --no-subproc
@@ -27,7 +28,6 @@ See TRAINING_LOG.md for training history and hyperparameters.
 """
 
 import argparse
-import os
 from pathlib import Path
 
 import torch
@@ -208,7 +208,7 @@ def train(
     )
 
     # Create or load model
-    if load_path and os.path.exists(load_path):
+    if load_path and Path(load_path).exists():
         print(f"\nLoading existing model from {load_path}...")
         model = MaskablePPO.load(
             load_path,
@@ -253,7 +253,7 @@ def train(
         try:
             model.policy = torch.compile(model.policy, mode="reduce-overhead")
             print("torch.compile applied successfully!")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - torch.compile raises various exception types
             print(f"torch.compile failed (non-fatal): {e}")
 
     # Train
@@ -293,7 +293,8 @@ Examples:
   uv run python -m app.training.train_ppo train --envs 64 --batch-size 2048
 
   # V6-style training (single-threaded, for debugging)
-  uv run python -m app.training.train_ppo train --no-subproc --no-compile --envs 32 --batch-size 1024
+  uv run python -m app.training.train_ppo train \
+      --no-subproc --no-compile --envs 32 --batch-size 1024
 
   # Resume training
   uv run python -m app.training.train_ppo resume --load models/masked_ppo/best_model/best_model.zip

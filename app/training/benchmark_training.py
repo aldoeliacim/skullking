@@ -7,6 +7,7 @@ Usage:
     uv run python -m app.training.benchmark_training
 """
 
+import contextlib
 import gc
 import time
 from dataclasses import dataclass
@@ -49,10 +50,10 @@ class BenchmarkResult:
 def get_gpu_stats() -> tuple[float, float]:
     """Get GPU utilization and memory usage."""
     try:
-        import subprocess
+        import subprocess  # noqa: PLC0415 - lazy import for optional GPU monitoring
 
         result = subprocess.run(
-            [
+            [  # noqa: S607 - nvidia-smi is a well-known utility
                 "nvidia-smi",
                 "--query-gpu=utilization.gpu,memory.used",
                 "--format=csv,noheader,nounits",
@@ -63,7 +64,7 @@ def get_gpu_stats() -> tuple[float, float]:
         )
         util, mem = result.stdout.strip().split(", ")
         return float(util), float(mem)
-    except Exception:
+    except Exception:  # noqa: BLE001 - subprocess/parsing can fail many ways
         return 0.0, 0.0
 
 
@@ -123,12 +124,10 @@ def run_benchmark(
         device="cuda",
     )
 
-    # Optional torch.compile
+    # Optional torch.compile (may fail on some systems)
     if use_compile and hasattr(torch, "compile"):
-        try:
+        with contextlib.suppress(Exception):
             model.policy = torch.compile(model.policy, mode="reduce-overhead")
-        except Exception:
-            pass
 
     # Warmup
     model.learn(total_timesteps=n_envs * n_steps, progress_bar=False)
@@ -194,8 +193,8 @@ def main():
     # Configurations to test
     # Best from previous run: 256 envs, batch 32768, SubprocVecEnv = 6,009 FPS
     # Try pushing higher with more envs
+    # Config format: (n_envs, batch_size, use_subproc, n_steps)
     configs = [
-        # (n_envs, batch_size, use_subproc, n_steps)
         # Previous best baseline
         (256, 32768, True, 2048),
         # Push more envs
@@ -209,7 +208,8 @@ def main():
     results = []
 
     for n_envs, batch_size, use_subproc, n_steps in configs:
-        config_str = f"envs={n_envs}, batch={batch_size}, {'Subproc' if use_subproc else 'Dummy'}, steps={n_steps}"
+        vec_type = "Subproc" if use_subproc else "Dummy"
+        config_str = f"envs={n_envs}, batch={batch_size}, {vec_type}, steps={n_steps}"
         console.print(f"[dim]Testing: {config_str}[/dim]")
 
         try:
@@ -222,7 +222,7 @@ def main():
             )
             results.append(result)
             console.print(f"  [green]FPS: {result.fps:,.0f}, GPU: {result.gpu_util:.0f}%[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - benchmark can fail many ways (OOM, CUDA, etc.)
             console.print(f"  [red]Failed: {e}[/red]")
 
         # Brief pause between tests

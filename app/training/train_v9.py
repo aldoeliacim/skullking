@@ -543,10 +543,8 @@ def main():
     )
     common_parser.add_argument("--load", type=str, default=None, help="Load model path")
 
-    # train-manager command
-    manager_parser = subparsers.add_parser(
-        "train-manager", parents=[common_parser], help="Train Manager policy"
-    )
+    # train-manager command (no extra args beyond common)
+    subparsers.add_parser("train-manager", parents=[common_parser], help="Train Manager policy")
 
     # train-worker command
     worker_parser = subparsers.add_parser(

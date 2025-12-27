@@ -287,9 +287,8 @@ class AbilityAwareEnv(WorkerEnv):
                     self.harry_pending = True
 
         # Check if round is complete
-        round_complete = (
-            len(current_round.tricks) >= self.current_round_num
-            and trick.is_complete(self.num_players)
+        round_complete = len(current_round.tricks) >= self.current_round_num and trick.is_complete(
+            self.num_players
         )
 
         # Handle Harry at round end
@@ -332,9 +331,7 @@ class AbilityAwareEnv(WorkerEnv):
         chosen_player = self.game.players[player_idx]
 
         # Resolve ability
-        current_round.ability_state.resolve_rosie(
-            self.agent_player_id, chosen_player.id
-        )
+        current_round.ability_state.resolve_rosie(self.agent_player_id, chosen_player.id)
 
         # Track decision
         self.ability_decisions["rosie"].append(action)
@@ -356,9 +353,7 @@ class AbilityAwareEnv(WorkerEnv):
             return self._get_extended_obs(), 0.0, False, False, {}
 
         # Map action to card
-        card_to_discard = (
-            agent.hand[action] if 0 <= action < len(agent.hand) else agent.hand[0]
-        )
+        card_to_discard = agent.hand[action] if 0 <= action < len(agent.hand) else agent.hand[0]
 
         # Store first discard choice
         self.bendt_first_discard = card_to_discard
@@ -373,10 +368,16 @@ class AbilityAwareEnv(WorkerEnv):
         card = get_card(card_to_discard)
         reward = self._evaluate_bendt_discard(card)
 
-        return self._get_extended_obs(), reward, False, False, {
-            "decision_phase": self.decision_phase.name,
-            "first_discard": card_to_discard.value,
-        }
+        return (
+            self._get_extended_obs(),
+            reward,
+            False,
+            False,
+            {
+                "decision_phase": self.decision_phase.name,
+                "first_discard": card_to_discard.value,
+            },
+        )
 
     def _step_bendt_2(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """Handle Bendt's second discard selection."""
@@ -538,9 +539,15 @@ class AbilityAwareEnv(WorkerEnv):
         # Handle Harry at round end
         if round_complete and self.harry_pending and self.enable_abilities:
             self.decision_phase = DecisionPhase.ABILITY_HARRY
-            return self._get_extended_obs(), ability_reward, False, False, {
-                "decision_phase": self.decision_phase.name,
-            }
+            return (
+                self._get_extended_obs(),
+                ability_reward,
+                False,
+                False,
+                {
+                    "decision_phase": self.decision_phase.name,
+                },
+            )
 
         if round_complete:
             current_round.calculate_scores()
@@ -625,13 +632,13 @@ class AbilityAwareEnv(WorkerEnv):
         if self.decision_phase == DecisionPhase.ABILITY_ROSIE:
             # All players are valid choices
             num_players = len(self.game.players) if self.game else 4
-            mask[:min(num_players, 6)] = True
+            mask[: min(num_players, 6)] = True
 
         elif self.decision_phase == DecisionPhase.ABILITY_BENDT_1:
             # All cards in hand are valid
             agent = self.game.get_player(self.agent_player_id) if self.game else None
             if agent and agent.hand:
-                mask[:min(len(agent.hand), 11)] = True
+                mask[: min(len(agent.hand), 11)] = True
             else:
                 mask[0] = True
 

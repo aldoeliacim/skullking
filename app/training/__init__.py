@@ -5,7 +5,8 @@ Usage:
     uv run python -m app.training.train_ppo train --timesteps 10000000
 
     # Resume training
-    uv run python -m app.training.train_ppo resume --load models/masked_ppo/best_model/best_model.zip
+    uv run python -m app.training.train_ppo resume \
+        --load models/masked_ppo/best_model/best_model.zip
 
 Components:
     - train_ppo: Main MaskablePPO training with curriculum learning

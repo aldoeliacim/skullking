@@ -430,10 +430,9 @@ class ManagerEnv(gym.Env[np.ndarray, int]):
     ) -> np.ndarray:
         """Build worker observation for simulating card play."""
         # Simplified obs for worker - full implementation in WorkerEnv
-        obs = np.zeros(WorkerEnv.OBS_DIM, dtype=np.float32)
         # This would be filled with proper worker observation
         # For now, return zeros (worker will use action mask)
-        return obs
+        return np.zeros(WorkerEnv.OBS_DIM, dtype=np.float32)
 
     def _play_trick_with_bots(self, current_round: Round) -> None:
         """Play trick with all bots (for fast-forward simulation)."""
