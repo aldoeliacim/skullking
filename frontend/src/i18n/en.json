@@ -8,18 +8,11 @@
     "yourName": "Your Name",
     "enterName": "Captain...",
     "createGame": "Create Game",
-    "or": "or join existing",
-    "gameCode": "Game Code",
-    "enterGameId": "Enter code...",
-    "joinGame": "Join Game",
-    "spectateGame": "Watch Game",
-    "browseGames": "Browse Active Games",
+    "browseGames": "Browse Games",
     "viewHistory": "History",
     "errorEnterName": "Please enter your name",
-    "errorEnterGameId": "Please enter a game code",
     "errorCreateFailed": "Failed to create game",
-    "errorConnection": "Connection failed",
-    "tip": "Tip: Share your 4-letter game code with friends to play together!"
+    "errorConnection": "Connection failed"
   },
   "history": {
     "title": "Game History",

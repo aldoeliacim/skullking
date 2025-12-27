@@ -28,7 +28,6 @@ export default function HomeScreen(): React.JSX.Element {
   const router = useRouter();
 
   const [playerName, setPlayerName] = useState('');
-  const [gameCode, setGameCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBrowse, setShowBrowse] = useState(false);
@@ -69,32 +68,6 @@ export default function HomeScreen(): React.JSX.Element {
       setIsLoading(false);
     }
   }, [playerName, router, t]);
-
-  const handleJoinGame = useCallback(() => {
-    if (!playerName.trim()) {
-      setError(t('login.errorEnterName'));
-      return;
-    }
-    if (!gameCode.trim()) {
-      setError(t('login.errorEnterGameId'));
-      return;
-    }
-    router.push({
-      pathname: '/lobby/[id]',
-      params: { id: gameCode.trim().toUpperCase(), playerName: playerName.trim() },
-    });
-  }, [playerName, gameCode, router, t]);
-
-  const handleSpectate = useCallback(() => {
-    if (!gameCode.trim()) {
-      setError(t('login.errorEnterGameId'));
-      return;
-    }
-    router.push({
-      pathname: '/game/[id]',
-      params: { id: gameCode.trim().toUpperCase(), spectator: 'true' },
-    });
-  }, [gameCode, router, t]);
 
   const handleSelectGame = useCallback(
     (game: GameInfo, spectate: boolean) => {
@@ -146,62 +119,27 @@ export default function HomeScreen(): React.JSX.Element {
               maxLength={20}
             />
 
-            <Pressable
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-              onPress={handleCreateGame}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={styles.primaryButtonText}>{t('login.createGame')}</Text>
-              )}
-            </Pressable>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>{t('login.or')}</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Text style={styles.label}>{t('login.gameCode')}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t('login.enterGameId')}
-              placeholderTextColor="#666"
-              value={gameCode}
-              onChangeText={(text) => {
-                setGameCode(text.toUpperCase());
-                setError(null);
-              }}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={4}
-            />
-
             <View style={styles.buttonRow}>
               <Pressable
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-                onPress={handleJoinGame}
+                style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+                onPress={handleCreateGame}
+                disabled={isLoading}
               >
-                <Text style={styles.secondaryButtonText}>{t('login.joinGame')}</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>{t('login.createGame')}</Text>
+                )}
               </Pressable>
               <Pressable
-                style={({ pressed }) => [styles.outlineButton, pressed && styles.buttonPressed]}
-                onPress={handleSpectate}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+                onPress={() => setShowBrowse(true)}
               >
-                <Text style={styles.outlineButtonText}>{t('login.spectateGame')}</Text>
+                <Text style={styles.secondaryButtonText}>{t('login.browseGames')}</Text>
               </Pressable>
             </View>
 
             {error && <Text style={styles.error}>{error}</Text>}
-          </View>
-
-          {/* Links */}
-          <View style={styles.links}>
-            <Pressable onPress={() => setShowBrowse(true)}>
-              <Text style={styles.link}>🎮 {t('login.browseGames')}</Text>
-            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -368,7 +306,12 @@ const styles = StyleSheet.create({
     color: '#e2e8f0',
     marginBottom: 16,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   primaryButton: {
+    flex: 1,
     backgroundColor: '#d4a84b',
     borderRadius: 8,
     padding: 14,
@@ -378,30 +321,6 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: '600',
-  },
-  buttonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#1a2d42',
-  },
-  dividerText: {
-    paddingHorizontal: 12,
-    fontSize: 12,
-    color: '#8899a6',
-    textTransform: 'uppercase',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
   },
   secondaryButton: {
     flex: 1,
@@ -415,19 +334,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  outlineButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1a2d42',
-  },
-  outlineButtonText: {
-    color: '#8899a6',
-    fontSize: 15,
-    fontWeight: '600',
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
   error: {
     marginTop: 16,
@@ -437,15 +346,6 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 14,
     textAlign: 'center',
-  },
-  links: {
-    marginTop: 24,
-    flexDirection: 'row',
-    gap: 24,
-  },
-  link: {
-    fontSize: 14,
-    color: '#d4a84b',
   },
   // Modal
   modalOverlay: {

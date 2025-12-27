@@ -8,18 +8,11 @@
     "yourName": "Tu Nombre",
     "enterName": "Capitan...",
     "createGame": "Crear Partida",
-    "or": "o unirse a una existente",
-    "gameCode": "Codigo de Partida",
-    "enterGameId": "Ingresa el codigo...",
-    "joinGame": "Unirse",
-    "spectateGame": "Ver Partida",
-    "browseGames": "Buscar Partidas Activas",
+    "browseGames": "Buscar Partidas",
     "viewHistory": "Historial",
     "errorEnterName": "Por favor ingresa tu nombre",
-    "errorEnterGameId": "Por favor ingresa un codigo",
     "errorCreateFailed": "Error al crear partida",
-    "errorConnection": "Error de conexion",
-    "tip": "Consejo: Comparte tu codigo de 4 letras con amigos para jugar juntos!"
+    "errorConnection": "Error de conexion"
   },
   "history": {
     "title": "Historial de Partidas",
