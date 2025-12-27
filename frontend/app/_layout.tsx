@@ -30,11 +30,12 @@ export default function RootLayout(): React.JSX.Element {
               headerShown: false,
               contentStyle: styles.content,
               animation: 'slide_from_right',
+              title: 'Skull King',
             }}
           >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="lobby/[id]" />
-            <Stack.Screen name="game/[id]" />
+            <Stack.Screen name="index" options={{ title: 'Skull King' }} />
+            <Stack.Screen name="lobby/[id]" options={{ title: 'Skull King - Lobby' }} />
+            <Stack.Screen name="game/[id]" options={{ title: 'Skull King - Game' }} />
           </Stack>
         </View>
       </GestureHandlerRootView>
