@@ -94,8 +94,11 @@ class ConnectionManager:
         if game_id in self.games:
             await self.game_handler.send_game_state(self.games[game_id], player_id)
 
-    async def _try_restore_game(self, game_id: str) -> bool:
+    async def try_restore_game(self, game_id: str) -> bool:
         """Try to restore a game from MongoDB.
+
+        Called when a player attempts to reconnect to a game that's
+        not in memory. The game may have been evicted or the server restarted.
 
         Args:
             game_id: Game identifier
@@ -139,6 +142,11 @@ class ConnectionManager:
     def disconnect(self, game_id: str, player_id: str) -> None:
         """Remove a player WebSocket connection.
 
+        Note: We do NOT delete the game when all players disconnect, because:
+        1. Players might reconnect (refresh, app background, network issues)
+        2. Game state is persisted to MongoDB for recovery
+        3. Game cleanup should be handled by a separate TTL/expiry mechanism
+
         Args:
             game_id: Game identifier
             player_id: Player identifier
@@ -148,16 +156,18 @@ class ConnectionManager:
             del self.active_connections[game_id][player_id]
             logger.info("Player %s disconnected from game %s", player_id, game_id)
 
-            # Clean up empty game (only if no players AND no spectators)
+            # Mark player as disconnected (but keep them in game for reconnection)
+            if game_id in self.games:
+                game = self.games[game_id]
+                player = game.get_player(player_id)
+                if player:
+                    player.is_connected = False
+
+            # Clean up empty connection dict (but keep game in memory)
             if not self.active_connections[game_id]:
                 del self.active_connections[game_id]
-                # Only delete game if no spectators either
-                no_spectators = (
-                    game_id not in self.spectator_connections
-                    or not self.spectator_connections[game_id]
-                )
-                if no_spectators and game_id in self.games:
-                    del self.games[game_id]
+                # DON'T delete the game - allow reconnection
+                # Games are persisted to MongoDB and can be restored
 
     def disconnect_spectator(self, game_id: str, spectator_id: str) -> None:
         """Remove a spectator WebSocket connection.

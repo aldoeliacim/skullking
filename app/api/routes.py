@@ -66,7 +66,15 @@ async def join_game(
     # Get game (can be by UUID or slug)
     game = websocket_manager.get_game(game_id)
 
+    # If game not in memory, try to restore from MongoDB (for reconnections)
     if not game:
+        restored = await websocket_manager.try_restore_game(game_id)
+        if restored:
+            game = websocket_manager.get_game(game_id)
+
+    if not game:
+        # Must accept before closing to avoid HTTP 403
+        await websocket.accept()
         await websocket.close(code=4004, reason="Game not found")
         return
 
@@ -79,6 +87,7 @@ async def join_game(
     if not player:
         # New player - only allow joining games that haven't started yet
         if game.state != GameState.PENDING:
+            await websocket.accept()
             await websocket.close(code=4005, reason="Game already in progress")
             return
 
@@ -91,8 +100,12 @@ async def join_game(
         )
 
         if not game.add_player(player):
+            await websocket.accept()
             await websocket.close(code=4003, reason="Game is full")
             return
+    # Existing player rejoining - update their connection status
+    else:
+        player.is_connected = True
 
     # Connect WebSocket using actual game UUID
     await websocket_manager.connect(websocket, actual_game_id, player_id)
