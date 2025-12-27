@@ -1,0 +1,74 @@
+.question {
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-xl);
+  text-align: center;
+}
+
+.choices {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.choiceButton {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  background: var(--color-bg-card);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.choiceButton.pirate {
+  border-color: var(--color-pirate);
+}
+
+.choiceButton.pirate:hover {
+  background: rgba(197, 48, 48, 0.15);
+  box-shadow: 0 0 20px rgba(197, 48, 48, 0.3);
+}
+
+.choiceButton.escape {
+  border-color: var(--color-info);
+}
+
+.choiceButton.escape:hover {
+  background: rgba(66, 153, 225, 0.15);
+  box-shadow: 0 0 20px rgba(66, 153, 225, 0.3);
+}
+
+.choiceIcon {
+  font-size: 48px;
+}
+
+.choiceLabel {
+  font-size: var(--text-xl);
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.choiceDesc {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .choices {
+    flex-direction: column;
+  }
+
+  .choiceButton {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .choiceIcon {
+    font-size: 36px;
+  }
+}

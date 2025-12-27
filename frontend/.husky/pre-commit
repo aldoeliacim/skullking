@@ -1,7 +1,0 @@
-cd frontend
-
-# Run lint-staged for staged files
-npx lint-staged
-
-# Type check
-bun run typecheck

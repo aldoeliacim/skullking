@@ -9,11 +9,11 @@ A modern Python implementation of the [Skull King](https://www.grandpabecksgames
 | Layer | Technology |
 |-------|------------|
 | **Backend** | Python 3.11+, FastAPI, WebSockets |
-| **Frontend** | React Native (Expo), TypeScript, Zustand |
+| **Frontend** | React 19.2, TypeScript, Vite, Zustand |
 | **Database** | MongoDB, Redis (pub/sub) |
 | **AI/ML** | Gymnasium, Stable-Baselines3, MaskablePPO |
-| **DevOps** | Docker, Docker Compose, uv, Bun |
-| **Quality** | Ruff, Oxlint, Biome, Pytest, Pre-commit |
+| **DevOps** | uv, npm, systemd |
+| **Quality** | Ruff, Mypy, Pytest, Pre-commit |
 
 ## Features
 
@@ -24,11 +24,11 @@ A modern Python implementation of the [Skull King](https://www.grandpabecksgames
 - **AI Bots**: Easy/Medium/Hard rule-based bots and trained neural network (MaskablePPO)
 - **Reinforcement Learning**: Gymnasium environment with action masking for training agents
 - **Internationalization**: English and Spanish support
-- **Cross-Platform**: Web, iOS, and Android via React Native (Expo)
+- **Cross-Platform**: Works on desktop and mobile browsers
 
 ## Quick Start
 
-### Local Development
+### Backend
 
 ```bash
 # Install uv (if needed)
@@ -37,20 +37,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install dependencies and run
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
-
-# Open http://localhost:8000
 ```
 
-### Docker
+### Frontend
 
 ```bash
-# Development (hot reload)
-docker compose -f docker-compose.dev.yml up -d
-
-# Production
-docker compose up -d --build
-
-# Access at http://localhost:8000
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:5173
 ```
 
 ### Run Tests
@@ -97,10 +92,18 @@ skullking/
 │   ├── training/     # MaskablePPO training with curriculum learning
 │   ├── repositories/ # MongoDB data access layer
 │   └── services/     # Game serialization, persistence
-├── frontend/         # React Native (Expo) app - see frontend/README.md
+├── frontend/         # React 19 + Vite app
+│   ├── src/
+│   │   ├── components/  # UI components (Card, Hand, TrickArea, etc.)
+│   │   ├── pages/       # Home, Lobby, Game screens
+│   │   ├── stores/      # Zustand state management
+│   │   ├── services/    # API and WebSocket clients
+│   │   ├── i18n/        # Translations (en/es)
+│   │   └── styles/      # CSS modules and theme
+│   └── dist/         # Production build output
 ├── models/           # Trained RL model checkpoints
 ├── scripts/          # Utility scripts (see scripts/README.md)
-├── static/           # Standalone web client for local play
+├── static/           # Card images served by backend
 ├── archive/          # Legacy code preserved for reference
 └── tests/            # Pytest test suite (319 tests)
 ```
@@ -140,28 +143,32 @@ uv run python -m app.training.train_v9 --manager-timesteps 5000000 --worker-time
 
 See [TRAINING_LOG.md](./TRAINING_LOG.md) for training history and [V9_OPTIMIZATION_PLAN.md](./V9_OPTIMIZATION_PLAN.md) for optimization details.
 
-## Docker Services
+## Deployment
 
-| Service | Port | Description |
-|---------|------|-------------|
-| app | 8000 | FastAPI application |
-| mongodb | 27017 | Game persistence |
-| redis | 6379 | Pub/Sub messaging |
-
-### Useful Commands
+### Deploy Script
 
 ```bash
-# View logs
-docker compose logs -f app
+# Deploy everything (backend + frontend)
+./scripts/deploy.sh all
 
-# Run bot game in container
-docker compose exec app python scripts/play_bot_game.py
+# Deploy only frontend to PVE
+./scripts/deploy.sh frontend
 
-# Access MongoDB
-docker compose exec mongodb mongosh skullking
+# Start/restart backend
+./scripts/deploy.sh backend
 
-# Stop everything
-docker compose down -v
+# Check backend status
+./scripts/deploy.sh status
+```
+
+### Manual Backend Start
+
+```bash
+# Development with hot reload
+uv run uvicorn app.main:app --reload --port 8000
+
+# Production
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Development

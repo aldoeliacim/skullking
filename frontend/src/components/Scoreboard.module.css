@@ -1,0 +1,117 @@
+.container {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  border: 1px solid rgba(212, 168, 75, 0.2);
+}
+
+.compact {
+  padding: var(--spacing-sm);
+}
+
+.title {
+  font-family: var(--font-display);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--text-xl);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 30px 1fr 50px 50px 60px;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.compact .header {
+  font-size: var(--text-xs);
+  grid-template-columns: 24px 1fr 40px 40px 50px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 30px 1fr 50px 50px 60px;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  align-items: center;
+}
+
+.compact .row {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  grid-template-columns: 24px 1fr 40px 40px 50px;
+}
+
+.me {
+  background: rgba(212, 168, 75, 0.15);
+  border: 1px solid rgba(212, 168, 75, 0.3);
+}
+
+.allied {
+  border-left: 3px solid var(--color-parrot);
+}
+
+.rank {
+  font-size: var(--text-lg);
+  text-align: center;
+}
+
+.name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.youBadge {
+  font-size: var(--text-xs);
+  background: var(--color-primary);
+  color: black;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: bold;
+}
+
+.stat {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.bidMade {
+  color: var(--color-success);
+  font-weight: bold;
+}
+
+.bidOver {
+  color: var(--color-error);
+}
+
+.score {
+  text-align: right;
+  font-weight: bold;
+  font-size: var(--text-md);
+  color: var(--color-primary);
+}
+
+@media (max-width: 480px) {
+  .header,
+  .row {
+    grid-template-columns: 24px 1fr 36px 36px 50px;
+  }
+}

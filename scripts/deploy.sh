@@ -2,7 +2,7 @@
 #
 # Skull King Deployment Script
 #
-# Deploys frontend to PVE nginx and backend to local Docker.
+# Deploys frontend to PVE nginx and backend as systemd service.
 # Usage: ./scripts/deploy.sh [frontend|backend|all]
 #
 
@@ -27,7 +27,7 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Build frontend using bun/expo
+# Build frontend using npm (Vite + React)
 build_frontend() {
     log_info "Building frontend..."
     cd "$PROJECT_DIR/frontend"
@@ -35,12 +35,12 @@ build_frontend() {
     # Install dependencies if needed
     if [ ! -d "node_modules" ]; then
         log_info "Installing dependencies..."
-        bun install
+        npm install
     fi
 
-    # Build for web
-    log_info "Running expo export..."
-    bunx expo export --platform web
+    # Build for production
+    log_info "Running Vite build..."
+    npm run build
 
     log_success "Frontend built successfully"
 }
@@ -90,7 +90,7 @@ server {
     gzip_proxied any;
     gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml;
 
-    # Backend API and WebSocket - proxy to Docker backend
+    # Backend API and WebSocket - proxy to backend
     location /games {
         include /etc/nginx/snippets/proxy_common.conf;
         proxy_pass http://BACKEND_IP:BACKEND_PORT/games;
@@ -117,14 +117,7 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    # Service worker and manifest - never cache
-    location ~* (sw\.js|manifest\.json|_expo/.*) {
-        expires -1;
-        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
-        add_header Pragma "no-cache";
-    }
-
-    # HTML files - never cache (for PWA updates)
+    # HTML files - never cache (for SPA updates)
     location ~* \.html$ {
         expires -1;
         add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
@@ -168,23 +161,30 @@ NGINX_EOF
     log_success "PVE nginx config updated and reloaded"
 }
 
-# Build and deploy backend
+# Deploy backend (start/restart uvicorn)
 deploy_backend() {
     log_info "Deploying backend..."
     cd "$PROJECT_DIR"
 
-    # Build backend image
-    log_info "Building backend Docker image..."
-    docker compose build backend
+    # Sync dependencies
+    log_info "Syncing Python dependencies..."
+    uv sync
 
-    # Restart backend container
-    log_info "Restarting backend container..."
-    docker compose up -d --force-recreate backend
+    # Check if backend is already running
+    if pgrep -f "uvicorn app.main:app" > /dev/null; then
+        log_info "Stopping existing backend..."
+        pkill -f "uvicorn app.main:app" || true
+        sleep 2
+    fi
+
+    # Start backend in background
+    log_info "Starting backend..."
+    nohup uv run uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" > /tmp/skullking-backend.log 2>&1 &
 
     # Wait for health check
     log_info "Waiting for backend to be healthy..."
     for i in {1..30}; do
-        if docker compose ps backend | grep -q "healthy"; then
+        if curl -s "http://localhost:$BACKEND_PORT/health" > /dev/null 2>&1; then
             log_success "Backend is healthy"
             return 0
         fi
@@ -192,6 +192,7 @@ deploy_backend() {
     done
 
     log_warn "Backend health check timeout (may still be starting)"
+    log_info "Check logs: tail -f /tmp/skullking-backend.log"
 }
 
 # Full deployment
@@ -209,15 +210,27 @@ deploy_all() {
     echo ""
 }
 
-# Remove old frontend config from aldo sites-enabled
-cleanup_old_config() {
-    log_info "Cleaning up old config..."
+# Show backend status and logs
+status() {
+    log_info "Backend status..."
+    if pgrep -f "uvicorn app.main:app" > /dev/null; then
+        log_success "Backend is running"
+        ps aux | grep "[u]vicorn app.main:app"
+    else
+        log_warn "Backend is not running"
+    fi
+    echo ""
+    log_info "Recent logs:"
+    tail -20 /tmp/skullking-backend.log 2>/dev/null || log_warn "No logs found"
+}
 
-    # Check if skullking is in the aldo config and needs to be removed
-    if ssh "$PVE_HOST" "grep -q 'skullking.aldo.pw' /etc/nginx/sites-enabled/aldo 2>/dev/null"; then
-        log_warn "Found skullking in aldo config - please manually remove it"
-        log_warn "Run: ssh pve 'sudo nano /etc/nginx/sites-enabled/aldo'"
-        log_warn "Remove the 'server { server_name skullking.aldo.pw; ... }' block"
+# Stop backend
+stop_backend() {
+    log_info "Stopping backend..."
+    if pkill -f "uvicorn app.main:app"; then
+        log_success "Backend stopped"
+    else
+        log_warn "Backend was not running"
     fi
 }
 
@@ -236,20 +249,23 @@ main() {
         nginx)
             update_nginx_config
             ;;
-        cleanup)
-            cleanup_old_config
+        status)
+            status
+            ;;
+        stop)
+            stop_backend
             ;;
         all)
             deploy_all
-            cleanup_old_config
             ;;
         *)
-            echo "Usage: $0 [frontend|backend|nginx|cleanup|all]"
+            echo "Usage: $0 [frontend|backend|nginx|status|stop|all]"
             echo ""
             echo "  frontend  - Build and deploy frontend to PVE"
-            echo "  backend   - Build and deploy backend Docker container"
+            echo "  backend   - Start/restart backend uvicorn server"
             echo "  nginx     - Update PVE nginx config only"
-            echo "  cleanup   - Check for old config that needs removal"
+            echo "  status    - Show backend status and logs"
+            echo "  stop      - Stop backend server"
             echo "  all       - Deploy everything (default)"
             exit 1
             ;;

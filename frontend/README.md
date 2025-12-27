@@ -1,156 +1,87 @@
 # Skull King Frontend
 
-A React Native (Expo) mobile-first frontend for the Skull King card game.
+A React 19 + Vite frontend for the Skull King card game.
 
 ## Tech Stack
 
-- **Framework**: Expo SDK 52 with Expo Router
-- **Language**: TypeScript (strict mode)
-- **State Management**: Zustand
-- **Animations**: React Native Reanimated
-- **i18n**: i18next with react-i18next
-- **Styling**: StyleSheet with custom theme system
-- **Runtime**: Bun
+- **React 19.2** with TypeScript
+- **Vite 7** for development and bundling
+- **Zustand 5** for state management
+- **Framer Motion 12** for animations
+- **react-i18next** for internationalization (English/Spanish)
+- **CSS Modules** for component styling
 
-## Prerequisites
-
-- [Bun](https://bun.sh/) >= 1.0
-- Node.js >= 18 (for Expo compatibility)
-- iOS Simulator (for iOS development)
-- Android Studio with emulator (for Android development)
-
-## Getting Started
-
-### Install dependencies
+## Development
 
 ```bash
-bun install
-```
+# Install dependencies
+npm install
 
-### Start development server
-
-```bash
-# Web
-bun run web
-
-# iOS
-bun run ios
-
-# Android
-bun run android
-```
-
-### Linting and formatting
-
-```bash
-# Lint with Oxlint
-bun run lint
-
-# Format with Biome
-bun run format
+# Start development server (http://localhost:5173)
+npm run dev
 
 # Type check
-bun run typecheck
+npm run typecheck
 
-# Run all checks
-bun run check
+# Lint
+npm run lint
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
 ## Project Structure
 
 ```
-frontend/
-├── app/                    # Expo Router screens
-│   ├── _layout.tsx        # Root layout
-│   ├── index.tsx          # Home/Login screen
-│   ├── lobby/[id].tsx     # Game lobby
-│   └── game/[id].tsx      # Game screen
-├── src/
-│   ├── components/        # Reusable UI components
-│   │   ├── AbilityModal.tsx    # Pirate ability resolution UI
-│   │   ├── BiddingModal.tsx    # Bid selection interface
-│   │   ├── Button.tsx          # Themed button component
-│   │   ├── Card.tsx            # Card display with animations
-│   │   ├── Hand.tsx            # Player hand with play validation
-│   │   ├── Input.tsx           # Themed text input
-│   │   ├── Scoreboard.tsx      # Live scores with alliance indicators
-│   │   ├── SettingsButton.tsx  # Language/sound settings
-│   │   ├── TigressModal.tsx    # Scary Mary choice dialog
-│   │   └── TrickArea.tsx       # Current trick display
-│   ├── hooks/             # Custom React hooks
-│   ├── i18n/              # Internationalization
-│   │   ├── en.json
-│   │   └── es.json
-│   ├── services/          # API and WebSocket services
-│   │   ├── api.ts
-│   │   ├── websocket.ts
-│   │   └── sounds.ts
-│   ├── stores/            # Zustand state stores
-│   │   └── gameStore.ts
-│   └── styles/            # Theme and styling
-│       └── theme.ts
-├── assets/                # Images, fonts, sounds
-├── app.json              # Expo config
-├── package.json
-├── tsconfig.json
-├── oxlint.json           # Oxlint config
-├── biome.json            # Biome formatter config
-└── .pre-commit-config.yaml
+src/
+├── components/       # Reusable UI components
+│   ├── Card.tsx          # Card display with images
+│   ├── Hand.tsx          # Player's hand
+│   ├── TrickArea.tsx     # Current trick display
+│   ├── Scoreboard.tsx    # Player scores
+│   ├── Modal.tsx         # Base modal component
+│   ├── BiddingModal.tsx  # Bid selection
+│   ├── TigressModal.tsx  # Scary Mary choice
+│   ├── AbilityModal.tsx  # Pirate abilities
+│   ├── Button.tsx        # Styled buttons
+│   └── Settings.tsx      # Language settings
+├── pages/            # Screen components
+│   ├── Home.tsx          # Welcome/join screen
+│   ├── Lobby.tsx         # Game lobby
+│   └── Game.tsx          # Main game screen
+├── stores/           # State management
+│   └── gameStore.ts      # Zustand store
+├── services/         # API & WebSocket
+│   ├── api.ts            # REST API client
+│   └── websocket.ts      # WebSocket client
+├── i18n/             # Translations
+│   ├── en.json           # English
+│   ├── es.json           # Spanish
+│   └── index.ts          # i18n config
+├── types/            # TypeScript types
+│   └── game.ts           # Game-related types
+├── utils/            # Helper functions
+│   └── cardUtils.ts      # Card parsing/validation
+└── styles/           # Global styles
+    └── theme.css         # CSS variables
 ```
 
 ## Features
 
-- **Responsive Design**: Mobile-first with tablet/desktop support
-- **Animations**: Smooth card dealing, playing, and scoring animations
-- **Pirate Abilities**: Interactive modals for Rosie, Bendt, Harry, Jade, Roatan abilities
-- **Loot Alliances**: Visual indicators showing player alliances and bonus tracking
-- **Internationalization**: English and Spanish support
-- **Real-time Updates**: WebSocket connection with automatic reconnection
+- **Responsive Design**: Works on desktop and mobile
+- **Real-time Gameplay**: WebSocket connection with auto-reconnect
+- **Pirate Abilities**: Full support for all 5 pirate abilities
+- **Animations**: Smooth transitions with Framer Motion
+- **i18n**: English and Spanish translations
 - **Spectator Mode**: Watch games in progress
-- **Bot Selection**: Choose AI difficulty (Easy/Medium/Hard/Neural Network)
-- **Sound Effects**: Optional audio feedback
 
-## Configuration
+## Backend API
 
-The app connects to the backend API. Configure the API URL:
+The frontend connects to:
+- **REST API**: `http://localhost:8000/games/...`
+- **WebSocket**: `ws://localhost:8000/games/ws/{game_id}/{player_id}`
 
-1. Create a `.env` file:
-   ```
-   EXPO_PUBLIC_API_URL=http://localhost:8000
-   ```
-
-2. Or modify `src/services/api.ts` directly.
-
-## Code Quality
-
-- **Oxlint**: Fast linting with React and TypeScript rules
-- **Biome**: Fast formatting
-- **TypeScript**: Strict mode with comprehensive type checking
-- **Pre-commit hooks**: Automated checks before commits
-
-## Building for Production
-
-### Web
-
-```bash
-bunx expo export --platform web
-```
-
-### iOS/Android
-
-```bash
-bunx eas build --platform ios
-bunx eas build --platform android
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run `bun run check` to ensure code quality
-5. Submit a pull request
-
-## License
-
-MIT
+Configure the backend URL by setting `VITE_API_URL` environment variable.

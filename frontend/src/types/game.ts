@@ -1,87 +1,134 @@
-// Shared game types to avoid circular dependencies
+// Game types for Skull King
 
-// Connection state (mirrored from websocket.ts to avoid import cycles)
+export type GamePhase = 'PENDING' | 'BIDDING' | 'PICKING' | 'ENDED';
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+export type BotDifficulty = 'easy' | 'medium' | 'hard';
+export type BotType = 'rl' | 'rule_based' | 'random';
+export type TigressChoice = 'pirate' | 'escape';
 
 export interface Player {
   id: string;
   username: string;
   is_bot: boolean;
-  bot_type?: string;
-  bot_difficulty?: string;
   score: number;
   bid: number | null;
   tricks_won: number;
-  is_host?: boolean;
+  is_ready?: boolean;
 }
 
 export interface Card {
-  id: string;
-  suit?: string;
+  id: number;
+  name: string;
+  type: CardType;
+  suit?: Suit;
   number?: number;
-  type?: string;
-  name?: string;
   image?: string;
 }
 
+export type CardType =
+  | 'skull_king'
+  | 'white_whale'
+  | 'kraken'
+  | 'mermaid'
+  | 'pirate'
+  | 'suit'
+  | 'escape'
+  | 'tigress'
+  | 'loot';
+
+export type Suit = 'roger' | 'parrot' | 'map' | 'chest';
+
 export interface TrickCard {
   player_id: string;
-  card_id: string;
-  tigress_choice?: 'pirate' | 'escape' | undefined;
+  card_id: number;
+  tigress_choice?: TigressChoice;
+}
+
+export interface GameState {
+  id: string;
+  slug: string;
+  phase: GamePhase;
+  players: Player[];
+  current_round: number;
+  current_trick: number;
+  picking_player_id: string | null;
+  hand: number[];
+  trick_cards: TrickCard[];
+  valid_cards: number[];
+  loot_alliances: Record<string, string>;
 }
 
 export interface AbilityData {
-  type: string;
-  pirate?: string;
-  data?: Record<string, unknown>;
+  type: AbilityType;
+  player_id: string;
+  options?: string[];
+  cards?: number[];
+  drawn_cards?: number[];
+  current_bid?: number;
+  deck_cards?: number[];
 }
 
-export type GamePhase = 'PENDING' | 'BIDDING' | 'PICKING' | 'ENDED';
+export type AbilityType =
+  | 'choose_starter'   // Rosie
+  | 'draw_and_discard' // Bendt
+  | 'extra_bet'        // Roatán
+  | 'view_deck'        // Jade
+  | 'modify_bid';      // Harry
 
-// Alliance between loot player and trick winner
-export interface LootAlliance {
-  lootPlayerId: string;
-  allyPlayerId: string;
+export interface GameLogEntry {
+  id: string;
+  message: string;
+  timestamp: number;
 }
 
-// Full game state interface (moved here to break circular dependency)
-export interface GameState {
-  // Connection
-  connectionState: ConnectionState;
-  gameId: string | null;
-  playerId: string | null;
-  playerName: string | null;
-  isSpectator: boolean;
+// WebSocket message types
+export type MessageType =
+  | 'INIT'
+  | 'GAME_STATE'
+  | 'JOINED'
+  | 'LEFT'
+  | 'SPECTATOR_JOINED'
+  | 'SPECTATOR_LEFT'
+  | 'STARTED'
+  | 'DEAL'
+  | 'START_BIDDING'
+  | 'BADE'
+  | 'END_BIDDING'
+  | 'START_PICKING'
+  | 'PICKED'
+  | 'NEXT_TRICK'
+  | 'VALID_CARDS'
+  | 'ANNOUNCE_TRICK_WINNER'
+  | 'ANNOUNCE_SCORES'
+  | 'END_GAME'
+  | 'ABILITY_TRIGGERED'
+  | 'ABILITY_RESOLVED'
+  | 'SHOW_DECK'
+  | 'CONTINUE_PROMPT'
+  | 'ALL_READY'
+  | 'REPORT_ERROR';
 
-  // Game state
-  phase: GamePhase;
-  players: Player[];
-  currentRound: number;
-  currentTrick: number;
-  hand: Card[];
-  trickCards: TrickCard[];
-  pickingPlayerId: string | null;
-  lootAlliances: LootAlliance[];
+export interface WebSocketMessage {
+  type: MessageType;
+  [key: string]: unknown;
+}
 
-  // UI state
-  showBidding: boolean;
-  showResults: boolean;
-  showAbility: boolean;
-  abilityData: AbilityData | null;
-  trickWinner: { playerId: string; playerName: string } | null;
-  logs: Array<{ message: string; type: string; timestamp: number }>;
+// API types
+export interface CreateGameResponse {
+  game_id: string;
+  slug: string;
+}
 
-  // Actions
-  connect: (gameId: string, playerId: string, playerName: string, isSpectator?: boolean) => void;
-  disconnect: () => void;
-  placeBid: (bid: number) => void;
-  playCard: (cardId: string, tigressChoice?: 'pirate' | 'escape') => void;
-  addBot: (botType: string, difficulty: string) => void;
-  removeBot: (botId: string) => void;
-  startGame: () => void;
-  continueReady: () => void;
-  resolveAbility: (data: Record<string, unknown>) => void;
-  addLog: (message: string, type?: string) => void;
-  clearTrickWinner: () => void;
-  reset: () => void;
+export interface GameInfo {
+  id: string;
+  slug: string;
+  state: GamePhase;
+  player_count: number;
+  spectator_count: number;
+  created_at: string;
+  players: Array<{
+    id: string;
+    username: string;
+    is_bot: boolean;
+  }>;
 }

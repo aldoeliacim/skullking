@@ -1,320 +1,201 @@
-import { type PickPayload, toCardIdNumeric } from '../types/api';
-import type { ConnectionState } from '../types/game';
+import type { WebSocketMessage, BotType, BotDifficulty, TigressChoice, AbilityType } from '../types/game';
 import { WS_BASE_URL } from './api';
 
-// Re-export ConnectionState from centralized types
-export type { ConnectionState } from '../types/game';
+type MessageHandler = (message: WebSocketMessage) => void;
+type ConnectionHandler = (state: 'connected' | 'disconnected' | 'reconnecting') => void;
 
-// WebSocket message types (matching backend Command enum)
-export type MessageType =
-  | 'INIT'
-  | 'GAME_STATE'
-  | 'JOINED'
-  | 'LEFT'
-  | 'SPECTATOR_JOINED'
-  | 'SPECTATOR_LEFT'
-  | 'STARTED'
-  | 'DEAL'
-  | 'START_BIDDING'
-  | 'BADE'
-  | 'END_BIDDING'
-  | 'START_PICKING'
-  | 'PICKED'
-  | 'NEXT_TRICK'
-  | 'VALID_CARDS'
-  | 'ANNOUNCE_TRICK_WINNER'
-  | 'ANNOUNCE_SCORES'
-  | 'END_GAME'
-  | 'ABILITY_TRIGGERED'
-  | 'ABILITY_RESOLVED'
-  | 'SHOW_DECK'
-  | 'CONTINUE_PROMPT'
-  | 'ALL_READY'
-  | 'REPORT_ERROR';
-
-// Backend sends "command", we map it to "type" for consistency
-interface RawWebSocketMessage {
-  command: string;
-  content: Record<string, unknown>;
-}
-
-export interface WebSocketMessage {
-  type: MessageType;
-  content: Record<string, unknown>;
-}
-
-export type MessageHandler = (message: WebSocketMessage) => void;
-
-// WebSocket client class
 class WebSocketClient {
   private ws: WebSocket | null = null;
-  private messageHandlers: Set<MessageHandler> = new Set();
-  private connectionStateHandlers: Set<(state: ConnectionState) => void> = new Set();
-  private connectionState: ConnectionState = 'disconnected';
+  private messageHandlers = new Set<MessageHandler>();
+  private connectionHandlers = new Set<ConnectionHandler>();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
-  private reconnectDelay = 1000;
-  private reconnectTimer: NodeJS.Timeout | null = null;
-  private currentUrl: string | null = null;
-  private heartbeatTimer: NodeJS.Timeout | null = null;
-  private heartbeatInterval = 30000;
-  private visibilityHandler: (() => void) | null = null;
-  private wasConnectedBeforeHidden = false;
+  private reconnectTimeout: number | null = null;
+  private heartbeatInterval: number | null = null;
+  private gameId: string | null = null;
+  private playerId: string | null = null;
+  private username: string | null = null;
+  private isSpectator = false;
 
-  // Connect to WebSocket
-  connect(gameId: string, playerId: string, isSpectator = false, username = 'Player'): void {
-    const endpoint = isSpectator ? 'spectate' : 'join';
-    const params = new URLSearchParams({
-      game_id: gameId,
-      player_id: playerId,
-      username: username,
-    });
-    this.currentUrl = `${WS_BASE_URL}/games/${endpoint}?${params.toString()}`;
-    this.setupVisibilityHandler();
+  connect(gameId: string, playerId: string, username: string, spectator = false) {
+    this.gameId = gameId;
+    this.playerId = playerId;
+    this.username = username;
+    this.isSpectator = spectator;
+    this.reconnectAttempts = 0;
     this.doConnect();
   }
 
-  // Setup visibility change handler for browser tab switching
-  private setupVisibilityHandler(): void {
-    if (typeof document === 'undefined') {
-      return; // Not in browser environment
-    }
-
-    // Remove existing handler if any
-    if (this.visibilityHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
-    }
-
-    this.visibilityHandler = () => {
-      if (document.hidden) {
-        // Tab is being hidden - remember if we were connected
-        this.wasConnectedBeforeHidden = this.connectionState === 'connected';
-      } else {
-        // Tab is visible again - check if we need to reconnect
-        if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
-          console.log('[WebSocket] Tab visible, attempting reconnect...');
-          this.reconnectAttempts = 0; // Reset attempts for fresh reconnect
-          this.attemptReconnect();
-        } else if (this.connectionState === 'connected') {
-          // Already connected - request game state refresh
-          this.requestGameState();
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', this.visibilityHandler);
-  }
-
-  // Remove visibility handler
-  private removeVisibilityHandler(): void {
-    if (typeof document !== 'undefined' && this.visibilityHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
-      this.visibilityHandler = null;
-    }
-  }
-
-  private doConnect(): void {
-    if (!this.currentUrl) {
+  private doConnect() {
+    if (this.ws?.readyState === WebSocket.OPEN) {
       return;
     }
 
-    this.setConnectionState('connecting');
+    const endpoint = this.isSpectator ? 'spectate' : 'join';
+    const params = new URLSearchParams({
+      game_id: this.gameId!,
+      player_id: this.playerId!,
+      username: this.username!,
+    });
+
+    const url = `${WS_BASE_URL}/games/${endpoint}?${params}`;
 
     try {
-      this.ws = new WebSocket(this.currentUrl);
+      this.ws = new WebSocket(url);
+      this.notifyConnectionState('reconnecting');
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
-        this.setConnectionState('connected');
+        this.notifyConnectionState('connected');
         this.startHeartbeat();
       };
 
       this.ws.onmessage = (event) => {
         try {
-          const raw: RawWebSocketMessage = JSON.parse(event.data);
-          // Convert backend "command" to frontend "type"
-          const message: WebSocketMessage = {
-            type: raw.command as MessageType,
-            content: raw.content,
-          };
-          this.notifyHandlers(message);
-        } catch (error) {
-          console.error('[WebSocket] Failed to parse message:', error);
+          const message = JSON.parse(event.data) as WebSocketMessage;
+          this.messageHandlers.forEach((handler) => {
+            try {
+              handler(message);
+            } catch (err) {
+              console.error('Message handler error:', err);
+            }
+          });
+        } catch (err) {
+          console.error('Failed to parse message:', err);
         }
+      };
+
+      this.ws.onclose = () => {
+        this.stopHeartbeat();
+        this.notifyConnectionState('disconnected');
+        this.attemptReconnect();
       };
 
       this.ws.onerror = (error) => {
-        console.error('[WebSocket] Error:', error);
+        console.error('WebSocket error:', error);
       };
-
-      this.ws.onclose = (event) => {
-        this.stopHeartbeat();
-
-        if (event.code !== 1000 && event.code !== 1001) {
-          // Abnormal closure, attempt reconnect
-          this.attemptReconnect();
-        } else {
-          this.setConnectionState('disconnected');
-        }
-      };
-    } catch (error) {
-      console.error('[WebSocket] Connection error:', error);
+    } catch (err) {
+      console.error('Failed to connect:', err);
       this.attemptReconnect();
     }
   }
 
-  private attemptReconnect(): void {
+  private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.setConnectionState('disconnected');
       return;
     }
 
-    this.setConnectionState('reconnecting');
     this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-    // Exponential backoff with jitter
-    const delay = Math.min(
-      this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1) + Math.random() * 1000,
-      30000,
-    );
-
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimeout = window.setTimeout(() => {
+      this.notifyConnectionState('reconnecting');
       this.doConnect();
     }, delay);
   }
 
-  private startHeartbeat(): void {
-    this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ command: 'PING' }));
-      }
-    }, this.heartbeatInterval);
+  private startHeartbeat() {
+    this.heartbeatInterval = window.setInterval(() => {
+      this.send({ command: 'PING' });
+    }, 30000);
   }
 
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
   }
 
-  // Disconnect
-  disconnect(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+  private notifyConnectionState(state: 'connected' | 'disconnected' | 'reconnecting') {
+    this.connectionHandlers.forEach((handler) => handler(state));
+  }
 
+  disconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     this.stopHeartbeat();
-    this.removeVisibilityHandler();
 
     if (this.ws) {
-      this.ws.close(1000, 'Client disconnect');
+      this.ws.onclose = null;
+      this.ws.close();
       this.ws = null;
     }
 
-    this.currentUrl = null;
-    this.reconnectAttempts = 0;
-    this.wasConnectedBeforeHidden = false;
-    this.setConnectionState('disconnected');
+    this.notifyConnectionState('disconnected');
   }
 
-  // Request full game state from server (for reconnection recovery)
-  requestGameState(): boolean {
-    return this.send('SYNC_STATE');
-  }
-
-  // Send message
-  send(command: string, content: Record<string, unknown> = {}): boolean {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
-      console.warn('[WebSocket] Cannot send, not connected');
-      return false;
-    }
-
-    try {
-      this.ws.send(JSON.stringify({ command, content }));
-      return true;
-    } catch (error) {
-      console.error('[WebSocket] Send error:', error);
-      return false;
+  send(data: Record<string, unknown>) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
     }
   }
 
-  // Game actions
-  placeBid(bid: number): boolean {
-    return this.send('BID', { bid });
+  // Game commands
+  placeBid(bid: number) {
+    this.send({ command: 'BID', bid });
   }
 
-  playCard(cardId: string, tigressChoice?: 'pirate' | 'escape'): boolean {
-    // Use typed payload to ensure correct format for backend
-    const payload: PickPayload = {
-      card_id: toCardIdNumeric(cardId),
+  playCard(cardId: number, tigressChoice?: TigressChoice) {
+    this.send({
+      command: 'PICK',
+      card_id: cardId,
+      ...(tigressChoice && { tigress_choice: tigressChoice }),
+    });
+  }
+
+  addBot(botType: BotType = 'rl', difficulty: BotDifficulty = 'hard') {
+    this.send({ command: 'ADD_BOT', bot_type: botType, difficulty });
+  }
+
+  removeBot(botId: string) {
+    this.send({ command: 'REMOVE_BOT', player_id: botId });
+  }
+
+  clearBots() {
+    this.send({ command: 'CLEAR_BOTS' });
+  }
+
+  startGame() {
+    this.send({ command: 'START_GAME' });
+  }
+
+  continueReady() {
+    this.send({ command: 'CONTINUE_READY' });
+  }
+
+  resolveAbility(abilityType: AbilityType, data: Record<string, unknown>) {
+    const commandMap: Record<AbilityType, string> = {
+      choose_starter: 'RESOLVE_ROSIE',
+      draw_and_discard: 'RESOLVE_BENDT',
+      extra_bet: 'RESOLVE_ROATAN',
+      view_deck: 'RESOLVE_JADE',
+      modify_bid: 'RESOLVE_HARRY',
     };
-    if (tigressChoice) {
-      payload.tigress_choice = tigressChoice;
-    }
-    return this.send('PICK', payload);
+    this.send({ command: commandMap[abilityType], ...data });
   }
 
-  addBot(botType: string, difficulty: string): boolean {
-    return this.send('ADD_BOT', { bot_type: botType, difficulty });
+  syncState() {
+    this.send({ command: 'SYNC_STATE' });
   }
 
-  removeBot(botId: string): boolean {
-    return this.send('REMOVE_BOT', { bot_id: botId });
-  }
-
-  startGame(): boolean {
-    return this.send('START_GAME');
-  }
-
-  continueReady(): boolean {
-    return this.send('CONTINUE_READY');
-  }
-
-  resolveAbility(data: Record<string, unknown>): boolean {
-    return this.send('RESOLVE_ABILITY', data);
-  }
-
-  // Message handlers
-  addMessageHandler(handler: MessageHandler): () => void {
+  // Handler management
+  onMessage(handler: MessageHandler) {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
   }
 
-  private notifyHandlers(message: WebSocketMessage): void {
-    this.messageHandlers.forEach((handler) => {
-      try {
-        handler(message);
-      } catch (error) {
-        console.error('[WebSocket] Handler error:', error);
-      }
-    });
+  onConnectionChange(handler: ConnectionHandler) {
+    this.connectionHandlers.add(handler);
+    return () => this.connectionHandlers.delete(handler);
   }
 
-  // Connection state handlers
-  addConnectionStateHandler(handler: (state: ConnectionState) => void): () => void {
-    this.connectionStateHandlers.add(handler);
-    handler(this.connectionState);
-    return () => this.connectionStateHandlers.delete(handler);
-  }
-
-  private setConnectionState(state: ConnectionState): void {
-    this.connectionState = state;
-    this.connectionStateHandlers.forEach((handler) => handler(state));
-  }
-
-  // Getters
-  getConnectionState(): ConnectionState {
-    return this.connectionState;
-  }
-
-  isConnected(): boolean {
-    return this.connectionState === 'connected';
+  get isConnected() {
+    return this.ws?.readyState === WebSocket.OPEN;
   }
 }
 
-// Export singleton instance
-export const websocket = new WebSocketClient();
-
-export default websocket;
+export const wsClient = new WebSocketClient();
+export default wsClient;

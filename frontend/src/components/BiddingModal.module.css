@@ -1,0 +1,78 @@
+.question {
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+}
+
+.handPreview {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-md);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+}
+
+.previewCard {
+  margin-left: -15px;
+}
+
+.previewCard:first-child {
+  margin-left: 0;
+}
+
+.bidGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+}
+
+.bidButton {
+  background: var(--color-bg-card);
+  border: 2px solid var(--color-bg-surface);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--text-xl);
+  font-weight: bold;
+  padding: var(--spacing-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bidButton:hover {
+  border-color: var(--color-primary);
+  background: rgba(212, 168, 75, 0.1);
+}
+
+.bidButton.selected {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: black;
+  box-shadow: var(--shadow-glow);
+}
+
+.confirmButton {
+  width: 100%;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-lg);
+  color: black;
+  font-size: var(--text-lg);
+  font-weight: bold;
+  padding: var(--spacing-md) var(--spacing-xl);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirmButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-text-muted);
+}
+
+.confirmButton:not(:disabled):hover {
+  box-shadow: var(--shadow-glow);
+}

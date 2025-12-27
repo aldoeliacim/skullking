@@ -1,0 +1,244 @@
+/* Skull King Theme - Deep Ocean Pirate Aesthetic */
+
+:root {
+  /* Colors - Primary */
+  --color-primary: #d4a84b;
+  --color-primary-dark: #b8922f;
+  --color-primary-light: #e6c06a;
+
+  /* Colors - Background */
+  --color-bg: #0a1628;
+  --color-bg-surface: #12253d;
+  --color-bg-card: #0f1d2e;
+  --color-bg-overlay: rgba(10, 22, 40, 0.95);
+
+  /* Colors - Text */
+  --color-text: #f0ebe3;
+  --color-text-muted: #8899a6;
+  --color-text-dark: #4a5568;
+
+  /* Colors - Semantic */
+  --color-success: #48bb78;
+  --color-error: #ef4444;
+  --color-warning: #ecc94b;
+  --color-info: #4299e1;
+
+  /* Colors - Game Suits */
+  --color-roger: #1a1a2e;
+  --color-parrot: #2d8a8a;
+  --color-map: #8b4dab;
+  --color-chest: #d4a84b;
+
+  /* Colors - Special Cards */
+  --color-skull-king: #8b2635;
+  --color-pirate: #c53030;
+  --color-mermaid: #319795;
+  --color-escape: #718096;
+  --color-kraken: #553c9a;
+  --color-whale: #3182ce;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(212, 168, 75, 0.4);
+  --shadow-glow-strong: 0 0 30px rgba(212, 168, 75, 0.6);
+
+  /* Typography */
+  --font-display: 'Pirata One', cursive;
+  --font-body: 'Crimson Text', Georgia, serif;
+  --font-mono: ui-monospace, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+
+  /* Animation */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Card Dimensions */
+  --card-width: 90px;
+  --card-height: 126px;
+  --card-width-sm: 70px;
+  --card-height-sm: 98px;
+  --card-width-lg: 120px;
+  --card-height-lg: 168px;
+
+  /* Z-Index Scale */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 300;
+  --z-popover: 400;
+  --z-tooltip: 500;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 168, 75, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 168, 75, 0.5);
+}
+
+/* Selection */
+::selection {
+  background: rgba(212, 168, 75, 0.3);
+  color: var(--color-text);
+}
+
+/* Focus Visible */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Utility Classes */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Animation Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(212, 168, 75, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(212, 168, 75, 0.7);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive Typography */
+@media (max-width: 768px) {
+  :root {
+    --text-4xl: 28px;
+    --text-3xl: 24px;
+    --text-2xl: 20px;
+    --card-width: 70px;
+    --card-height: 98px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --text-4xl: 24px;
+    --text-3xl: 20px;
+    --text-2xl: 18px;
+    --card-width: 60px;
+    --card-height: 84px;
+  }
+}

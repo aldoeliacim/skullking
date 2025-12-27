@@ -1,0 +1,72 @@
+.settingsButton {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.settingsButton:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-width: 280px;
+}
+
+.settingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.settingLabel {
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+
+.toggleGroup {
+  display: flex;
+  gap: var(--spacing-xs);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.toggleButton {
+  background: transparent;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggleButton:hover {
+  color: var(--color-text);
+}
+
+.toggleButton.active {
+  background: var(--color-primary);
+  color: black;
+}
+
+.version {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-top: var(--spacing-md);
+}

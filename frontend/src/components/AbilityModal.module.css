@@ -1,0 +1,170 @@
+.description {
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+}
+
+.playerList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.playerButton {
+  background: var(--color-bg-card);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: var(--spacing-md);
+  cursor: pointer;
+  font-size: var(--text-md);
+  transition: all 0.2s ease;
+}
+
+.playerButton:hover {
+  border-color: var(--color-primary);
+}
+
+.playerButton.selected {
+  background: var(--color-primary);
+  color: black;
+  border-color: var(--color-primary);
+}
+
+.cardGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.cardWrapper {
+  position: relative;
+}
+
+.newBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--color-success);
+  color: black;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.selectionCount {
+  text-align: center;
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+}
+
+.buttonRow {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.skipButton {
+  flex: 1;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  padding: var(--spacing-md);
+  cursor: pointer;
+  font-size: var(--text-md);
+  transition: all 0.2s ease;
+}
+
+.skipButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.confirmButton {
+  flex: 1;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-lg);
+  color: black;
+  padding: var(--spacing-md);
+  cursor: pointer;
+  font-size: var(--text-md);
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.confirmButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirmButton:not(:disabled):hover {
+  box-shadow: var(--shadow-glow);
+}
+
+.betGrid,
+.modifierGrid {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.betButton,
+.modifierButton {
+  background: var(--color-bg-card);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  padding: var(--spacing-lg);
+  cursor: pointer;
+  font-size: var(--text-xl);
+  font-weight: bold;
+  min-width: 80px;
+  transition: all 0.2s ease;
+}
+
+.betButton:hover,
+.modifierButton:hover {
+  border-color: var(--color-primary);
+}
+
+.betButton.selected,
+.modifierButton.selected {
+  background: var(--color-primary);
+  color: black;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.modifierButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.modLabel {
+  font-size: var(--text-sm);
+  font-weight: normal;
+}
+
+.newBidValue {
+  font-size: var(--text-2xl);
+}
+
+.deckCards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  justify-content: center;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+}

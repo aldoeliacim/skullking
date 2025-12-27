@@ -17,21 +17,22 @@ uv run mypy app/                           # Type check
 pre-commit run --all-files                 # Run all pre-commit hooks
 ```
 
-### Frontend (React Native/Expo)
+### Frontend (React 19 + Vite)
 ```bash
 cd frontend
-bun install                                # Install dependencies
-bun run start                              # Start Expo dev server
-bun run build:web                          # Build for web (outputs to dist/)
-bun run lint:check                         # Lint with oxlint + biome
-bun run typecheck                          # TypeScript check
+npm install                                # Install dependencies
+npm run dev                                # Start Vite dev server (port 5173)
+npm run build                              # Build for production (outputs to dist/)
+npm run typecheck                          # TypeScript check
+npm run lint                               # ESLint check
 ```
 
-### Docker
+### Deployment
 ```bash
-docker compose up -d --build               # Build and run production
-docker compose -f docker-compose.dev.yml up -d  # Development with hot reload
-./scripts/deploy.sh all                    # Deploy frontend to PVE, backend to Docker
+./scripts/deploy.sh all                    # Deploy frontend to PVE, start backend
+./scripts/deploy.sh frontend               # Deploy frontend only
+./scripts/deploy.sh backend                # Start/restart backend
+./scripts/deploy.sh status                 # Check backend status
 ```
 
 ### RL Training
@@ -59,11 +60,14 @@ Three environment tiers with increasing complexity:
 
 All envs use action masking via `action_masks()` method for invalid action handling.
 
-### Frontend State Management
-- **Zustand stores** in `frontend/src/stores/`: `gameStore.ts`, `wsStore.ts`
-- **WebSocket connection** in `frontend/src/services/websocket.ts`
-- **Message handlers** in `frontend/src/stores/messageHandlers.ts`
-- Routes: `/` (home), `/lobby/[id]`, `/game/[id]`
+### Frontend Architecture (React 19 + Vite)
+- **State Management**: Zustand store in `frontend/src/stores/gameStore.ts`
+- **WebSocket**: `frontend/src/services/websocket.ts` with auto-reconnect
+- **API Client**: `frontend/src/services/api.ts` for REST endpoints
+- **Components**: `frontend/src/components/` (Card, Hand, TrickArea, modals)
+- **Pages**: `frontend/src/pages/` (Home, Lobby, Game)
+- **Styling**: CSS Modules with theme variables in `frontend/src/styles/theme.css`
+- **i18n**: react-i18next with translations in `frontend/src/i18n/{en,es}.json`
 
 ### Game Flow
 1. WebSocket connects → `ws://.../ws/{game_id}/{player_id}`

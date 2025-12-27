@@ -1,43 +1,25 @@
 {
   "app": {
     "title": "Skull King",
-    "name": "Skull King",
     "subtitle": "A trick-taking pirate card game"
   },
-  "login": {
+  "home": {
     "yourName": "Your Name",
     "enterName": "Captain...",
     "createGame": "Create Game",
     "browseGames": "Browse Games",
-    "viewHistory": "History",
     "errorEnterName": "Please enter your name",
-    "errorCreateFailed": "Failed to create game",
-    "errorConnection": "Connection failed"
-  },
-  "history": {
-    "title": "Game History",
-    "loading": "Loading...",
-    "noGames": "No completed games yet",
-    "noGamesHint": "Play some games to see your history!",
-    "error": "Failed to load history",
-    "description": "View past games and scores",
-    "points": "{{score}} pts"
+    "errorCreateFailed": "Failed to create game"
   },
   "browse": {
     "title": "Active Games",
     "loading": "Loading...",
-    "noGames": "No active games right now",
-    "noGamesHint": "Create a new game to get started!",
-    "error": "Failed to load games",
-    "refresh": "Refresh",
-    "watch": "Watch",
+    "noGames": "No active games",
     "join": "Join",
-    "statePending": "In Lobby",
-    "stateBidding": "Bidding",
-    "statePlaying": "Playing",
-    "description": "Find and join active games",
-    "playerCount": "{{count}} players",
-    "spectatorCount": "{{count}} watching"
+    "watch": "Watch",
+    "players": "{{count}} players",
+    "inLobby": "In Lobby",
+    "inProgress": "In Progress"
   },
   "lobby": {
     "title": "Game Lobby",
@@ -46,168 +28,86 @@
     "copied": "Copied!",
     "players": "Players",
     "you": "You",
-    "bot": "Bot",
     "host": "Host",
-    "gameSettings": "Game Settings",
-    "addOpponents": "Add Opponents",
-    "selectOpponent": "Select Opponent",
-    "botAI": "Neural Network",
-    "botAIDesc": "Trained AI - strongest opponent",
-    "botHard": "Hard",
-    "botHardDesc": "Strategic rule-based bot",
-    "botMedium": "Medium",
-    "botMediumDesc": "Balanced gameplay",
+    "addBot": "Add Bot",
+    "fillBots": "Fill with Bots",
+    "clearBots": "Clear Bots",
     "botEasy": "Easy",
-    "botEasyDesc": "Makes occasional mistakes",
-    "botRandom": "Random",
-    "botRandomDesc": "Plays randomly",
-    "addBot": "Add Opponent",
-    "quickSetup": "Quick Setup",
-    "fillWithBots": "Fill with AI Bots",
-    "clearBots": "Remove All Bots",
-    "leave": "Leave",
+    "botMedium": "Medium",
+    "botHard": "Hard",
+    "botAI": "AI",
     "startGame": "Start Game",
-    "needPlayers": "Need at least 2 players to start",
-    "waitingForHost": "Waiting for host...",
-    "errorConnectionLost": "Connection lost",
-    "errorOccurred": "An error occurred"
+    "leave": "Leave",
+    "needPlayers": "Need at least 2 players",
+    "waitingHost": "Waiting for host...",
+    "connectionLost": "Connection lost"
   },
   "game": {
-    "round": "Round",
-    "waiting": "Waiting...",
-    "yourScore": "Your Score:",
-    "currentTrick": "Current Trick",
-    "yourHand": "Your Hand",
-    "makeYourBid": "Make Your Bid",
-    "bidQuestion": "How many tricks will you win?",
-    "gameLog": "Game Log",
-    "biddingPhase": "Bidding Phase",
-    "playingTricks": "Playing Tricks",
-    "gameOver": "Game Over",
-    "inProgress": "In Progress",
+    "round": "Round {{current}}/10",
     "score": "Score",
     "bid": "Bid",
     "tricks": "Tricks",
-    "trick": "trick",
-    "tricksPlural": "tricks",
-    "card": "card",
-    "cards": "cards",
-    "wonTrick": "won the trick!",
-    "cardsVisibleBelow": "Your cards are visible below",
-    "yourBid": "Your Bid:",
-    "tricksWon": "Tricks Won:",
     "yourTurn": "Your Turn!",
-    "alliedWith": "Allied with {{name}}",
-    "tigressChoice": "Scary Mary",
-    "tigressQuestion": "Play as Pirate or Escape?",
-    "tigressPirate": "Pirate",
-    "tigressPirateDesc": "Win tricks, beats suits",
-    "tigressEscape": "Escape",
-    "tigressEscapeDesc": "Lose on purpose",
-    "continue": "Continue",
-    "waitingForPlayers": "Waiting for players...",
-    "ready": "ready",
-    "scoreboard": "Scoreboard",
-    "rules": "Rules",
-    "spectator": "Spectator"
+    "yourHand": "Your Hand",
+    "waiting": "Waiting...",
+    "spectator": "Spectator",
+    "wonTrick": "{{player}} won the trick!",
+    "biddingPhase": "Bidding Phase",
+    "playingPhase": "Playing Phase"
   },
-  "results": {
-    "title": "Game Over!",
-    "finalScores": "Final Scores",
-    "rank": "#",
-    "player": "Player",
-    "score": "Score",
-    "playAgain": "Play Again",
-    "youWon": "You Won!",
-    "wins": "Wins!"
+  "bidding": {
+    "title": "Make Your Bid",
+    "question": "How many tricks will you win?",
+    "confirm": "Confirm Bid",
+    "trick": "trick",
+    "tricks": "tricks"
   },
-  "log": {
-    "playerJoined": "{username} joined the game",
-    "playerLeft": "{username} left the game",
-    "spectatorJoined": "{username} is now watching ({count} spectators)",
-    "spectatorLeft": "A spectator left ({count} spectators)",
-    "gameStarted": "Game started with {count} players",
-    "cardsDealt": "Round {round} - Cards dealt",
-    "playerBid": "{player} bid {bid}",
-    "biddingComplete": "All bids placed - playing begins",
-    "trickWon": "{winner} won the trick",
-    "roundComplete": "Round {round} complete",
-    "gameWon": "{winner} won the game!",
-    "abilityResolved": "{ability} ability resolved",
-    "abilityTriggered": "{pirate}'s ability triggered!",
-    "playerReady": "{player} is ready to continue"
+  "tigress": {
+    "title": "Scary Mary",
+    "question": "Play as Pirate or Escape?",
+    "pirate": "Pirate",
+    "pirateDesc": "Win tricks, beats suits",
+    "escape": "Escape",
+    "escapeDesc": "Lose on purpose"
   },
   "ability": {
     "rosie": {
-      "name": "Rosie",
       "title": "Rosie's Ability",
       "description": "Choose who will start the next trick:"
     },
     "bendt": {
-      "name": "Bendt the Bandit",
       "title": "Bendt's Ability",
       "description": "You drew 2 cards. Select 2 cards to discard:",
       "drawnCards": "Drawn cards:",
       "yourHand": "Your hand:",
-      "confirmDiscard": "Confirm Discard"
+      "discard": "Discard Cards",
+      "skip": "Skip"
     },
     "roatan": {
-      "name": "Roatan",
       "title": "Roatán's Ability",
       "description": "Declare an extra bet for bonus points:",
-      "noBet": "No Bet",
-      "hint": "If you win this trick and make your bid, you get the bonus. Otherwise, lose the points!"
+      "noBet": "No Bet"
     },
     "jade": {
-      "name": "Jade",
       "title": "Jade's Ability",
       "description": "Cards remaining in the deck:",
       "gotIt": "Got it!"
     },
     "harry": {
-      "name": "Harry the Giant",
       "title": "Harry's Ability",
       "description": "Adjust your bid by +1 or -1:",
-      "noChange": "No change",
       "decrease": "-1",
-      "increase": "+1",
       "keep": "Keep",
-      "newBid": "Bid"
+      "increase": "+1"
     },
-    "newCard": "NEW",
-    "selected": "Selected",
-    "skip": "Skip (auto-discard)",
-    "discard": "Discard Cards",
-    "noBet": "No Bet",
-    "unknown": {
-      "title": "Pirate Ability",
-      "description": "Unknown ability type"
-    }
+    "newCard": "NEW"
   },
-  "common": {
-    "confirm": "Confirm",
-    "close": "Close",
-    "cancel": "Cancel",
-    "continue": "Continue"
-  },
-  "scoreboard": {
-    "title": "Scoreboard",
-    "player": "Player",
-    "score": "Score",
-    "bid": "Bid",
-    "tricks": "Tricks"
-  },
-  "continue": {
-    "title": "Trick Complete",
-    "message": "Ready to continue?",
-    "button": "Continue",
-    "waiting": "Waiting for other players..."
-  },
-  "rules": {
-    "advancedTitle": "Advanced Rules"
-  },
-  "modal": {
-    "tapToDismiss": "Tap outside to close"
+  "results": {
+    "title": "Game Over!",
+    "winner": "{{player}} Wins!",
+    "youWon": "You Won!",
+    "finalScores": "Final Scores",
+    "playAgain": "Play Again"
   },
   "settings": {
     "title": "Settings",
@@ -215,38 +115,19 @@
     "sound": "Sound",
     "vibration": "Vibration",
     "on": "On",
-    "off": "Off",
-    "version": "v{{version}}"
+    "off": "Off"
+  },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "continue": "Continue"
   },
   "error": {
-    "gameAlreadyStarted": "Game already started",
-    "notEnoughPlayers": "Not enough players",
-    "notInBiddingPhase": "Not in bidding phase",
-    "notInPickingPhase": "Not in picking phase",
-    "noActiveTrick": "No active trick",
-    "noActiveRound": "No active round",
-    "playerNotFound": "Player not found",
     "notYourTurn": "Not your turn",
-    "alreadyPlacedBid": "Already placed bid",
-    "alreadyPlayed": "Already played in this trick",
-    "missingBidValue": "Missing bid value",
-    "bidMustBeNumber": "Bid must be a number",
-    "invalidBid": "Invalid bid value",
     "invalidCard": "Invalid card",
-    "cardNotInHand": "Card not in hand",
-    "tigressRequiresChoice": "Scary Mary requires choice: pirate or escape",
-    "mustFollowSuit": "Must follow suit if you have cards of that suit",
-    "noPendingAbility": "No pending ability",
-    "unknownAbility": "Unknown ability type",
-    "cannotAddBotAfterStart": "Cannot add bot after game started",
-    "gameIsFull": "Game is full",
-    "cannotRemoveBotAfterStart": "Cannot remove bot after game started",
-    "missingBotId": "Missing bot ID",
-    "botNotFound": "Bot not found",
-    "invalidPlayerChosen": "Invalid player chosen",
-    "cannotResolveAbility": "Cannot resolve ability",
-    "invalidCardIds": "Invalid card selection",
-    "invalidBetAmount": "Invalid bet amount",
-    "invalidModifier": "Invalid modifier"
+    "mustFollowSuit": "Must follow suit",
+    "connectionFailed": "Connection failed",
+    "gameNotFound": "Game not found"
   }
 }

@@ -1,10 +1,10 @@
-export { Button } from './Button';
-export { Input } from './Input';
 export { Card } from './Card';
 export { Hand } from './Hand';
 export { TrickArea } from './TrickArea';
 export { Scoreboard } from './Scoreboard';
+export { Modal } from './Modal';
 export { BiddingModal } from './BiddingModal';
 export { TigressModal } from './TigressModal';
 export { AbilityModal } from './AbilityModal';
-export { SettingsButton } from './SettingsButton';
+export { Button } from './Button';
+export { SettingsButton } from './Settings';
