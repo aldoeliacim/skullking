@@ -159,57 +159,100 @@ export const borderRadius = {
 } as const;
 
 // Shadows - Deep ocean shadows with golden accent glows
+// Use boxShadow for web, native shadow props for mobile
 export const shadows = {
-  sm: {
-    shadowColor: '#060e18',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  md: {
-    shadowColor: '#060e18',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  lg: {
-    shadowColor: '#060e18',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  xl: {
-    shadowColor: '#060e18',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.7,
-    shadowRadius: 20,
-    elevation: 16,
-  },
-  glow: (color: string) => ({
-    shadowColor: color,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 16,
-    elevation: 12,
+  sm: Platform.select({
+    web: { boxShadow: '0 1px 2px rgba(6, 14, 24, 0.4)' },
+    default: {
+      shadowColor: '#060e18',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.4,
+      shadowRadius: 2,
+      elevation: 2,
+    },
   }),
-  goldGlow: {
-    shadowColor: '#d4a84b',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  tealGlow: {
-    shadowColor: '#2d8a8a',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-} as const;
+  md: Platform.select({
+    web: { boxShadow: '0 3px 6px rgba(6, 14, 24, 0.5)' },
+    default: {
+      shadowColor: '#060e18',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.5,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+  }),
+  lg: Platform.select({
+    web: { boxShadow: '0 6px 12px rgba(6, 14, 24, 0.6)' },
+    default: {
+      shadowColor: '#060e18',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.6,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  }),
+  xl: Platform.select({
+    web: { boxShadow: '0 10px 20px rgba(6, 14, 24, 0.7)' },
+    default: {
+      shadowColor: '#060e18',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.7,
+      shadowRadius: 20,
+      elevation: 16,
+    },
+  }),
+  glow: (color: string) =>
+    Platform.select({
+      web: { boxShadow: `0 0 16px ${color}b3` },
+      default: {
+        shadowColor: color,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.7,
+        shadowRadius: 16,
+        elevation: 12,
+      },
+    }),
+  goldGlow: Platform.select({
+    web: { boxShadow: '0 0 12px rgba(212, 168, 75, 0.5)' },
+    default: {
+      shadowColor: '#d4a84b',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  }),
+  tealGlow: Platform.select({
+    web: { boxShadow: '0 0 12px rgba(45, 138, 138, 0.5)' },
+    default: {
+      shadowColor: '#2d8a8a',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  }),
+};
+
+// Text shadows - Use textShadow for web, native props for mobile
+export const textShadows = {
+  sm: Platform.select({
+    web: { textShadow: '1px 1px 2px rgba(0, 0, 0, 0.4)' },
+    default: {
+      textShadowColor: 'rgba(0, 0, 0, 0.4)',
+      textShadowOffset: { width: 1, height: 1 },
+      textShadowRadius: 2,
+    },
+  }),
+  md: Platform.select({
+    web: { textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)' },
+    default: {
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 2, height: 2 },
+      textShadowRadius: 4,
+    },
+  }),
+};
 
 // Animation durations
 export const animation = {
@@ -256,6 +299,7 @@ export const theme = {
   spacing,
   borderRadius,
   shadows,
+  textShadows,
   animation,
   zIndex,
   cardDimensions,

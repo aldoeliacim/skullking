@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import type { Card as CardType, TrickCard } from '../stores/gameStore';
 import { cardDimensions, colors, screen, spacing, typography } from '../styles/theme';
@@ -137,13 +137,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     minHeight: cardDimensions.height + spacing.md,
   },
-  cardWrapper: {
-    // Shadow for stacking effect
-    shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
+  cardWrapper: Platform.select({
+    web: { boxShadow: '-2px 0 4px rgba(0, 0, 0, 0.2)' },
+    default: {
+      shadowColor: '#000',
+      shadowOffset: { width: -2, height: 0 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    },
+  }),
   emptyHand: {
     height: cardDimensions.height,
     justifyContent: 'center',
