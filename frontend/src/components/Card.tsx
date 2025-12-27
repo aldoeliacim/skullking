@@ -7,11 +7,12 @@ import Animated, {
   interpolate,
   runOnJS,
 } from 'react-native-reanimated';
+import { API_BASE_URL } from '../services/api';
 import type { Card as CardType } from '../stores/gameStore';
 import { borderRadius, cardDimensions, colors, shadows, typography } from '../styles/theme';
 
-// Base URL for card images
-const CARD_IMAGE_BASE_URL = '/static/images/cards/';
+// Base URL for card images (served by backend)
+const CARD_IMAGE_BASE_URL = `${API_BASE_URL}/static/images/cards/`;
 
 interface CardProps {
   card: CardType;
