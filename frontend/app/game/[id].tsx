@@ -81,10 +81,20 @@ export default function GameScreen(): React.JSX.Element {
 
     // Only connect if not already connected
     if (connectionState === 'disconnected') {
-      const playerIdToUse =
-        params.playerId || (isSpectatorMode ? `spectator_${Date.now()}` : `player_${Date.now()}`);
-      const playerNameToUse = params.playerName || 'Player';
-      connect(gameCode, playerIdToUse, playerNameToUse, isSpectatorMode);
+      // First try to load saved session (for reconnection after refresh/background)
+      sessionStorage.loadSession().then((session) => {
+        // Use session if it exists and matches this game
+        if (session && session.gameId === gameCode) {
+          connect(session.gameId, session.playerId, session.playerName, session.isSpectator);
+        } else {
+          // No saved session - use params or generate new ID
+          const playerIdToUse =
+            params.playerId ||
+            (isSpectatorMode ? `spectator_${Date.now()}` : `player_${Date.now()}`);
+          const playerNameToUse = params.playerName || 'Player';
+          connect(gameCode, playerIdToUse, playerNameToUse, isSpectatorMode);
+        }
+      });
     }
 
     // Don't disconnect on cleanup - the game may still be in progress
