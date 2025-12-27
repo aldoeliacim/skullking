@@ -117,16 +117,31 @@ export function AbilityModal({
   };
 
   const renderDrawDiscard = (): React.JSX.Element => {
+    // Use full hand if available, otherwise fall back to drawn cards
+    const handCards = (data?.hand as number[]) || [];
     const drawnCards = (data?.drawn_cards as number[]) || [];
     const mustDiscard = (data?.must_discard as number) || 2;
-    const parsedCards: CardType[] = drawnCards.map((id) => parseCard(id));
+
+    // Show full hand - player can choose ANY cards to discard
+    const cardsToShow = handCards.length > 0 ? handCards : drawnCards;
+    const parsedCards: CardType[] = cardsToShow.map((id) => parseCard(id));
+    const drawnCardIds = new Set(drawnCards.map(String));
+
+    const handleSkip = (): void => {
+      // Skip by discarding the drawn cards (auto-select them)
+      onResolve({ discarded_cards: drawnCards.slice(0, mustDiscard).map(String) });
+      setSelectedCards([]);
+    };
 
     return (
       <>
         <Text style={styles.emoji}>🃏</Text>
         <Text style={styles.title}>{t('ability.bendt.title', "Bendt's Ability")}</Text>
         <Text style={styles.subtitle}>
-          {t('ability.bendt.description', `Select ${mustDiscard} cards to discard:`)}
+          {t(
+            'ability.bendt.description',
+            `You drew ${drawnCards.length} cards. Select ${mustDiscard} cards from your hand to discard:`,
+          )}
         </Text>
         <ScrollView
           horizontal
@@ -134,36 +149,46 @@ export function AbilityModal({
           contentContainerStyle={styles.cardsContainer}
         >
           {parsedCards.map((card) => (
-            <Card
-              key={card.id}
-              card={card}
-              size="medium"
-              selected={selectedCards.includes(card.id)}
-              onPress={() => handleCardSelect(card.id)}
-            />
+            <View key={card.id} style={styles.cardWrapper}>
+              <Card
+                card={card}
+                size="medium"
+                selected={selectedCards.includes(card.id)}
+                onPress={() => handleCardSelect(card.id)}
+              />
+              {drawnCardIds.has(card.id) && <Text style={styles.newCardBadge}>NEW</Text>}
+            </View>
           ))}
         </ScrollView>
         <Text style={styles.selectionInfo}>
           {t('ability.selected', 'Selected')}: {selectedCards.length}/{mustDiscard}
         </Text>
-        <Pressable
-          onPress={handleConfirmDiscard}
-          disabled={selectedCards.length !== mustDiscard}
-          style={({ pressed }) => [
-            styles.confirmButton,
-            selectedCards.length !== mustDiscard && styles.confirmButtonDisabled,
-            pressed && styles.confirmButtonPressed,
-          ]}
-        >
-          <Text
-            style={[
-              styles.confirmButtonText,
-              selectedCards.length !== mustDiscard && styles.confirmButtonTextDisabled,
+        <View style={styles.buttonRow}>
+          <Pressable
+            onPress={handleSkip}
+            style={({ pressed }) => [styles.skipButton, pressed && styles.skipButtonPressed]}
+          >
+            <Text style={styles.skipButtonText}>{t('ability.skip', 'Skip (auto-discard)')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleConfirmDiscard}
+            disabled={selectedCards.length !== mustDiscard}
+            style={({ pressed }) => [
+              styles.confirmButton,
+              selectedCards.length !== mustDiscard && styles.confirmButtonDisabled,
+              pressed && styles.confirmButtonPressed,
             ]}
           >
-            {t('ability.discard', 'Discard Cards')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.confirmButtonText,
+                selectedCards.length !== mustDiscard && styles.confirmButtonTextDisabled,
+              ]}
+            >
+              {t('ability.discard', 'Discard Cards')}
+            </Text>
+          </Pressable>
+        </View>
       </>
     );
   };
@@ -509,6 +534,45 @@ const styles = StyleSheet.create({
   },
   confirmButtonTextDisabled: {
     color: colors.textDark,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  skipButton: {
+    backgroundColor: colors.surfaceLight,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  skipButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.8,
+  },
+  skipButtonText: {
+    fontSize: typography.fontSize.base,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  cardWrapper: {
+    position: 'relative',
+  },
+  newCardBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: colors.success,
+    color: colors.text,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
   },
 });
 

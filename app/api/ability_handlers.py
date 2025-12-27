@@ -217,8 +217,22 @@ class AbilityHandlers:
             await self._send_error(game.id, player_id, "No active round")
             return
 
-        # Jade is auto-resolved, but player can acknowledge
+        # Get the pending ability
+        ability = current_round.ability_state.get_pending_ability(player_id)
+        if not ability or ability.ability_type != AbilityType.VIEW_DECK:
+            await self._send_error(game.id, player_id, "No pending Jade ability")
+            return
+
+        # Resolve and continue game
+        if not current_round.ability_state.resolve_jade(player_id):
+            await self._send_error(game.id, player_id, "Cannot resolve Jade ability")
+            return
+
         logger.info("Player %s acknowledged deck view (Jade)", player_id)
+
+        trick = current_round.tricks[-1] if current_round.tricks else None
+        if trick:
+            await self._ability_resolved(game, current_round, ability, trick)
 
     async def handle_resolve_harry(
         self, game: "Game", player_id: str, content: dict[str, Any]

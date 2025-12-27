@@ -373,14 +373,22 @@ function handleAbilityTriggered(
   set: SetState,
   get: GetState,
 ): void {
-  set({
+  const updates: Partial<GameState> = {
     showAbility: !get().isSpectator,
     abilityData: {
       type: content.ability_type as string,
-      pirate: content.pirate as string,
+      pirate: content.pirate_type as string,
       data: content as Record<string, unknown>,
     },
-  });
+  };
+
+  // For Bendt's ability, sync the updated hand (includes drawn cards)
+  if (content.ability_type === 'draw_discard' && content.hand) {
+    const handIds = content.hand as number[];
+    updates.hand = handIds.map((id) => parseCard(id));
+  }
+
+  set(updates);
 }
 
 /**

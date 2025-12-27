@@ -112,6 +112,8 @@ class GameHandler:
             "SYNC_STATE": self._handle_sync_state,
             "ADD_BOT": self._handle_add_bot,
             "REMOVE_BOT": self._handle_remove_bot,
+            # Generic ability resolver (routes to specific handler)
+            "RESOLVE_ABILITY": self._handle_resolve_ability,
             # Pirate ability handlers (delegated to AbilityHandlers)
             "RESOLVE_ROSIE": self.ability_handlers.handle_resolve_rosie,
             "RESOLVE_BENDT": self.ability_handlers.handle_resolve_bendt,
@@ -758,14 +760,16 @@ class GameHandler:
             player = game.get_player(ability.player_id)
             if player:
                 player.hand.extend(drawn_cards)
-            await self._send_ability_prompt(
-                game,
-                ability,
-                {
-                    "drawn_cards": [c.value for c in drawn_cards],
-                    "must_discard": min(2, len(drawn_cards)),
-                },
-            )
+                # Send full hand so player can choose any 2 cards to discard
+                await self._send_ability_prompt(
+                    game,
+                    ability,
+                    {
+                        "drawn_cards": [c.value for c in drawn_cards],
+                        "hand": [c.value for c in player.hand],
+                        "must_discard": min(2, len(drawn_cards)),
+                    },
+                )
 
     async def _handle_roatan_ability(
         self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
@@ -782,20 +786,18 @@ class GameHandler:
     ) -> None:
         """Handle Jade's view deck ability."""
         undealt = self._get_undealt_cards(game)
-        current_round.ability_state.resolve_jade(ability.player_id)
 
-        if not self._is_bot_player(game, ability.player_id):
-            await self.manager.send_personal_message(
-                ServerMessage(
-                    command=Command.SHOW_DECK,
-                    game_id=game.id,
-                    content={"undealt_cards": [c.value for c in undealt]},
-                ),
-                game.id,
-                ability.player_id,
+        if self._is_bot_player(game, ability.player_id):
+            # Bot doesn't need to see cards, just resolve
+            current_round.ability_state.resolve_jade(ability.player_id)
+            await self._ability_resolved(game, current_round, ability, trick)
+        else:
+            # Human player - show the undealt cards via ABILITY_TRIGGERED
+            await self._send_ability_prompt(
+                game,
+                ability,
+                {"undealt_cards": [c.value for c in undealt]},
             )
-
-        await self._ability_resolved(game, current_round, ability, trick)
 
     async def _handle_ability_trigger(
         self, game: Game, current_round: "Round", ability: PendingAbility, trick: Trick
@@ -1025,6 +1027,84 @@ class GameHandler:
             game_id,
             player_id,
         )
+
+    async def _handle_resolve_ability(
+        self, game: Game, player_id: str, content: dict[str, Any]
+    ) -> None:
+        """Handle generic RESOLVE_ABILITY command - routes to specific handler.
+
+        Frontend sends RESOLVE_ABILITY; we inspect the pending ability
+        and delegate to the appropriate specific handler.
+        """
+        current_round = game.get_current_round()
+        if not current_round:
+            await self._send_error(game.id, player_id, "No active round")
+            return
+
+        ability = current_round.ability_state.get_pending_ability(player_id)
+
+        # Also check for armed Harry (handled differently)
+        if not ability and current_round.ability_state.has_armed_harry(player_id):
+            # Harry's ability at end of round
+            modifier = content.get("new_bid")
+            if modifier is not None:
+                # Frontend sends new_bid, we need to convert to modifier
+                current_bid = 0
+                player = game.get_player(player_id)
+                if player and player.bid is not None:
+                    current_bid = player.bid
+                # Convert absolute bid to modifier
+                actual_modifier = modifier - current_bid if modifier != current_bid else 0
+                # Clamp to valid range
+                actual_modifier = max(-1, min(1, actual_modifier))
+                content["modifier"] = actual_modifier
+            await self.ability_handlers.handle_resolve_harry(game, player_id, content)
+            return
+
+        if not ability:
+            await self._send_error(game.id, player_id, "No pending ability")
+            return
+
+        # Route to specific handler based on ability type
+        handlers = {
+            AbilityType.CHOOSE_STARTER: self.ability_handlers.handle_resolve_rosie,
+            AbilityType.DRAW_DISCARD: self.ability_handlers.handle_resolve_bendt,
+            AbilityType.EXTRA_BET: self.ability_handlers.handle_resolve_roatan,
+            AbilityType.VIEW_DECK: self.ability_handlers.handle_resolve_jade,
+            AbilityType.MODIFY_BID: self.ability_handlers.handle_resolve_harry,
+        }
+
+        handler = handlers.get(ability.ability_type)
+        if handler:
+            # Transform content to match specific handler expectations
+            transformed = self._transform_ability_content(ability.ability_type, content)
+            await handler(game, player_id, transformed)
+        else:
+            await self._send_error(game.id, player_id, "Unknown ability type")
+
+    def _transform_ability_content(
+        self, ability_type: AbilityType, content: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Transform frontend ability content to backend expected format."""
+        # Rosie: selected_player_id -> chosen_player_id
+        if ability_type == AbilityType.CHOOSE_STARTER and "selected_player_id" in content:
+            content["chosen_player_id"] = content["selected_player_id"]
+
+        # Bendt: discarded_cards (strings) -> discard_cards (ints)
+        if ability_type == AbilityType.DRAW_DISCARD and "discarded_cards" in content:
+            content["discard_cards"] = [int(c) for c in content["discarded_cards"]]
+
+        # Roatan: Uses extra_bet directly (already correct)
+
+        # Harry: new_bid -> modifier
+        if (
+            ability_type == AbilityType.MODIFY_BID
+            and "new_bid" in content
+            and "modifier" not in content
+        ):
+            content["modifier"] = content["new_bid"]
+
+        return content
 
     async def _handle_sync_state(
         self, game: Game, player_id: str, _content: dict[str, Any]
